@@ -30,6 +30,68 @@ Schritt 1 der Android-Angleichung an iOS Build 60 (nur lesend, nichts ausgenomme
 - **RevenueCat**: `eas.json` setzt nur `EXPO_PUBLIC_REVENUECAT_IOS_KEY`; `lib/purchases.ts` liest auch `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`. In der EAS-Production-Umgebung prüfen.
 - Die iOS-Prüfung gegen denselben Kandidaten zeigt ebenfalls offene Zeilen (u. a. „Abo: erneuter Kauf …“, „App-Start: Startlogo …“), siehe Abschnitte 2 und 4.
 
+## Prüfergebnis Abschnitt 2 (2026-11-12)
+
+Methode: Für jede OTA die hinzugefügten Zeilen (Diff gegen ihre Basis) und die neu eingeführten Bezeichner/Texte im Kandidaten gesucht, Rest von Hand angesehen. Nur lesend, keine Geräteprüfung. „Zeilen“ = gefundene/hinzugefügte Zeilen ab 25 Zeichen.
+
+### A. Inhaltlich enthalten – Empfehlung: ausnehmen mit Begründung „inhaltlich in Build-60-Basis enthalten“ (10)
+
+| Gruppe | OTA | Befund |
+|---|---|---|
+| `24fcdd3e` | Abo: erneuter Kauf, sichere Wiederherstellung | alle 45 Ergänzungen vorhanden; nur nicht mehr genutzte Importe in `premium.tsx` nicht entfernt |
+| `98d81197` | P1 Linienglättung | Logik vorhanden, nur 2 Kommentarzeilen fehlen |
+| `0c80972b` | Gesundheitsakte: Speicherung und Gaben-Historie | alle Ergänzungen vorhanden |
+| `92fb3b6e` | Dezentes Bedienfeedback | vollständig vorhanden |
+| `4c44785c` | Geteilte Hunde: Gesundheitsdaten lesend | 115/116 Zeilen |
+| `91021808` | Gemeinsam trainieren: Standortfreigabe | 297/300 Zeilen |
+| `2dde9e07` | Bedienung: flexible Texte, Felder, Kalender | `KeyboardAwareScrollView` in anderer Form vorhanden (27 Verwendungen) |
+| `f43a7b44` | Hundedashboard: Hinweise und Termine | 43/46 Zeilen; Löschaktion im `EventActionsSheet` anders eingebunden |
+| `283b31ad` | Fährtenkarte: Lege-/Suchspur unterscheiden | Farbschema vorhanden, Suchspur-Linie anders gezeichnet → auf dem Android-Gerät ansehen |
+| `4d3845d7` | Kalender: eigene Termine sicher löschen | vorhanden bis auf die Widget-Aktualisierung → hängt an Punkt E |
+
+### B. In Build 60 anders gelöst (Trainingsdoku neu T-184 bzw. Build-58-Fährtenbasis) – Empfehlung: ausnehmen mit Verweis (6)
+
+| Gruppe | OTA | Befund |
+|---|---|---|
+| `b60775e0` | Trainingsjournal: Vorbereiten – Beobachten – Nächstes Mal (3 Schritte) | Schritt-Ablauf fehlt, Build 60 hat die neue Trainingsdoku (T-184) |
+| `2cfd0175` | Übungsauswahl: eine Auswahl, Varianten-Identität | 76/81 Zeilen; Auswahl in T-184 neu gebaut |
+| `197688a1` | Journal und Vorbereitung | Verlaufs-/Notizanzeige in T-184 neu gebaut |
+| `89625848` | Trainingshistorie vor Übernahme frisch prüfen | 0/67 Zeilen; auf iOS ausgenommen (#39) |
+| `6aa534dd` | GPS-Start abgesichert; Trainingsvorlagen | 21/205 Zeilen; auf iOS ausgenommen (#38: GPS durch Build-58-Basis, Vorlagen in T-184) |
+| `79568808` | Joker- und Gummimaterial | Bewertungsschutz vorhanden (`isScoredObject`, `legacyJokerAnalysis`); fehlt nur die Android-Detektor-Geometrie in `useTrackRecorder` (Build-58-Fährtenbasis) |
+
+Kundendaten: Build 49 speichert Entwürfe mit `workflowStep`. Vor dem Release auf dem Gerät prüfen, dass solche Entwürfe und vorhandene Trainingseinträge in Build 60 laden, bearbeitet und gespeichert werden können.
+
+### C. Diagnose/Entwicklerwerkzeuge – Empfehlung: ausnehmen wie iOS (2)
+
+| Gruppe | OTA | Befund |
+|---|---|---|
+| `6f50426f` | QA-Diagnose: Sollwinkel-Zeitmarkierungen | 43/46 Zeilen, nur Export-Schema-Erweiterung fehlt |
+| `845881b1` | TrackLab Diagnose: Aufnahme-/Exportstand | Herkunftsangabe im Support-Export (`withSupportProvenance`) fehlt |
+
+### D. Auf iOS bewusst nicht übernommen – auf Android heute bei Kundinnen und Kunden (Entscheidung der Nutzerin) (4)
+
+Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Store. Gleich wie iOS entscheiden heisst: Android-Nutzer:innen verlieren sie beim Update auf Build 60.
+
+| Gruppe | OTA | Befund | iOS-Entscheid |
+|---|---|---|---|
+| `a7ec4e94` | Build 47: Teilen- und Gruppen-Hub, Erste Schritte, Hilfe | 51/867 Zeilen; Hilfe-Center, Erste-Schritte-Tour und `/track/sharing` fehlen | #32 nicht übernommen |
+| `1a3e0055` | Planlinie und Läufigkeit | Läufigkeit weitgehend vorhanden (69/77 Bezeichner); Planlinie beim Legen (`LayPlanControl`, `useLayPlan`) fehlt | #46/#48 nicht übernommen |
+| `51e3a51a` | Fährtenansicht: sichere Planauswahl | 0/21 Zeilen (hängt an der Planlinie) | #49 nicht übernommen |
+| `220ac7ff` | Fährtenkarte: Übersicht, Kartentypwechsel, Richtungsmarker | 3/64 Zeilen; Umschalter Strasse/Satellit fehlt | #54 nicht übernommen |
+
+### E. Fehlt echt – Empfehlung: nachziehen bzw. prüfen (2) und native Funde
+
+| Gruppe | OTA | Befund |
+|---|---|---|
+| `17aabc80` | App-Start: Startlogo ohne Tippen ausblenden | `useDismissStartupSplash` fehlt, auch auf iOS nicht entschieden. Auf dem Android-Gerät prüfen, ob das Startlogo hängen bleibt; wenn ja nachziehen |
+| `e9cde79c` | Fährtenkarte: kompakte Sammelmarker | 7/11 Zeilen; Zahl-Badge an Sammelmarkern anders umgesetzt → auf dem Android-Gerät ansehen |
+
+**Native Teile von Build 49, die in der Build-60-Basis fehlen** (kein OTA-Thema, aber für den Android-Build entscheidend):
+
+- **`modules/anyvo-daily-widget`**: Android-Startbildschirm-Widget „Heute“ (`app/widgets/today.tsx`, `features/widgets/*`). Fehlt komplett. Ohne Nachziehen verschwindet das Widget bei Nutzer:innen, die es eingerichtet haben.
+- **`modules/anyvo-greeting-audio`**: Android-eigene Wiedergabe des Begrüssungstons. Build 60 spielt den Ton über `features/home/useGreetingSound.ts`; ob das auf Android gleich funktioniert (Audiofokus, Lautlos), auf dem Gerät prüfen.
+
 ## 1. Bestätigt fehlend – Android-eigene Änderungen (inhaltlich geprüft) (2)
 
 Im Kandidaten fehlt der Code nachweislich. Empfehlung: **nachziehen**, vor dem nativen Android-Build.
