@@ -1,5 +1,20 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA aus main – 2026-11-12 (Abend)
+
+Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus
+EAS nachkontrolliert. Ersetzt für iOS 60 die Angabe «Aktiv» im Abschnitt darunter.
+- **Aktiv:** Source `2e0e2d10` (main `d505250f` gemergt in `96e7f661` plus 7 Lint-Kommentarzeilen),
+  Group `79a9f554-be6b-4964-99fc-53deb53c7b89`. Release-Karte Issue #87: Kontakte (#63),
+  Gruppentraining Stufe 1 (#83), Einführung, aktiver Hund, Training-Tab, 90-Tage-Trend, PDF-Bericht.
+  Gerätetest offen (Testweg Vorher).
+- **Release-Quelle:** `release/ios60-production-2e0e2d10-20261112`.
+- **Jede weitere iOS-60-OTA muss `2e0e2d10` enthalten.** `main` enthält ihn noch nicht
+  (die Fährten-Fixes `e253a552`/`96e7f661` fehlen in main); vor der nächsten OTA aus main
+  den Release-Branch nach main mergen oder wieder eine Release-Quelle aus main plus `2e0e2d10` bauen.
+- **Board:** Feld «Ziel» durch Einzelauswahl «Release-Ziel» ersetzt (auch Kombi-Werte); alle OTA-Karten gesetzt.
+- iOS 57 und Android unverändert.
+
 ## Stand iOS 60 nach drei OTAs – 2026-11-12
 
 Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus
