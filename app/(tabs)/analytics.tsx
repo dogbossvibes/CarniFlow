@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
+import { useActiveDog } from '@/hooks/useActiveDog';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSession } from '@/hooks/useSession';
 import { scoreLabel } from '@/services/analytics/scoring';
@@ -35,16 +36,16 @@ export default function AnalyticsScreen() {
   const { t }                  = useT();
   const { session }            = useSession();
   const { dogs }               = useDogs();
-  const [dogIdx,   setDogIdx]  = useState(0);
   const [period,   setPeriod]  = useState<7 | 30 | 90>(30);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOverride, setAiOverride] = useState<TrainingAnalysis | null>(null);
   const { width }              = useWindowDimensions();
   const router                 = useRouter();
 
-  const selectedDog = dogs[dogIdx] ?? null;
+  // Aktiver Hund gilt app-weit (stores/activeDog.ts); die Chips schalten ihn um.
+  const { activeDog: selectedDog, setActiveDog } = useActiveDog(dogs);
   const {
-    latestScore, latestAnalysis, trend7, trend30,
+    latestScore, latestAnalysis, trend7, trend30, trend90,
     trendPoints, recommendations, loading, refresh,
   } = useAnalytics(selectedDog?.id ?? null);
 
@@ -96,7 +97,11 @@ export default function AnalyticsScreen() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setAiOverride(null); }, [selectedDog?.id]);
 
-  const activeTrend = period === 7 ? trend7 : trend30;
+  // Jeder Zeitraum hat seinen eigenen Trend (90T zeigte früher den 30-Tage-Wert).
+  const activeTrend = period === 7 ? trend7 : period === 30 ? trend30 : trend90;
+  // Noch keine bewertete Einheit: neutrale Einladung statt „0 / 0% / 0%" —
+  // Nullen lesen sich wie eine schlechte Bewertung.
+  const hasAnalysis = !!latestScore || !!coach;
 
   const trendIcon = activeTrend.direction === 'up'
     ? 'trending-up' : activeTrend.direction === 'down'
@@ -154,20 +159,20 @@ export default function AnalyticsScreen() {
         {dogs.length > 1 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={s.dogScroll} contentContainerStyle={s.dogScrollContent}>
-            {dogs.map((d, i) => (
+            {dogs.map(d => (
               <TouchableOpacity
                 key={d.id}
-                style={[s.dogChip, i === dogIdx && s.dogChipActive]}
-                onPress={() => setDogIdx(i)}
+                style={[s.dogChip, d.id === selectedDog?.id && s.dogChipActive]}
+                onPress={() => setActiveDog(d.id)}
                 activeOpacity={0.75}
               >
-                {i === dogIdx && (
+                {d.id === selectedDog?.id && (
                   <LinearGradient
                     colors={['rgba(0,255,204,0.15)', 'rgba(0,255,204,0.05)']}
                     style={StyleSheet.absoluteFill}
                   />
                 )}
-                <Text style={[s.dogChipTxt, i === dogIdx && s.dogChipTxtActive]}>{d.name}</Text>
+                <Text style={[s.dogChipTxt, d.id === selectedDog?.id && s.dogChipTxtActive]}>{d.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -221,59 +226,84 @@ export default function AnalyticsScreen() {
           </TouchableOpacity>
 
           {/* ── Hero Score Card ── */}
-          <View style={s.heroCard}>
-            <LinearGradient
-              colors={['#0F0F1A', '#111118']}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={s.heroInner}>
-              <View style={s.ringWrap}>
-                <ScoreRing
-                  score={latestScore?.gesamtscore ?? 0}
-                  size={150}
-                  label={latestScore ? scoreLabel(latestScore.gesamtscore) : t('training.noData')}
-                />
-              </View>
+          {hasAnalysis && (
+            <View style={s.heroCard}>
+              <LinearGradient
+                colors={['#0F0F1A', '#111118']}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={s.heroInner}>
+                <View style={s.ringWrap}>
+                  <ScoreRing
+                    score={latestScore?.gesamtscore ?? 0}
+                    size={150}
+                    label={latestScore ? scoreLabel(latestScore.gesamtscore) : t('training.noData')}
+                  />
+                </View>
 
-              <View style={s.heroStats}>
-                {/* Trend */}
-                <View style={s.statItem}>
-                  <View style={s.statIconRow}>
-                    <Ionicons name={trendIcon} size={14} color={trendColor} />
-                    <Text style={[s.statValue, { color: trendColor }]}>
-                      {activeTrend.deltaPct > 0 ? `+${activeTrend.deltaPct}%` : `${activeTrend.deltaPct}%`}
+                <View style={s.heroStats}>
+                  {/* Trend */}
+                  <View style={s.statItem}>
+                    <View style={s.statIconRow}>
+                      <Ionicons name={trendIcon} size={14} color={trendColor} />
+                      <Text style={[s.statValue, { color: trendColor }]}>
+                        {activeTrend.deltaPct > 0 ? `+${activeTrend.deltaPct}%` : `${activeTrend.deltaPct}%`}
+                      </Text>
+                    </View>
+                    <Text style={s.statLabel}>{t('analyse.trend')}</Text>
+                  </View>
+
+                  <View style={s.statDivider} />
+
+                  {/* Stabilität */}
+                  <View style={s.statItem}>
+                    <Text style={s.statValue}>{activeTrend.stabilität}%</Text>
+                    <Text style={s.statLabel}>{t('analyse.stability')}</Text>
+                  </View>
+
+                  <View style={s.statDivider} />
+
+                  {/* Sessions */}
+                  <View style={s.statItem}>
+                    <Text style={s.statValue}>{activeTrend.sessions}</Text>
+                    <Text style={s.statLabel}>{t('analyse.units')}</Text>
+                  </View>
+                </View>
+
+                {/* Avg score badge */}
+                {activeTrend.durchschnitt > 0 && (
+                  <View style={s.avgBadge}>
+                    <Text style={s.avgBadgeTxt}>
+                      {t('analyse.avgPointsPeriod', { points: activeTrend.durchschnitt })}
                     </Text>
                   </View>
-                  <Text style={s.statLabel}>{t('analyse.trend')}</Text>
-                </View>
-
-                <View style={s.statDivider} />
-
-                {/* Stabilität */}
-                <View style={s.statItem}>
-                  <Text style={s.statValue}>{activeTrend.stabilität}%</Text>
-                  <Text style={s.statLabel}>{t('analyse.stability')}</Text>
-                </View>
-
-                <View style={s.statDivider} />
-
-                {/* Sessions */}
-                <View style={s.statItem}>
-                  <Text style={s.statValue}>{activeTrend.sessions}</Text>
-                  <Text style={s.statLabel}>{t('analyse.units')}</Text>
-                </View>
+                )}
               </View>
-
-              {/* Avg score badge */}
-              {activeTrend.durchschnitt > 0 && (
-                <View style={s.avgBadge}>
-                  <Text style={s.avgBadgeTxt}>
-                    {t('analyse.avgPointsPeriod', { points: activeTrend.durchschnitt })}
-                  </Text>
-                </View>
-              )}
             </View>
-          </View>
+          )}
+
+          {/* ── Noch keine Auswertung: Einladung statt Nullwerten ── */}
+          {!hasAnalysis && !aiLoading && (
+            <View style={s.emptyCard}>
+              <View style={s.emptyIcon}>
+                <Ionicons name="analytics-outline" size={28} color={C.accent} />
+              </View>
+              <Text style={s.emptyTitle} accessibilityRole="header">
+                {selectedDog ? t('analyse.emptyTitleDog', { dog: selectedDog.name }) : t('analyse.emptyTitle')}
+              </Text>
+              <Text style={s.emptyText}>{t('analyse.emptyHint')}</Text>
+              <TouchableOpacity
+                style={s.emptyBtn}
+                onPress={() => router.push('/unit/document')}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('analyse.capture')}
+              >
+                <Ionicons name="create-outline" size={16} color={C.accentText} />
+                <Text style={s.emptyBtnTxt}>{t('analyse.capture')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* ── Smart Analyse Button (optionale serverseitige Anreicherung) ── */}
           {selectedDog && (
@@ -307,18 +337,6 @@ export default function AnalyticsScreen() {
 
           {/* ── Analyse-Ergebnis (regelbasiert; optional serverseitig angereichert) ── */}
           {coach && <AICoachCard analysis={coach} />}
-
-          {!coach && !loading && !aiLoading && (
-            <View style={s.emptyCard}>
-              <Ionicons name="analytics-outline" size={32} color={C.subtle} style={{ marginBottom: 10 }} />
-              <Text style={s.emptyTitle}>{t('analyse.emptyTitle')}</Text>
-              <Text style={s.emptyText}>{t('analyse.emptyText')}</Text>
-              <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/unit/document')} activeOpacity={0.8}>
-                <Ionicons name="create-outline" size={16} color={C.accentText} />
-                <Text style={s.emptyBtnTxt}>{t('analyse.capture')}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* ── Radar Chart ── */}
           {latestScore && latestScore.gesamtscore > 0 && (
@@ -453,8 +471,9 @@ const s = StyleSheet.create({
   hintText: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 19 },
 
   emptyCard:  { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 32, alignItems: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 15, color: C.white, fontWeight: '700', marginBottom: 8 },
-  emptyText:  { fontSize: 13, color: C.muted, textAlign: 'center', lineHeight: 19 },
+  emptyIcon:  { width: 56, height: 56, borderRadius: 18, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyTitle: { fontSize: 17, color: C.white, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
+  emptyText:  { fontSize: 14, color: '#A0A0A0', textAlign: 'center', lineHeight: 20 },
   emptyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.accent, borderRadius: 13, paddingHorizontal: 16, paddingVertical: 10, marginTop: 16 },
   emptyBtnTxt:{ fontSize: 14, fontWeight: '800', color: C.accentText },
 });

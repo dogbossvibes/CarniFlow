@@ -1,5 +1,6 @@
 import { HomeDayGreeting } from "@/components/home/HomeDayGreeting";
 import { DogCard } from "@/components/dogs/DogCard";
+import { ActiveDogSwitcher } from "@/components/dogs/ActiveDogSwitcher";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { UnitListCard } from "@/components/training/UnitListCard";
@@ -293,6 +294,8 @@ export default function HomeScreen() {
               username={homeProfile?.id === user?.id ? homeProfile?.username : null} />
             {/* Dezenter Anpassen-Button + Hilfe (Coachmark „home") */}
             <View style={s.heroBtnReihe}>
+              {/* Aktiver Hund (app-weit) — nur bei mehr als einem Hund sichtbar */}
+              <ActiveDogSwitcher dogs={dogs} />
               <HelpButton topicId="home" autoShow tint={C.white} style={s.heroIconBtn} />
               <TouchableOpacity
                 style={s.anpassenBtn}
