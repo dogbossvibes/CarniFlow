@@ -83,6 +83,8 @@ export interface TrackEndInput {
   geomDistanceM: number | null; // Distanz virtuelle Hundeposition → gespeicherter Endpunkt
   openMandatoryObjects: number; // noch nicht gefundene Pflicht-Gegenstände
   accuracyM?: number | null;
+  /** T-207: GPS-Genauigkeit des gelegten Endpunkts (m), falls bekannt. */
+  endPointAccuracyM?: number | null;
   lastSegmentReached?: boolean;
   approachSeen?: boolean;
   stableEndFixCount?: number;
@@ -107,8 +109,17 @@ export const DEFAULT_TRACK_END_OPTIONS: TrackEndOptions = {
   approachingRemainingM: 10,
 };
 
-export function endRadiusM(accuracyM: number | null | undefined): number {
-  return Math.min(3, Math.max(1.5, 0.5 * (accuracyM ?? 6)));
+/**
+ * Radius um den gelegten Endpunkt, in dem der Hundeführer «am Ende» gilt.
+ * T-207: Der Endpunkt stammt aus einer eigenen GPS-Aufzeichnung beim Legen. Ist dessen
+ * Genauigkeit bekannt, zählt die kombinierte Unsicherheit beider Aufzeichnungen
+ * (wie die Gegenstands-Toleranz aus T-196), gedeckelt bei 5 m. Ohne sie gilt die alte Formel.
+ */
+export function endRadiusM(accuracyM: number | null | undefined, endPointAccuracyM?: number | null): number {
+  const legacy = Math.min(3, Math.max(1.5, 0.5 * (accuracyM ?? 6)));
+  if (endPointAccuracyM == null || !Number.isFinite(endPointAccuracyM) || endPointAccuracyM <= 0) return legacy;
+  const combined = Math.hypot(accuracyM != null && Number.isFinite(accuracyM) && accuracyM > 0 ? accuracyM : 6, endPointAccuracyM);
+  return Math.max(legacy, Math.min(5, 1 + 0.5 * combined));
 }
 
 export function trackEndBlocker(input: TrackEndInput, options: TrackEndOptions = DEFAULT_TRACK_END_OPTIONS): string | null {
@@ -119,7 +130,7 @@ export function trackEndBlocker(input: TrackEndInput, options: TrackEndOptions =
   if (!input.lastSegmentReached && (input.handlerProgressM ?? 0) / input.trackLengthM < options.reachedProgressRatio)
     return 'handler_progress';
   const handlerDist = input.handlerDistanceToEndM ?? null;
-  if (handlerDist == null || handlerDist > endRadiusM(input.accuracyM)) return 'handler_distance';
+  if (handlerDist == null || handlerDist > endRadiusM(input.accuracyM, input.endPointAccuracyM)) return 'handler_distance';
   if (!input.approachSeen) return 'approach_history';
   if ((input.stableEndFixCount ?? 0) < 2 || (input.stableEndFixSpanMs ?? 0) < 800) return 'end_hysteresis';
   return null;

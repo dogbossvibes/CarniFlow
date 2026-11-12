@@ -1,11 +1,11 @@
 // Fährten-Simulator (T-192): schnelle Selbsttests für die Absuche (Hund, Hundeführer,
 // Gegenstände) und ein Kontrolllauf durch den echten Such-Recorder. Läuft immer mit.
 import './searchMocks';
-import { buildSearchGroup, renderReport, SEARCH_GROUPS, addSearchOutcome, type SearchCell } from './matrix';
+import { buildSearchGroup, emptySearchCell, renderReport, SEARCH_GROUPS, addSearchOutcome } from './matrix';
 import { makeRng } from './rng';
 import { runSearchScenario } from './searchScenario';
 import { buildSearchTruth, DEFAULT_HANDLER, DOGS } from './searchTruth';
-import { buildTruthTrack, DEFAULT_WALK, type TrackSpec } from './truthTrack';
+import { buildTruthTrack, DEFAULT_WALK, SHAPE_TRACKS, type TrackSpec } from './truthTrack';
 
 const SHORT: TrackSpec = { name: 'kurz', parts: [{ leg: 18 }, { turn: 90 }, { leg: 18 }], articlesAtM: [10, 36] };
 
@@ -48,12 +48,64 @@ describe('Lauf durch den echten Such-Recorder', () => {
     expect(o.search.analytics).not.toBeNull();
     expect(o.score.startLocked).toBe(true);
 
-    const cell: SearchCell = { table: 't', row: 'r', col: 'c', runs: 0, startLocked: 0, endReached: 0, indicated: 0, foundIndicated: 0,
-      analysisContactIndicated: 0, notIndicated: 0, foundNotIndicated: 0, layObjectErrSumM: 0, layObjectN: 0, appDeviationSumM: 0,
-      dogDeviationSumM: 0, handlerDeviationSumM: 0, recorderScoreSum: 0, analysisScoreSum: 0, analysisScoreN: 0, deviationEvents: 0, breaks: 0 };
+    const cell = emptySearchCell('t', 'r', 'c');
     addSearchOutcome(cell, o);
     expect(cell.indicated).toBe(1);   // der Gegenstand am Fährtenende zählt nicht in die Quote
     expect(renderReport([{ group: 'suche', seeds: 1, runs: 1, elapsedS: 0, cells: [], searchCells: [cell] }])).toContain('Verwiesene Gegenstände');
+  }, 120000);
+
+  test('Sprachführung und Ende laufen mit und lassen sich gegen die Wahrheit auswerten (T-205)', async () => {
+    const o = await runSearchScenario({ track: SHORT, device: 'dual', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 1 });
+    expect(o.search.spoken.some(e => e.key === 'search-started')).toBe(true);
+    expect(o.search.spoken.some(e => e.key?.startsWith('feature:'))).toBe(true);
+    // Gesprochene Ansagen überlappen sich nie (eine Sprachausgabe).
+    const spans = o.search.spoken.filter(e => e.endMs != null).map(e => [e.startMs, e.endMs as number]).sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < spans.length; i++) expect(spans[i][0]).toBeGreaterThanOrEqual(spans[i - 1][1] - 1);
+    expect(o.score.guidance.features.length).toBeGreaterThan(0);
+    expect(o.search.trace.length).toBeGreaterThan(10);
+    expect(o.score.guidance.pawErrMeanM).toBeGreaterThanOrEqual(0);
+  }, 120000);
+
+  test('App-Abbruch und Fortsetzen über den echten Speicherweg (T-205)', async () => {
+    const o = await runSearchScenario({ track: SHORT, device: 'dual', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 2,
+      interruptions: [{ kind: 'kill', atFrac: 0.5, durationS: 10 }] });
+    expect(o.search.kills).toHaveLength(1);
+    const k = o.search.kills[0];
+    expect(k.restartMs).not.toBeNull();
+    expect(k.pointsBefore).toBeGreaterThan(0);
+    expect(o.score.guidance.resume).toHaveLength(1);
+    // Nach dem Fortsetzen nimmt die Absuche wieder Punkte auf.
+    expect(o.search.trace.some(t => t.tMs > (k.restartMs as number) + 3000)).toBe(true);
+  }, 120000);
+
+  test('Pause, Sperrbildschirm und manuelles Antippen lassen sich einspielen (T-205)', async () => {
+    const o = await runSearchScenario({ track: SHORT, device: 'dual', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 3,
+      manualTap: { tapAfterS: 2 }, interruptions: [{ kind: 'lock', atFrac: 0.3, durationS: 8 }, { kind: 'pause', atFrac: 0.6, durationS: 5 }] });
+    expect(o.score.guidance.manualTaps).toBeGreaterThan(0);
+    expect(o.search.trace.some(t => t.paused)).toBe(true);
+  }, 120000);
+
+  test('Fährtenverlust und schwierige Formen erzeugen die erwartete Wahrheit (T-205)', () => {
+    const lay = buildTruthTrack(SHAPE_TRACKS.Kreuzung, DEFAULT_WALK, makeRng(5));
+    // Schenkel 4 kreuzt Schenkel 1: ein Punkt des letzten Schenkels liegt nah am ersten.
+    const { x, y, s } = lay.path;
+    const late = x.map((_, i) => i).filter(i => s[i] > 100);
+    const early = x.map((_, i) => i).filter(i => s[i] < 35);
+    const minD = Math.min(...late.map(i => Math.min(...early.filter((_, k) => k % 10 === 0).map(j => Math.hypot(x[i] - x[j], y[i] - y[j])))));
+    expect(minD).toBeLessThan(1);
+    const t = buildSearchTruth(lay, DOGS.ruhig, DEFAULT_HANDLER, makeRng(6), { losses: [{ atM: 50, offsetM: 10, lengthM: 12 }] });
+    expect(t.lossWindowsS).toHaveLength(1);
+    expect(Math.max(...t.dogSamples.filter(d => d.lost).map(d => d.lateralM))).toBeGreaterThan(7);
+    // Am Fährtenende geht der Hundeführer zum Hund.
+    const end = t.handlerTimeline.samples[t.handlerTimeline.samples.length - 1];
+    const last = lay.path.x.length - 1;
+    expect(Math.hypot(end.x - lay.path.x[last], end.y - lay.path.y[last])).toBeLessThan(2);
+  });
+
+  test('Regression T-207: nach dem abgekürzten Winkel bleibt der Fortschritt nicht am alten Schenkel hängen', async () => {
+    // Dieser Lauf blieb vor T-207 nach dem ersten Winkel bei 28 % stehen (Kontinuitätsfalle).
+    const o = await runSearchScenario({ track: SHAPE_TRACKS.Kreuzung, device: 'single', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 4 });
+    expect(o.score.progressPct).toBeGreaterThan(90);
   }, 120000);
 
   test('Such-Matrix lässt sich aufbauen', () => {
