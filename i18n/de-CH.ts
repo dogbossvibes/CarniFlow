@@ -287,6 +287,8 @@ export const deCH = {
   'analyse.running':     'Smart Analyse läuft …',
   'analyse.emptyTitle':  'Sammle Trainings und entdecke Muster',
   'analyse.emptyText':   'Anyvo analysiert deine Trainings anhand deiner Trainingsdaten – ohne dass du alles manuell auswerten musst.',
+  'analyse.emptyTitleDog': 'Noch keine Auswertung für {dog}',
+  'analyse.emptyHint': 'Erfasse ein Training mit Bewertung. Danach siehst du hier Score, Trend und Schwerpunkte.',
   'analyse.capture':     'Training erfassen',
   'analyse.cardTitle':   'Smart Analyse',
   'analyse.cardSub':     'Analyse & Empfehlung',

@@ -277,6 +277,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "analyse.running": "Smart Analyse in corso …",
   "analyse.emptyTitle": "Raccogli allenamenti e scopri schemi",
   "analyse.emptyText": "Anyvo analizza i tuoi allenamenti dai dati, senza dover valutare tutto manualmente.",
+  "analyse.emptyTitleDog": "Ancora nessuna analisi per {dog}",
+  "analyse.emptyHint": "Registra un allenamento con una valutazione. Qui vedrai poi punteggio, tendenza e punti chiave.",
   "analyse.capture": "Registra allenamento",
   "analyse.cardTitle": "Smart Analyse",
   "analyse.cardSub": "Analisi e raccomandazione",

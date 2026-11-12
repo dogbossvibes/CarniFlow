@@ -265,6 +265,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'analyse.running':     'Smart Analyse lauft …',
   'analyse.emptyTitle':  'Sammle Trainings und entdeck Muster',
   'analyse.emptyText':   'Anyvo wertet dini Trainings anhand vo dine Trainingsdate us – ohni dass du alles vo Hand muesch uswerte.',
+  'analyse.emptyTitleDog': 'No kei Uuswertig für {dog}',
+  'analyse.emptyHint': 'Erfass es Training mit Bewertig. Dänn gsehsch da Score, Trend und Schwerpünkt.',
   'analyse.capture':     'Training erfasse',
   'analyse.cardTitle':   'Smart Analyse',
   'analyse.cardSub':     'Analyse & Empfehlige',
