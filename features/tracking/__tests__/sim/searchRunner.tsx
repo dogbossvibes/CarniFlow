@@ -48,6 +48,12 @@ export interface SearchRunInput {
   actions?: readonly SearchAction[];
   /** Beginn der Absuche (ms) für relative Zeiten; Standard = erstes Ereignis. */
   startMs?: number;
+  /**
+   * App im Hintergrund (Bildschirm gesperrt, Anruf). Positionen kommen nur an, wenn der Recorder
+   * Hintergrund-Ortung angefordert hat (wie positionStream → natives Modul); Bewegungsdaten fallen
+   * in dieser Zeit aus (Annahme).
+   */
+  backgroundWindows?: readonly { fromMs: number; toMs: number }[];
 }
 
 /** Zustand nach jeder GPS-Messung (für Pfote, Fortschritt und «falscher Schenkel»). */
@@ -110,12 +116,18 @@ function Harness(p: HarnessProps) {
   const seed = p.seed;
   const cb = p.cb;
 
+  // Wie run.tsx (T-206): je Fund genau einmal, nach einem Neustart aus dem Run-Zustand geseedet.
   const autoDwellKey = s.autoDwellObjectIds.join('|');
+  const announcedDwell = useRef<Set<string>>(new Set(seed?.autoDwellObjectIds ?? []));
   useEffect(() => {
     if (!s.recording) return;
-    autoDwellKey.split('|').filter(Boolean).forEach(id => requestVoice({ eventType: 'object',
-      text: i18n.t('track.voiceObjectDetected') as string, language: speechLanguage(i18n.language as never),
-      priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' }));
+    autoDwellKey.split('|').filter(Boolean).forEach(id => {
+      if (announcedDwell.current.has(id)) return;
+      announcedDwell.current.add(id);
+      requestVoice({ eventType: 'object',
+        text: i18n.t('track.voiceObjectDetected') as string, language: speechLanguage(i18n.language as never),
+        priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' });
+    });
   }, [s.recording, autoDwellKey]);
 
   const voiceRecovery = useMemo(() => ({
@@ -231,7 +243,7 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
     useTrackingStore.setState(PRISTINE_STORE, true);
     await AsyncStorage.clear();
     searchBridge.sqlite.length = 0; searchBridge.speech.reset();
-    searchBridge.feedFix = null; searchBridge.feedMotion = null;
+    searchBridge.feedFix = null; searchBridge.feedMotion = null; searchBridge.backgroundAllowed = false;
     searchBridge.motionAvailable = input.motionAvailable ?? true;
     resetVoiceEvents(startMs);
     // Ansagen auf Deutsch wie bei den Kundinnen (Länge der Sätze bestimmt die Sprechdauer).
@@ -308,6 +320,8 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
         continue;
       }
       if (killed) continue;
+      const inBackground = (input.backgroundWindows ?? []).some(w => ev.at >= w.fromMs && ev.at < w.toMs);
+      if (inBackground && (ev.motion || !searchBridge.backgroundAllowed)) continue;
       if (ev.motion) {
         const m = ev.motion;
         const sample: BridgeMotion = { timestamp: m.t, movementState: m.movementState, stepDelta: m.stepDelta,

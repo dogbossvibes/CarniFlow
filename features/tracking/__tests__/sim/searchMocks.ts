@@ -21,8 +21,9 @@ jest.mock('@/features/tracking/utils/positionSource', () => ({
     coords: { latitude: s.lat, longitude: s.lng, accuracy: s.accuracy ?? null, altitude: null, altitudeAccuracy: null, heading: s.course ?? null, speed: s.speed ?? null },
     timestamp: s.t,
   }),
-  startPositionSource: jest.fn(async (cb: (s: unknown) => void) => {
+  startPositionSource: jest.fn(async (cb: (s: unknown) => void, _opts?: unknown, extras?: { allowBackground?: boolean }) => {
     require('./searchBridge').searchBridge.feedFix = cb;
+    require('./searchBridge').searchBridge.backgroundAllowed = extras?.allowBackground === true;
     return { stop: jest.fn(), info: { isNativeAvailable: false, rawGnssSupported: false, source: 'expo', provider: null } };
   }),
 }));

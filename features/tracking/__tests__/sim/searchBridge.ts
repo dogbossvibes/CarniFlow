@@ -91,7 +91,9 @@ export const searchBridge: {
   feedFix: ((fix: BridgeFix) => void) | null;
   feedMotion: ((sample: BridgeMotion) => void) | null;
   motionAvailable: boolean;
+  /** Hat der Recorder Hintergrund-Ortung angefordert? (iOS: Positionen auch bei gesperrtem Bildschirm) */
+  backgroundAllowed: boolean;
   speech: FakeSpeech;
   /** Was die App tatsächlich in SQLite geschrieben hätte (übersteht einen App-Abbruch). */
   sqlite: SqliteRow[];
-} = { feedFix: null, feedMotion: null, motionAvailable: true, speech: new FakeSpeech(), sqlite: [] };
+} = { feedFix: null, feedMotion: null, motionAvailable: true, backgroundAllowed: false, speech: new FakeSpeech(), sqlite: [] };
