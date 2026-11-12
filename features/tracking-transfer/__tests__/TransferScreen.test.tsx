@@ -21,7 +21,6 @@ jest.mock('@/features/sync/services/syncEngine', () => ({ syncPendingOperations:
 jest.mock('../rpc', () => ({ createSupabaseTransferClient: () => ({ epoch: () => 0, dispose: jest.fn() }) }));
 jest.mock('../localStore', () => ({ createTransferLocalStore: () => ({}) }));
 jest.mock('../operationJournal', () => ({ createTransferJournal: () => ({}) }));
-jest.mock('../TransferContactSearch', () => ({ TransferContactSearch: () => null }));
 jest.mock('../i18n', () => ({ transferErrorKey: () => 'failure' }));
 jest.mock('../service', () => ({ transferCrypto: {}, createTrackTransferService: () => ({ listOwned: mockListOwned, restoreOwned: mockRestoreOwned, list: mockList, offer: mockOffer, read: mockRead, accept: mockAccept, recover: jest.fn(), revoke: jest.fn() }) }));
 const mockListOwned = jest.fn(), mockRestoreOwned = jest.fn();
