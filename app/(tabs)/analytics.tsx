@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
+import { useActiveDog } from '@/hooks/useActiveDog';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSession } from '@/hooks/useSession';
 import { scoreLabel } from '@/services/analytics/scoring';
@@ -35,14 +36,14 @@ export default function AnalyticsScreen() {
   const { t }                  = useT();
   const { session }            = useSession();
   const { dogs }               = useDogs();
-  const [dogIdx,   setDogIdx]  = useState(0);
   const [period,   setPeriod]  = useState<7 | 30 | 90>(30);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOverride, setAiOverride] = useState<TrainingAnalysis | null>(null);
   const { width }              = useWindowDimensions();
   const router                 = useRouter();
 
-  const selectedDog = dogs[dogIdx] ?? null;
+  // Aktiver Hund gilt app-weit (stores/activeDog.ts); die Chips schalten ihn um.
+  const { activeDog: selectedDog, setActiveDog } = useActiveDog(dogs);
   const {
     latestScore, latestAnalysis, trend7, trend30, trend90,
     trendPoints, recommendations, loading, refresh,
@@ -157,20 +158,20 @@ export default function AnalyticsScreen() {
         {dogs.length > 1 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={s.dogScroll} contentContainerStyle={s.dogScrollContent}>
-            {dogs.map((d, i) => (
+            {dogs.map(d => (
               <TouchableOpacity
                 key={d.id}
-                style={[s.dogChip, i === dogIdx && s.dogChipActive]}
-                onPress={() => setDogIdx(i)}
+                style={[s.dogChip, d.id === selectedDog?.id && s.dogChipActive]}
+                onPress={() => setActiveDog(d.id)}
                 activeOpacity={0.75}
               >
-                {i === dogIdx && (
+                {d.id === selectedDog?.id && (
                   <LinearGradient
                     colors={['rgba(0,255,204,0.15)', 'rgba(0,255,204,0.05)']}
                     style={StyleSheet.absoluteFill}
                   />
                 )}
-                <Text style={[s.dogChipTxt, i === dogIdx && s.dogChipTxtActive]}>{d.name}</Text>
+                <Text style={[s.dogChipTxt, d.id === selectedDog?.id && s.dogChipTxtActive]}>{d.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>

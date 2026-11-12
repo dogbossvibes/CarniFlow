@@ -685,6 +685,9 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'greeting.morning': 'Guete Morge',
   'greeting.day':     'Guete Tag',
   'greeting.evening': 'Guete Abig',
+  'activeDog.title': 'Aktive Hund',
+  'activeDog.hint': 'Gilt für d Analyse und d Fährte-Übersicht. Du chasch jederziit wächsle.',
+  'activeDog.switchA11y': 'Aktive Hund: {dog}. Wächsle',
 
   // Einführung beim ersten Start
   'onboarding.tagline': 'Training, Fährte und Gsundheit vo dim Hund a eim Ort.',
