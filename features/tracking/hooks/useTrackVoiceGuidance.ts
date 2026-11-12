@@ -23,7 +23,16 @@ export interface VoicePhysicalContext {
   activeObjectWait: boolean;
 }
 
-export const maxVoiceDistanceM = (dogLeadM: number) => Math.min(8, Math.max(3, dogLeadM + 2.5));
+// Plausibilitätsgrenze: Luftlinie Hundeführer → Punkt. Entlang der Fährte liegt der Punkt
+// höchstens «Hundeabstand + Vorausdistanz» vor dem Hundeführer; die Luftlinie kann nie länger
+// sein. Ist sie es doch (plus Spielraum fürs GPS), stimmt der Fortschritt nicht → keine Ansage.
+// T-203: Die frühere feste Grenze (max. 8 m) unterdrückte die Ansage auf Geraden, bis der Hund
+// 0–2,5 m vor dem Punkt war (bei 10 m Hundeabstand ganz).
+export const VOICE_DISTANCE_SLACK_M = 2.5;
+export const maxVoiceDistanceM = (dogLeadM: number, aheadM: number) =>
+  Math.max(0, dogLeadM) + Math.max(0, aheadM) + VOICE_DISTANCE_SLACK_M;
+// Annahme: Bis die Schrittzahl gehört wird, ist der Hund rund 1,5 m weiter (≈ 1,5–2 s bei Suchtempo).
+export const SPEECH_TRAVEL_M = 1.5;
 function handlerDistanceM(a: NonNullable<VoicePhysicalContext['handlerPosition']>, b: { lat: number; lng: number }): number {
   const rad = Math.PI / 180;
   const dy = (a.latitude - b.lat) * 111_320;
@@ -135,7 +144,7 @@ export function useTrackVoiceGuidance(
         : physical && (!physical.handlerPosition || feature.lat == null || feature.lng == null) ? 'physical_position_missing'
         : physical?.handlerPosition && feature.lat != null && feature.lng != null
           && handlerDistanceM(physical.handlerPosition, { lat: feature.lat, lng: feature.lng })
-            > maxVoiceDistanceM(physical.configuredDogLeadM) ? 'physical_distance' : null;
+            > maxVoiceDistanceM(physical.configuredDogLeadM, aheadM) ? 'physical_distance' : null;
       if (reason) {
         const key = `${feature.id}:${reason}`;
         if (!suppressedRef.current.has(key)) {
@@ -154,7 +163,7 @@ export function useTrackVoiceGuidance(
       const locale = getCurrentLocale();
       lastSpeakRef.current = now;
       // Distanz → geschätzte Schritte über die zentrale Utility (persönliche Schrittlänge optional).
-      const steps = Math.max(1, metersToSteps(bestD, stepLengthM));
+      const steps = Math.max(1, metersToSteps(Math.max(0, bestD - SPEECH_TRAVEL_M), stepLengthM));
       requestVoice({
         eventType: best.kind, text: best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale),
         language: speechLanguage(locale), priority: 4, onceKey: `feature:${best.id}`, phase: 'search',
@@ -165,7 +174,7 @@ export function useTrackVoiceGuidance(
             && !nowPhysical?.activeObjectWait
             && (!(nowPhysical?.handlerPosition && best.lat != null && best.lng != null)
               || handlerDistanceM(nowPhysical.handlerPosition, { lat: best.lat, lng: best.lng })
-                <= maxVoiceDistanceM(nowPhysical.configuredDogLeadM))
+                <= maxVoiceDistanceM(nowPhysical.configuredDogLeadM, best.arcM - (latest.dogProgressM ?? 0)))
             && best.arcM - latest.dogProgressM >= -DEFAULT_GUIDANCE_OPTIONS.passedM
             && best.arcM - latest.dogProgressM <= DEFAULT_GUIDANCE_OPTIONS.announceAheadM; },
       });

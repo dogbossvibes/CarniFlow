@@ -27,7 +27,7 @@ import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind, type PositionSourceSample,
 } from '@/features/tracking/utils/positionSource';
 import {
-  DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward,
+  DEFAULT_HANDLER_DISTANCE_M, buildArc, pointAtDistance, projectForward,
   projectForwardCandidates, pickContinuousProjection, predictContinuityFoot, type LL as GeoLL,
 } from '@/features/tracking/utils/searchGeometry';
 import {
@@ -40,6 +40,7 @@ import { useTrackingStore, type TrackPointSample } from '@/features/tracking/sto
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
+import { dogProgressWithObjectHold } from '@/features/tracking/utils/dogObjectHold';
 import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
@@ -362,6 +363,9 @@ export function useSearchRecorder(opts: {
   const autoDwellIdsRef = useRef<Set<string>>(new Set());
   const dismissedDwellIdsRef = useRef<Set<string>>(new Set());
   const [activeObjectWait, setActiveObjectWait] = useState(false);
+  // T-203: Zeitpunkt (s seit Suchbeginn), zu dem ein Gegenstand in DIESER Sitzung bestätigt wurde —
+  // nur für den Wiederanlauf der virtuellen Hundeposition. Nicht persistiert, keine Wertung.
+  const [objectResolvedAtS, setObjectResolvedAtS] = useState<Record<number, number>>({});
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const startMsRef = useRef(0);
   const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
@@ -729,6 +733,7 @@ export function useSearchRecorder(opts: {
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
           objectStatusesRef.current[i] = 'auto_dwell_found';
+          setObjectResolvedAtS(prev => ({ ...prev, [i]: (Date.now() - startMsRef.current) / 1000 }));
           useTrackingStore.getState().noteSearchAutoDwell(key);
           pushSnapshot();
         }
@@ -1264,7 +1269,7 @@ export function useSearchRecorder(opts: {
       else if (rs.unobservedObjectIds?.includes(key)) objectStatusesRef.current[i] = 'unobserved';
     });
     if (rs?.endFired) objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
-    setActiveObjectWait(false);
+    setActiveObjectWait(false); setObjectResolvedAtS({});
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     const diagnosticEnvironment = captureDiagnosticEnvironment();
     if (sessionIdRef.current) void recordSupportProvenance(sessionIdRef.current, 'search', !!resume, opts?.diagnosticAttemptKey, diagnosticEnvironment);
@@ -1372,6 +1377,8 @@ export function useSearchRecorder(opts: {
     if (bestI >= 0) {
       foundRef.current.add(bestI);
       objectStatusesRef.current[bestI] = 'manual_found';
+      const resolvedIndex = bestI;
+      setObjectResolvedAtS(prev => ({ ...prev, [resolvedIndex]: (Date.now() - startMsRef.current) / 1000 }));
       autoDwellRef.current.delete(bestI);
       autoDwellStartRef.current.delete(bestI);
       // Resolving this object must release its blocker even without another fix.
@@ -1405,7 +1412,12 @@ export function useSearchRecorder(opts: {
   // Vor START_LOCKED (Punkt 4): kein Hundabstand-Offset, kein Marker — nur die
   // Handlerposition selbst zählt, solange die Start-Assoziation nicht feststeht.
   const startLockedForDisplay = !hasTrack || searchStartState === 'START_LOCKED';
-  const dogProgressM = startLockedForDisplay ? estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total) : snap.progressM;
+  // T-203: Die Pfote hält am nächsten offenen Gegenstand (Hund liegt), bis er gefunden oder verpasst ist.
+  const dogProgressM = startLockedForDisplay
+    ? dogProgressWithObjectHold({ handlerProgressM: snap.progressM, leadM: handlerDistanceM, trackTotalM: arc.total,
+      objects: laidObjects.map((o, i) => ({ arcM: o.atM, status: snap.objectStatuses[i], resolvedAtS: objectResolvedAtS[i] ?? null })),
+      nowS: elapsedS }).dogProgressM
+    : snap.progressM;
   const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
   return {
