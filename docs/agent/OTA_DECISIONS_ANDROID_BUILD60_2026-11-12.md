@@ -73,7 +73,7 @@ Kundendaten: Build 49 speichert Entwürfe mit `workflowStep`. Vor dem Release au
 
 Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Store. Gleich wie iOS entscheiden heisst: Android-Nutzer:innen verlieren sie beim Update auf Build 60.
 
-**Nutzerentscheid 2026-11-12: alle vier nachziehen** (Android-Funktionen behalten).
+**Nutzerentscheid 2026-11-12: alle vier ausnehmen**, weder Android noch iOS: Die Funktionen haben nicht korrekt funktioniert. (Ein früherer Entscheid desselben Tages zum Nachziehen ist damit ersetzt.) Android-Nutzer:innen verlieren sie bewusst beim Update auf Build 60.
 
 | Gruppe | OTA | Befund | iOS-Entscheid |
 |---|---|---|---|
