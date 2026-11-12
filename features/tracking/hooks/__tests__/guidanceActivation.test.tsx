@@ -53,7 +53,9 @@ describe('Voice — Activation Guard', () => {
         { handlerPosition: { latitude: 0, longitude: lng }, configuredDogLeadM: 5, activeObjectWait: waiting });
       return null;
     }
-    act(() => { renderer = TestRenderer.create(<Physical lng={0} waiting={false} />); });
+    // T-203: Die Grenze ist «Hundeabstand + Vorausdistanz + 2,5 m» (hier 12,5 m). 22 m Luftlinie
+    // passen nicht zum Fortschritt → keine Ansage; 4,5 m passen, aber der Hund liegt noch am Gegenstand.
+    act(() => { renderer = TestRenderer.create(<Physical lng={-0.0001} waiting={false} />); });
     expect(speak).not.toHaveBeenCalled();
     act(() => { rerender(<Physical lng={0.00006} waiting />); });
     expect(speak).not.toHaveBeenCalled();
