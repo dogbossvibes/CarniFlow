@@ -304,19 +304,8 @@ describe('DocumentScreen — Übungsbewertung & Notiz', () => {
     await selectExercise(node);
     await flush();
 
-    tap(node, 'trainingDoc.exerciseDetails');
-    // 5-Sterne-Reihe der SelectedExerciseCard: 3. Stern antippen (das Icon
-    // selbst trägt kein onPress — das sitzt auf der umschliessenden Touchable).
-    // findAllByType(TouchableOpacity) statt eines typ-agnostischen findAll, da
-    // TouchableOpacity Press-Handling intern an Pressable weiterreicht und ein
-    // typ-offener onPress-Scan sonst dieselbe Taste doppelt zählen kann.
-    const stars = (node.root as unknown as {
-      findAllByType: (type: unknown) => {
-        props: { onPress: () => void };
-        findAllByProps: (props: { name: string }) => unknown[];
-      }[];
-    }).findAllByType(TouchableOpacity).filter((btn) => btn.findAllByProps({ name: 'star-outline' }).length > 0);
-    act(() => { stars[2].props.onPress(); });
+    // T-184: Lernstufe statt Sterne, direkt auf der Karte sichtbar.
+    tap(node, 'trainingLevel.festigen');
 
     const note = inputByPlaceholder(node, 'training.exerciseNotePlaceholder');
     act(() => { note.props.onChangeText('War heute unruhig'); });
@@ -327,7 +316,7 @@ describe('DocumentScreen — Übungsbewertung & Notiz', () => {
     expect(mockCreateDocumentedUnit).toHaveBeenCalledWith(
       'owner-1',
       expect.anything(),
-      [expect.objectContaining({ exercise_name: 'Übung', rating: 3, notes: 'War heute unruhig', seq_index: 0 })],
+      [expect.objectContaining({ exercise_name: 'Übung', rating: 4, rating_scale: 'lernstufe', notes: 'War heute unruhig', seq_index: 0 })],
       'unit-id', expect.any(Function),
     );
   });
@@ -640,13 +629,18 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     shared_with_trainer: true, photos: ['private-past-photo'], videos: ['private-video'],
     exercises: [{ id: 'past-ex', discipline: 'Fährte', exercise_name: 'Übung', rating: 5, notes: 'Past result', seq_index: 0, duration_sec: 123 }],
   });
-  it('reuses exercises as a plan with no old performance, media or invented duration', async () => {
+  // T-184: Übungen vom letzten Mal sind automatisch vorgewählt und gelten als
+  // trainiert. Alte Sterne, Notizen, Medien und Dauer werden nie übernommen.
+  it('preselects last exercises as trained with no old rating, notes, media or invented duration', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush(); await flush();
+    expect(node.root.findAll(n => n.props.name === 'Übung' && typeof n.props.onRemove === 'function')).toHaveLength(1);
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(strings(node).join(' ')).toContain('trainingLevel.legacy');
+    expect(strings(node).join(' ')).not.toContain('trainingLevel.trend');
     tap(node, 'trainingDoc.buildOn'); await flush();
-    expect(saveButton(node).props.disabled).toBe(true);
-    expect(strings(node)).toContain('trainingDoc.planned');
-    tap(node, 'trainingDoc.planned'); await flush();
+    expect(node.root.findAll(n => n.props.name === 'Übung' && typeof n.props.onRemove === 'function')).toHaveLength(1);
+    expect(saveButton(node).props.disabled).toBe(false);
     mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
     await submitTraining(node);
     expect(mockCreateDocumentedUnit).toHaveBeenCalledWith('owner-1', expect.objectContaining({ duration_sec: null, photos: [], videos: [], shared_with_trainer: false }),
@@ -654,13 +648,16 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
   });
   it('zeigt gespeicherte Übungsnotizen schon in der Vorbereitung', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush();
     expect(strings(node)).toContain('Past result');
   });
   it('verknüpft Vorhistorie nur nach Auswahl und behält die neue Beobachtung', async () => {
     const old = past();
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [old], error: null }) });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining'); await selectExercise(node); await flush();
+    const node = render(); await flush(); await flush();
+    // Vorgewählte Übung entfernen, damit eine frisch gewählte Übung ohne Herkunft entsteht.
+    act(() => { node.root.findAll(n => n.props.name === 'Übung' && typeof n.props.onRemove === 'function')[0].props.onRemove(); });
+    await selectExercise(node); await flush();
     tap(node, 'trainingDoc.exerciseDetails');
     act(() => { inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Today only'); });
     const choose = node.root.findAll(n => n.props.testID === 'exercise-history-past-unit-past-ex' && typeof n.props.onPress === 'function')[0];
@@ -675,16 +672,16 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
   });
   it('does not display another dog history even when a stale response contains it', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush();
     expect(strings(node)).toContain('Past observation');
     showContext(node); tap(node, 'Malu'); await flush();
     expect(strings(node)).not.toContain('Past observation');
-    tap(node, 'trainingFlow.previousTraining');
+
     expect(strings(node)).toContain('trainingDoc.noHistory');
   });
   it('zeigt allgemeine Notizen älterer Trainings getrennt von Übungsbeobachtungen im ausgeklappten Verlauf', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past(), { ...past(), id: 'older-unit', session_date: '2026-10-13', notes: 'Older general note' }], error: null }) });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush();
     expect(strings(node)).not.toContain('Older general note');
     tap(node, 'trainingDoc.selectPast'); await flush();
     expect(strings(node)).toContain('Older general note');
@@ -695,7 +692,7 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     const remove = jest.fn();
     let handler!: (state: AppStateStatus) => void;
     const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, callback) => { handler = callback; return { remove }; });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining'); await selectExercise(node); tap(node, 'trainingDoc.exerciseDetails');
+    const node = render(); await flush(); await selectExercise(node); tap(node, 'trainingDoc.exerciseDetails');
     act(() => { inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Unsaved today'); });
     const update = () => (node as unknown as { update(element: React.ReactElement): void }).update(<DocumentScreen />);
     const oldCalls = mockGetTrainingUnits.mock.calls.length;
@@ -714,7 +711,7 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
   it('verwirft eine überholte Resume-Antwort und behält Historie bei einem späteren Ladefehler', async () => {
     let handler!: (state: AppStateStatus) => void;
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, callback) => { handler = callback; return { remove: jest.fn() }; });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush();
     let oldResolve!: (value: unknown) => void; let newResolve!: (value: unknown) => void;
     mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { oldResolve = resolve; }) })
       .mockReturnValueOnce({ limit: () => new Promise(resolve => { newResolve = resolve; }) });
@@ -731,14 +728,14 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     const q = mockLegacySessions();
     q.limit.mockResolvedValue({ data: [{ id: 'legacy-id', owner_id: 'owner-1', dog_id: 'dog-1', category: 'Fährte', title: 'Übung',
       session_date: '2026-10-13', created_at: '2026-10-13T08:00:00Z', notes: 'Legacy observation' }], error: null });
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    const node = render(); await flush();
     expect(strings(node)).toContain('Legacy observation');
     const preparation = node.root.findByType(TrainingPreparation);
     act(() => preparation.props.onOpen(preparation.props.units[0]));
     expect(mockPush).toHaveBeenCalledWith('/training/legacy-id');
   });
   it('guards two presses in the same render and preserves draft after a thrown save', async () => {
-    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining'); await selectExercise(node); await flush();
+    const node = render(); await flush(); await selectExercise(node); await flush();
     let rejectSave!: (reason: Error) => void;
     mockCreateDocumentedUnit.mockReturnValue(new Promise((_resolve, reject) => { rejectSave = reject; }));
     await advanceToSave(node);
@@ -751,7 +748,7 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     expect(saveButton(node).props.disabled).toBe(false);
     act(() => node.unmount()); await flush();
     const reopened = render(); await flush();
-    expect(strings(reopened)).toContain('trainingFlow.nextTitle');
+    expect(strings(reopened)).toContain('trainingFlow.captureTitle');
     expect(saveButton(reopened).props.disabled).toBe(false);
   });
   it('keeps existing media/transcript, measured times and trainer permission when editing', async () => {
@@ -765,6 +762,89 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
       started_at: '2026-10-14T10:00:00Z', ended_at: '2026-10-14T10:02:00Z',
       audio_files: [{ url: 'audio-a', duration: '0:10', transcript: 'Existing transcript' }],
     }), [expect.objectContaining({ duration_sec: 123, rating: 5, notes: 'Past result' })], expect.any(Function));
+    // Alte Sternebewertung bleibt ohne Lernstufen-Markierung (T-184): ausdrücklich null.
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toHaveProperty('rating_scale', null);
+  });
+  it('prefills the last learning level, shows the trend and saves the new level (T-184)', async () => {
+    const learned = { ...past(), exercises: [{ ...past().exercises[0], rating: 2, rating_scale: 'lernstufe' }] };
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [learned], error: null }) });
+    const node = render(); await flush(); await flush();
+    const radio = (label: string) => node.root.findAll(n => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === `Übung: ${label}` && typeof n.props.onPress === 'function')[0];
+    expect(radio('trainingLevel.lernen').props.accessibilityState).toEqual({ checked: true });
+    expect(strings(node).join(' ')).toContain('trend.same');
+    act(() => radio('trainingLevel.festigen').props.onPress()); await flush();
+    expect(strings(node).join(' ')).toContain('trainingLevel.trend.up');
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
+    await submitTraining(node);
+    expect(mockCreateDocumentedUnit.mock.calls[0][2]).toEqual([expect.objectContaining({ rating: 4, rating_scale: 'lernstufe', notes: null })]);
+  });
+  it('does not save a preselected exercise that was deselected (T-184)', async () => {
+    const two = { ...past(), exercises: [past().exercises[0], { ...past().exercises[0], id: 'past-ex-2', exercise_name: 'Zweite', seq_index: 1 }] };
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [two], error: null }) });
+    const node = render(); await flush(); await flush();
+    act(() => { node.root.findAll(n => n.props.name === 'Zweite' && typeof n.props.onRemove === 'function')[0].props.onRemove(); });
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
+    await submitTraining(node);
+    expect(mockCreateDocumentedUnit.mock.calls[0][2].map((e: { exercise_name: string }) => e.exercise_name)).toEqual(['Übung']);
+  });
+  it('does not bring back preselected exercises the user removed after reopening (T-184)', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); await flush();
+    act(() => { node.root.findAll(n => n.props.name === 'Übung' && typeof n.props.onRemove === 'function')[0].props.onRemove(); });
+    await flush(); act(() => node.unmount());
+    const reopened = render(); await flush(); await flush();
+    expect(reopened.root.findAll(n => n.props.name === 'Übung' && typeof n.props.onRemove === 'function')).toHaveLength(0);
+  });
+  it('restores the original star rating when a newly set level is cleared while editing (T-184)', async () => {
+    mockParams = { id: 'edit-unit' };
+    mockGetTrainingUnitById.mockResolvedValue({ data: past(), error: null });
+    mockUpdateDocumentedUnit.mockReset().mockResolvedValue({ error: null });
+    const node = render(); await flush();
+    const radio = (label: string) => node.root.findAll(n => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === `Übung: ${label}` && typeof n.props.onPress === 'function')[0];
+    act(() => radio('trainingLevel.festigen').props.onPress()); await flush();
+    act(() => radio('trainingLevel.festigen').props.onPress()); await flush();
+    await submitTraining(node);
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: 5, rating_scale: null });
+  });
+  it('clearing a saved learning level while editing removes the marker explicitly (T-184)', async () => {
+    mockParams = { id: 'edit-unit' };
+    const learned = { ...past(), exercises: [{ ...past().exercises[0], rating: 2, rating_scale: 'lernstufe' }] };
+    mockGetTrainingUnitById.mockResolvedValue({ data: learned, error: null });
+    mockUpdateDocumentedUnit.mockReset().mockResolvedValue({ error: null });
+    const node = render(); await flush();
+    const radio = (label: string) => node.root.findAll(n => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === `Übung: ${label}` && typeof n.props.onPress === 'function')[0];
+    act(() => radio('trainingLevel.lernen').props.onPress()); await flush();
+    await submitTraining(node);
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: null, rating_scale: null });
+  });
+  it('never shows the own (restored) training as „Letztes Mal“ (T-184, render-safe unit id)', async () => {
+    const node = render(); await flush(); await selectExercise(node);
+    await flush(); act(() => node.unmount());
+    const key = (await AsyncStorage.getAllKeys()).find(k => k.startsWith('training_document_v1:owner-1:') && !k.includes(':edit:'))!;
+    const stored = JSON.parse((await AsyncStorage.getItem(key))!);
+    stored.value.selected[0].exerciseKey = 'ident-1';
+    const history = (unitId: string) => ({ ...past(), id: unitId, exercises: [{ ...past().exercises[0], exercise_identity_id: 'ident-1', discipline: stored.value.selected[0].discipline, exercise_name: stored.value.selected[0].name }] });
+    const historical = (n: ReactTestRenderer) => n.root.findAll(x => typeof x.props.onRatingChange === 'function' && 'historical' in x.props)[0].props.historical;
+    for (const [unitId, shown] of [[stored.value.unitId, false], ['other-unit', true]] as const) {
+      await AsyncStorage.setItem(key, JSON.stringify(stored));
+      mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [history(unitId)], error: null }) });
+      const restored = render(); await flush(); await flush();
+      expect(!!historical(restored)).toBe(shown);
+      act(() => restored.unmount());
+    }
+  });
+  it('loads an older three-step draft (workflowStep 2) completely into the single screen (T-184)', async () => {
+    const node = render(); await flush(); await selectExercise(node);
+    act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('From old step two'));
+    await flush(); act(() => node.unmount());
+    const key = (await AsyncStorage.getAllKeys()).find(k => k.startsWith('training_document_v1:owner-1:') && !k.includes(':edit:'))!;
+    const stored = JSON.parse((await AsyncStorage.getItem(key))!);
+    stored.value.workflowStep = 2;
+    await AsyncStorage.setItem(key, JSON.stringify(stored));
+    const restored = render(); await flush();
+    expect(strings(restored)).toContain('trainingFlow.captureTitle');
+    expect(inputByPlaceholder(restored, 'training.exerciseNotePlaceholder').props.value).toBe('From old step two');
+    expect(saveButton(restored).props.disabled).toBe(false);
   });
 });
 
@@ -907,6 +987,16 @@ describe('DocumentScreen — atomic restore and exact duration', () => {
     const second = render(); await flush(); await act(async () => { await saveButton(second).props.onPress(); });
     expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(125);
   });
+  // ESLint-Fix (react-hooks/refs): Der Hinweis «bereits abgeschlossen» hängt an
+  // remoteCompleted UND einer alten, nicht-atomaren Fertigstellung – unverändert.
+  it.each([[false, true], [true, false]])('restored remoteCompleted draft with atomic=%s shows the legacy completion hint: %s', async (atomic, shown) => {
+    const first = render(); await flush(); await act(async () => first.unmount()); mounted.splice(mounted.indexOf(first), 1);
+    const key = 'training_document_v1:owner-1:edit:existing'; const saved = JSON.parse((await AsyncStorage.getItem(key))!);
+    saved.value.remoteCompleted = true; saved.value.atomic = atomic;
+    await AsyncStorage.setItem(key, JSON.stringify(saved));
+    const second = render(); await flush();
+    expect(strings(second).includes('trainingDoc.remoteCompleted')).toBe(shown);
+  });
   it('tapping the already selected dog leaves results and exercise duration intact', async () => {
     mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Other' }];
     const node = render(); await flush(); tap(node, 'Yam');
@@ -984,7 +1074,7 @@ describe('DocumentScreen — unified saved exercise selection', () => {
 });
 
 
-describe('DocumentScreen — approved three-step training flow', () => {
+describe('DocumentScreen — one-screen training flow (T-184)', () => {
   beforeEach(() => {
     mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }];
     mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
@@ -998,17 +1088,17 @@ describe('DocumentScreen — approved three-step training flow', () => {
   it('shows the previous hint first, stores today separately, and shows the saved hint on next entry', async () => {
     mockListFocuses.mockResolvedValue({ data: [hint()], error: null });
     const node = render(); await flush();
-    expect(strings(node)).toContain('trainingFlow.prepareTitle');
+    expect(strings(node)).toContain('trainingFlow.captureTitle');
     expect(strings(node)).toContain('Start with a calm pause');
-    expect(node.root.findAll(n => n.props.multiline !== undefined || n.props.placeholder !== undefined).filter(n => typeof n.props.onChangeText === 'function')).toHaveLength(0);
+    // Ein Screen (T-184): vor der Übungswahl gibt es noch kein Übungsfeld.
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder')).toBeUndefined();
     expect(strings(node)).not.toContain('training.exercisesFor');
     await selectExercise(node);
     const observation = inputByPlaceholder(node, 'training.exerciseNotePlaceholder');
     expect(observation.props.value).toBe('');
     act(() => observation.props.onChangeText('More confident today'));
-    expect(strings(node)).not.toContain('trainingDoc.exerciseNextFocus');
     await advanceToSave(node);
-    expect(strings(node)).toContain('More confident today');
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('More confident today');
     act(() => inputByPlaceholder(node, 'trainingFlow.hintPlaceholder').props.onChangeText('Practise the second hide calmly'));
     mockCreateDocumentedUnit.mockResolvedValue({ data: { id: 'unit-id' }, error: null });
     await submitTraining(node); await flush();
@@ -1021,7 +1111,7 @@ describe('DocumentScreen — approved three-step training flow', () => {
     mockListFocuses.mockResolvedValue({ data: [hint('Practise the second hide calmly')], error: null });
     act(() => node.unmount());
     const next = render(); await flush();
-    expect(strings(next)).toContain('trainingFlow.prepareTitle');
+    expect(strings(next)).toContain('trainingFlow.captureTitle');
     expect(strings(next)).toContain('Practise the second hide calmly');
     await selectExercise(next);
     expect(inputByPlaceholder(next, 'training.exerciseNotePlaceholder').props.value).toBe('');
@@ -1037,8 +1127,7 @@ describe('DocumentScreen — approved three-step training flow', () => {
     expect(strings(node)).not.toContain('trainingFlow.saved');
     act(() => node.unmount());
     const restored = render(); await flush();
-    expect(strings(restored)).toContain('trainingFlow.nextTitle');
-    expect(strings(restored)).toContain('Today only');
+    expect(strings(restored)).toContain('trainingFlow.captureTitle');
     expect(inputByPlaceholder(restored, 'trainingFlow.hintPlaceholder').props.value).toBe('Remember next time');
     act(() => restored.root.findAll(n => n.props.accessibilityLabel === 'common.back' && typeof n.props.onPress === 'function')[0].props.onPress());
     expect(inputByPlaceholder(restored, 'training.exerciseNotePlaceholder').props.value).toBe('Today only');
@@ -1048,7 +1137,7 @@ describe('DocumentScreen — approved three-step training flow', () => {
     const node = render(); await flush(); await selectExercise(node);
     act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Belongs to Yam'));
     showContext(node); tap(node, 'Malu'); await flush();
-    expect(strings(node)).toContain('trainingFlow.prepareTitle');
+    expect(strings(node)).toContain('trainingFlow.captureTitle');
     expect(strings(node).join(' ')).not.toContain('Belongs to Yam');
     await selectExercise(node);
     act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Belongs to Malu'));
@@ -1077,23 +1166,22 @@ describe('DocumentScreen — approved three-step training flow', () => {
     expect(strings(node)).toContain('trainingDoc.focusError');
     tap(node, 'trainingDoc.focusError'); await flush();
     expect(strings(node)).toContain('Start with a calm pause');
-    expect(node.root.findAll(n => n.props.multiline !== undefined || n.props.placeholder !== undefined).filter(n => typeof n.props.onChangeText === 'function')).toHaveLength(0);
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder')).toBeUndefined();
     expect(mockCompleteFocus).not.toHaveBeenCalled();
     tap(node, 'trainingDoc.focusDone'); await flush();
     expect(mockCompleteFocus.mock.calls[0][1]).toMatchObject({ id: 'hint-1', status: 'done', expectedRevision: 1 });
   });
-  it('uses Android system back for the previous step without losing observations', async () => {
-    let handler: (() => boolean | null | undefined) | undefined;
-    const remove = jest.fn();
-    const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, callback) => { handler = () => callback({} as never); return { remove }; });
+  // T-184: keine Schritte mehr – System-Zurück verlässt den Screen normal, die
+  // heutige Beobachtung bleibt im Entwurf erhalten.
+  it('does not intercept Android system back and keeps the observation in the draft', async () => {
+    const spy = jest.spyOn(BackHandler, 'addEventListener');
     const node = render(); await flush(); await selectExercise(node);
     act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Keep this observation'));
-    await advanceToSave(node);
-    expect(handler).toBeDefined();
-    act(() => { expect(handler!()).toBe(true); });
-    expect(strings(node)).toContain('trainingFlow.observeTitle');
-    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Keep this observation');
-    expect(remove).toHaveBeenCalled();
+    await flush();
+    expect(spy).not.toHaveBeenCalled();
+    act(() => node.unmount());
+    const restored = render(); await flush();
+    expect(inputByPlaceholder(restored, 'training.exerciseNotePlaceholder').props.value).toBe('Keep this observation');
     spy.mockRestore();
   });
 
@@ -1163,5 +1251,49 @@ describe('training document explicit score input', () => {
     act(() => values()[7].props.onPress());
     await submitTraining(node);
     expect(mockAtomicSave.mock.calls[0][2].score).toBe(8);
+  });
+});
+
+describe('DocumentScreen — Speicher-Hinweis und Allgemeines Training (T-184)', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+  });
+  it('ohne Übung: deutlicher Hinweis, Tipp öffnet die Übungsauswahl; Speichern bleibt aus', async () => {
+    const node = render(); await flush();
+    expect(saveButton(node).props.disabled).toBe(true);
+    expect(strings(node)).toContain('trainingFlow.chooseExerciseToSave');
+    expect(strings(node)).not.toContain('training.exercisesFor');
+    tap(node, 'trainingFlow.chooseExerciseToSave'); await flush();
+    expect(strings(node)).toContain('training.exercisesFor');
+    expect(mockAtomicSave).not.toHaveBeenCalled();
+  });
+  it('„Allgemeines Training“ steht zuerst in der Auswahl und speichert als Übung der Sparte', async () => {
+    const node = render(); await flush(); await openExercisePicker(node);
+    const groups = node.root.findAll(n => typeof n.props.testID === 'string' && n.props.testID.startsWith('exercise-group-') && typeof n.props.onPress === 'function');
+    expect(groups[0].props.accessibilityLabel).toBe('trainingFlow.generalTraining');
+    tap(node, 'trainingFlow.generalTraining'); await flush();
+    expect(saveButton(node).props.disabled).toBe(false);
+    expect(strings(node)).not.toContain('trainingFlow.chooseExerciseToSave');
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_name: 'trainingFlow.generalTraining', discipline: 'Fährte' })]);
+  });
+  it('ein bestehendes „Allgemeines Training“ wird wiederverwendet, keine neue Übung angelegt', async () => {
+    mockListIdentities.mockResolvedValue({ data: [{ id: 'g1', owner_id: 'owner-1', discipline_key: 'system:faehrte', display_name: 'trainingFlow.generalTraining', revision: 1, archived_at: null }], error: null });
+    const node = render(); await flush(); await openExercisePicker(node);
+    expect(node.root.findAll(n => n.props.testID === 'exercise-group-trainingflow.generaltraining' && typeof n.props.onPress === 'function').length).toBeGreaterThan(0);
+    tap(node, 'trainingFlow.generalTraining'); await flush();
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'g1' })]);
+    expect(mockAtomicSave.mock.calls[0][5].identityChanges).toEqual([]);
+  });
+  it('Bearbeiten: kein Allgemeines-Training-Vorschlag und kein Speicher-Hinweisknopf', async () => {
+    mockParams = { id: 'existing' };
+    mockGetTrainingUnitById.mockReset().mockResolvedValue({ data: { id: 'existing', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed', session_date: '2026-10-14',
+      notes: null, duration_sec: 60, photos: [], videos: [], audio_files: [], score: null,
+      exercises: [{ id: 'row', discipline: 'Fährte', exercise_name: 'Übung', rating: 3, notes: null, duration_sec: null, seq_index: 0 }] }, error: null });
+    const node = render(); await flush();
+    expect(strings(node)).not.toContain('trainingFlow.generalTraining');
+    expect(strings(node)).not.toContain('trainingFlow.chooseExerciseToSave');
   });
 });

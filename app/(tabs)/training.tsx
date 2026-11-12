@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { ContinueTrainingSection } from '@/components/training/ContinueTrainingSection';
 
 
 // Training-Hub: fokussiert auf Timer + Fährten-Tool (+ nachträglich
@@ -26,6 +27,9 @@ export default function TrainingScreen() {
             <Ionicons name="stats-chart-outline" size={20} color={C.white} />
           </TouchableOpacity>
         </View>
+
+        {/* T-184 Etappe 2: Weitermachen (nur lesend) */}
+        <ContinueTrainingSection />
 
         <AnimatedPressable accessibilityRole="button" accessibilityLabel={t('training.startTimer')} style={s.heroWrap} scale={0.98} onPress={() => router.push('/unit/timer')}>
           <View style={s.heroHeading}>

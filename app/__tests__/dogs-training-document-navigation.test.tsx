@@ -12,6 +12,8 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocu
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, loading: false, refresh: jest.fn() }) }));
 jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ isPro: true, loading: false }) }));
 jest.mock('@/components/dogs/DogCompactCard', () => ({ DogCompactCard: 'DogCard' }));
+// T-184 Etappe 2: Letztes Training wird hier nicht geladen (eigene Tests).
+jest.mock('@/hooks/useDogTrainingSummary', () => ({ useDogTrainingSummary: () => ({ data: undefined }) }));
 jest.mock('@/components/dogs/SharedDogsInbox', () => ({ SharedDogsInbox: 'SharedDogsInbox' }));
 jest.mock('@/components/dogs/types', () => ({ dogToIdentity: (dog: unknown) => dog }));
 jest.mock('@/components/ui/AnimatedPressable', () => ({ AnimatedPressable: 'AnimatedPressable' }));
@@ -28,7 +30,7 @@ jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual(
 let node: ReactTestRenderer;
 beforeEach(() => { jest.clearAllMocks(); act(() => { node = TestRenderer.create(<DogsScreen />); }); });
 afterEach(() => { act(() => node.unmount()); });
-const cards = () => node.root.findAll(n => typeof n.props.onTraining === 'function');
+const cards = () => node.root.findAll(n => (n.type as unknown) === 'DogCard');
 
 it.each(mockDogs.map((dog, index) => [dog.id, index] as const))('opens documentation with the exact clicked dog %s', (dogId, index) => {
   act(() => cards()[index].props.onTraining());
@@ -62,4 +64,9 @@ it('preserves the track and statistics routes for each dog', () => {
     act(() => card.props.onStats());
     expect(mockPush).toHaveBeenLastCalledWith(`/dog/${mockDogs[index].id}`);
   });
+});
+
+it.each(mockDogs.map((dog, index) => [dog.id, index] as const))('T-184 Etappe 3b: „Training von <Hund>“ öffnet die Seite des geklickten Hundes %s', (dogId, index) => {
+  act(() => cards()[index].props.onTrainingPage());
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/unit/progress', params: { dogId } });
 });

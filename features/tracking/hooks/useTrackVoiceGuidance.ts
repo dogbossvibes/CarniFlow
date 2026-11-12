@@ -112,10 +112,12 @@ export function useTrackVoiceGuidance(
   const lastSpeakRef = useRef(0);
   const onAnnouncedRef = useRef(recovery?.onAnnounced);
   const suppressedRef = useRef<Set<string>>(new Set());
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production a67cef9b; Sprachführung bewusst unverändert (GPS-Kontinuität)
   onAnnouncedRef.current = recovery?.onAnnounced;
   const initialIds = recovery?.initialAnnouncedIds;
   const enabled = recovery?.enabled ?? true;
   const latestRef = useRef({ enabled, voiceOn, dogProgressM, physical });
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production a67cef9b; Sprachführung bewusst unverändert (GPS-Kontinuität)
   latestRef.current = { enabled, voiceOn, dogProgressM, physical };
 
   // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen — bzw.

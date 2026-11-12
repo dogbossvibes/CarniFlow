@@ -96,6 +96,7 @@ export default function TrackAuswertungScreen() {
   const authGeneration = useRef(0);
   const [authEpoch, setAuthEpoch] = useState(0);
   useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
   }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
@@ -122,6 +123,7 @@ export default function TrackAuswertungScreen() {
     let alive = true;
     const loadEpoch = authGeneration.current;
     const userId = authenticatedSession?.user.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setData(null); setDisplaySupplement(null); setNotes(''); setLegs([]); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
@@ -291,6 +293,7 @@ export default function TrackAuswertungScreen() {
     } else setFeedback([]);
   }, [id]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   useEffect(() => { void refreshSharing(); }, [refreshSharing]);
 
   const openSharePicker = async () => {

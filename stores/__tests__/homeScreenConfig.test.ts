@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Text } from 'react-native';
 import {
+  HOME_QUICK_ACTIONS_META,
   ALL_HOME_WIDGETS,
   ALL_QUICK_ACTIONS,
   ALL_FAB_ACTIONS,
@@ -409,7 +410,7 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
   });
 
   it('50) resolveQuickAction: Route, Hund (nur wenn vorhanden), hide/unknown → null', () => {
-    expect(resolveQuickAction('start_training', [])).toEqual({ type: 'route', route: '/unit/start' });
+    expect(resolveQuickAction('start_training', [])).toEqual({ type: 'route', route: '/unit/timer' });
     expect(resolveQuickAction('create_appointment', [])).toEqual({ type: 'route', route: '/training-hub' });
     expect(resolveQuickAction('add_dog', [])).toEqual({ type: 'route', route: '/add-dog' });
     expect(resolveQuickAction('open-dog:d1', [{ id: 'd1' }])).toEqual({ type: 'dog', dogId: 'd1' });
@@ -504,4 +505,11 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(fabTexts(node)).toContain('create_appointment');
   });
+});
+
+// T-184: Trainings-Einstiege führen nicht mehr in den Live-Ablauf mit Sternen.
+it('routes training quick actions to the timer or the new capture screen, never the star live flow', () => {
+  expect(HOME_QUICK_ACTIONS_META.start_obedience.route).toBe('/unit/document?discipline=unterordnung');
+  expect(resolveQuickAction('start_training', [])).toEqual({ type: 'route', route: '/unit/timer' });
+  expect(Object.values(HOME_QUICK_ACTIONS_META).map(meta => meta.route)).not.toContain('/unit/start');
 });

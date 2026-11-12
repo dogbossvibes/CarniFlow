@@ -246,12 +246,14 @@ export function useSearchRecorder(opts: {
   const laidObjects = useMemo(() => opts.laidObjects.map((o, i) => ({ ...o, recoveryIndex: o.recoveryIndex ?? i }))
     .filter(o => !isTrainingJoker(o.material)), [opts.laidObjects]);
   const onFixDiagRef = useRef(opts.onFixDiag);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
 
   // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
   const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sessionIdRef.current = opts.sessionId ?? null;
   const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
   const streamSourceModeRef = useRef<unknown>(null);
@@ -1101,6 +1103,7 @@ export function useSearchRecorder(opts: {
   // Prop-Identitäten immun — unabhängig davon, dass run.tsx die Identitäten
   // zusätzlich stabilisiert.
   const onFixRef = useRef(onFix);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixRef.current = onFix;
   // Observation only: no start/stop/restore or React updates on lifecycle events.
   useEffect(() => {
@@ -1450,12 +1453,15 @@ export function useSearchRecorder(opts: {
     : snap.progressM;
   const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   return {
     ready, recording, paused,
     objectStatuses: snap.objectStatuses,
     points: snap.points, position, endHandlerFix, liveFix, continuityEpoch, deviationM: snap.deviationM,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     onTrack: !hasTrack || (offTrackReliableRef.current && offTrackRef.current.state === 'on_track'),
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
