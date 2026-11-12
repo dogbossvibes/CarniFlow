@@ -25,6 +25,7 @@ import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSear
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useTrackVoiceGuidance, say, speechLanguage, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { requestVoice, resetVoiceEvents, voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
+import { useTrackVoiceAudioSession } from '@/features/tracking/utils/trackVoiceAudioSession';
 import i18n from '@/i18n/config';
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
@@ -223,6 +224,7 @@ export default function TrackRunScreen() {
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
   const [voiceOn, setVoiceOn] = useState(true);
+  useTrackVoiceAudioSession(voiceOn);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
   const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
   useEffect(() => {
     if (!voiceOn || !s.recording) return;
