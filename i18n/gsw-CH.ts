@@ -101,6 +101,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "trainingFlow.trainedToday": "Hüt trainiert",
   "trainingFlow.addExercise": "Wiiteri Üebig uswähle",
   "trainingFlow.chooseExercise": "Üebig uswähle",
+  "trainingFlow.generalTraining": "Allgemeins Training",
+  "trainingFlow.chooseExerciseToSave": "Wähl mindeschtens ei Üebig us, zum Speichere",
   "trainingFlow.optionalDetails": "Duur, Datum & wiiteri Agabe · optional",
   "trainingFlow.nextHelp": "Dini Hiwiis erschined bim nächschte Training mit dem Hund i de jeweilige Sparte wieder. Offe bliibt offe, bis du es bewusst erledigsch.",
   "trainingFlow.observed": "Hüt beobachtet",

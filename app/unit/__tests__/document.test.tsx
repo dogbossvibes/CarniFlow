@@ -1253,3 +1253,47 @@ describe('training document explicit score input', () => {
     expect(mockAtomicSave.mock.calls[0][2].score).toBe(8);
   });
 });
+
+describe('DocumentScreen — Speicher-Hinweis und Allgemeines Training (T-184)', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+  });
+  it('ohne Übung: deutlicher Hinweis, Tipp öffnet die Übungsauswahl; Speichern bleibt aus', async () => {
+    const node = render(); await flush();
+    expect(saveButton(node).props.disabled).toBe(true);
+    expect(strings(node)).toContain('trainingFlow.chooseExerciseToSave');
+    expect(strings(node)).not.toContain('training.exercisesFor');
+    tap(node, 'trainingFlow.chooseExerciseToSave'); await flush();
+    expect(strings(node)).toContain('training.exercisesFor');
+    expect(mockAtomicSave).not.toHaveBeenCalled();
+  });
+  it('„Allgemeines Training“ steht zuerst in der Auswahl und speichert als Übung der Sparte', async () => {
+    const node = render(); await flush(); await openExercisePicker(node);
+    const groups = node.root.findAll(n => typeof n.props.testID === 'string' && n.props.testID.startsWith('exercise-group-') && typeof n.props.onPress === 'function');
+    expect(groups[0].props.accessibilityLabel).toBe('trainingFlow.generalTraining');
+    tap(node, 'trainingFlow.generalTraining'); await flush();
+    expect(saveButton(node).props.disabled).toBe(false);
+    expect(strings(node)).not.toContain('trainingFlow.chooseExerciseToSave');
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_name: 'trainingFlow.generalTraining', discipline: 'Fährte' })]);
+  });
+  it('ein bestehendes „Allgemeines Training“ wird wiederverwendet, keine neue Übung angelegt', async () => {
+    mockListIdentities.mockResolvedValue({ data: [{ id: 'g1', owner_id: 'owner-1', discipline_key: 'system:faehrte', display_name: 'trainingFlow.generalTraining', revision: 1, archived_at: null }], error: null });
+    const node = render(); await flush(); await openExercisePicker(node);
+    expect(node.root.findAll(n => n.props.testID === 'exercise-group-trainingflow.generaltraining' && typeof n.props.onPress === 'function').length).toBeGreaterThan(0);
+    tap(node, 'trainingFlow.generalTraining'); await flush();
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'g1' })]);
+    expect(mockAtomicSave.mock.calls[0][5].identityChanges).toEqual([]);
+  });
+  it('Bearbeiten: kein Allgemeines-Training-Vorschlag und kein Speicher-Hinweisknopf', async () => {
+    mockParams = { id: 'existing' };
+    mockGetTrainingUnitById.mockReset().mockResolvedValue({ data: { id: 'existing', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed', session_date: '2026-10-14',
+      notes: null, duration_sec: 60, photos: [], videos: [], audio_files: [], score: null,
+      exercises: [{ id: 'row', discipline: 'Fährte', exercise_name: 'Übung', rating: 3, notes: null, duration_sec: null, seq_index: 0 }] }, error: null });
+    const node = render(); await flush();
+    expect(strings(node)).not.toContain('trainingFlow.generalTraining');
+    expect(strings(node)).not.toContain('trainingFlow.chooseExerciseToSave');
+  });
+});

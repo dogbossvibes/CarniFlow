@@ -4,6 +4,7 @@
 import type { TrainingExercise } from '@/types/trainingUnit';
 import { legacyStars, levelOf, trendOf, type LearningLevel } from '@/features/training/documentation/learningLevel';
 import { daysSince, type SummaryUnit } from './summary';
+import { isGeneralExercise } from '@/features/training/documentation/generalExercise';
 
 export const MATRIX_COLUMNS = 6;
 export const FALLBACK_DAYS = 7;
@@ -45,6 +46,10 @@ export function buildMatrix(units: readonly SummaryUnit[], discipline: string | 
   // zeigt im Tab „Alle“ auch alte Einträge ohne Übungen (nichts verschwindet).
   const scoped = all.filter(u => (u.exercises ?? []).some(inScope(discipline)));
   const listed = discipline ? scoped : all;
+  // „Allgemeines Training“ ohne bestimmte Übung: in „Alle Trainings“ sichtbar,
+  // in der Matrix (Zeilen, Spalten, Trend, Rückfall-Hinweis) ausgeblendet.
+  const inMatrix = (e: TrainingExercise) => inScope(discipline)(e) && !isGeneralExercise(e.exercise_name);
+  const matrixUnits = scoped.filter(u => (u.exercises ?? []).some(inMatrix));
 
   // Vorgänger je Zeile über die gesamte geladene Historie (nicht nur sichtbare
   // Spalten) – nur über die stabile Identität, nie über den Namen (gleiche
@@ -52,9 +57,9 @@ export function buildMatrix(units: readonly SummaryUnit[], discipline: string | 
   const previousByUnit = new Map<string, Map<string, TrainingExercise>>();
   const lastSeen = new Map<string, TrainingExercise | null>();
   const last = new Map<string, { exercise: TrainingExercise; previous: TrainingExercise | undefined; date: string }>();
-  for (const u of scoped) {
+  for (const u of matrixUnits) {
     const prev = new Map<string, TrainingExercise>();
-    const inUnit = (u.exercises ?? []).filter(inScope(discipline));
+    const inUnit = (u.exercises ?? []).filter(inMatrix);
     const count = new Map<string, number>();
     for (const e of inUnit) count.set(rowKey(e), (count.get(rowKey(e)) ?? 0) + 1);
     for (const e of inUnit) {
@@ -72,10 +77,10 @@ export function buildMatrix(units: readonly SummaryUnit[], discipline: string | 
     previousByUnit.set(u.id, prev);
   }
 
-  const visible = scoped.slice(-MATRIX_COLUMNS);
+  const visible = matrixUnits.slice(-MATRIX_COLUMNS);
   const rowsMap = new Map<string, MatrixRow & { last: string }>();
   for (const [ci, u] of visible.entries()) {
-    for (const e of [...(u.exercises ?? [])].filter(inScope(discipline)).sort((a, b) => a.seq_index - b.seq_index)) {
+    for (const e of [...(u.exercises ?? [])].filter(inMatrix).sort((a, b) => a.seq_index - b.seq_index)) {
       const k = rowKey(e);
       const row = rowsMap.get(k) ?? { key: k, name: e.exercise_name, discipline: e.discipline, cells: visible.map(() => ({ kind: 'none' } as MatrixCell)), last: '' };
       if (row.cells[ci].kind === 'none') row.cells[ci] = cellOf(e, previousByUnit.get(u.id)?.get(k));

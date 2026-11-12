@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
-  ActivityIndicator, Alert, AppState, Keyboard, KeyboardAvoidingView, Platform,
+  AccessibilityInfo, ActivityIndicator, Alert, AppState, Keyboard, KeyboardAvoidingView, Platform,
   StyleSheet, Text, TextInput, TouchableOpacity, View, type ScrollViewInstance,
 } from 'react-native';
 import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
@@ -199,6 +199,8 @@ function DocumentForm() {
   const [saved, setSaved] = useState(false);
   const [otherDogDrafts, setOtherDogDrafts] = useState<NonNullable<DocumentDraft['otherDogs']>>({});
   const scrollRef = useRef<ScrollViewInstance>(null);
+  // Lage von „Heute trainiert“ im ScrollView: der Speicher-Hinweis springt dorthin.
+  const trainedTodayY = useRef(0);
   const dogSwitchLock = useRef(false);
   useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
 
@@ -727,9 +729,9 @@ function DocumentForm() {
             onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} availableUnitIds={new Set(visibleHistory.units.map(unit => unit.id))} />}
 
           {/* Übungen von heute (früher Schritt 2) */}
-          {!editing && <><Text style={s.sectionTitle}>{t('trainingFlow.trainedToday')}</Text><TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: pickerOpen }} onPress={() => setPickerOpen(v => !v)}><Text style={s.actionText}>{t(selected.length ? 'trainingFlow.addExercise' : 'trainingFlow.chooseExercise')}</Text></TouchableOpacity></>}
+          {!editing && <><Text style={s.sectionTitle} onLayout={e => { trainedTodayY.current = e.nativeEvent.layout.y; }}>{t('trainingFlow.trainedToday')}</Text><TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: pickerOpen }} onPress={() => setPickerOpen(v => !v)}><Text style={s.actionText}>{t(selected.length ? 'trainingFlow.addExercise' : 'trainingFlow.chooseExercise')}</Text></TouchableOpacity></>}
           {(editing || pickerOpen) && disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
-            disciplineLabel={disc.label} suggestions={[...disc.exercises.filter(e => e !== 'Eigene Übung'), ...recentNames]}
+            disciplineLabel={disc.label} suggestions={[...(editing ? [] : [t('trainingFlow.generalTraining')]), ...disc.exercises.filter(e => e !== 'Eigene Übung'), ...recentNames]}
             historyByIdentity={Object.fromEntries(visibleHistory.units.filter(unit => unit.id !== id).reverse().flatMap(unit => (unit.exercises ?? [])
               .filter(exercise => !!exercise.exercise_identity_id)
               .map(exercise => [exercise.exercise_identity_id!, { date: unit.session_date, notes: exercise.notes }])))}
@@ -861,11 +863,22 @@ function DocumentForm() {
 
       {/* Speichern — sticky/fixed CTA über dem Home Indicator */}
       <SafeAreaView edges={['bottom']} style={s.footer}>
-        {!canSave && draftReady && (
+        {!canSave && draftReady && (dogId && dogs.some(d => d.id === dogId) && !editing && !selected.length ? (
+          // Kein Training ohne Übung: deutlicher Hinweis, Tipp öffnet die Übungsauswahl.
+          <TouchableOpacity style={s.saveHintButton} accessibilityRole="button" accessibilityHint={t('trainingFlow.chooseExercise')}
+            disabled={saving || remoteCompleted || pendingSave}
+            onPress={() => {
+              tapHaptic(); setPickerOpen(true);
+              scrollRef.current?.scrollTo({ y: Math.max(0, trainedTodayY.current - 12), animated: true });
+              AccessibilityInfo.announceForAccessibility(t('trainingFlow.chooseExercise'));
+            }}>
+            <Text style={[s.saveHint, s.saveHintAction]}>{t('trainingFlow.chooseExerciseToSave')}</Text>
+          </TouchableOpacity>
+        ) : (
           <Text style={s.saveHint}>
-            {!dogId ? t('training.chooseDogSaveHint') : !editing && !selected.length ? t('trainingFlow.chooseExercise') : t('trainingDoc.performedHint')}
+            {!dogId ? t('training.chooseDogSaveHint') : t('trainingDoc.performedHint')}
           </Text>
-        )}
+        ))}
         <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97}
           disabled={saving || !canSave}
           onPress={speichern}>
@@ -937,6 +950,8 @@ const s = StyleSheet.create({
 
   footer:  { paddingHorizontal: 20, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
   saveHint:{ fontSize: 12.5, color: C.textMuted, textAlign: 'center', marginBottom: 10, fontWeight: '600' },
+  saveHintButton: { minHeight: 44, justifyContent: 'center', marginBottom: 6 },
+  saveHintAction: { fontSize: 14, color: C.accent, marginBottom: 0, textDecorationLine: 'underline' },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 56, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
   saveTxt: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: 0.3 },
 });

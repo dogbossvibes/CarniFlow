@@ -102,6 +102,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "trainingFlow.trainedToday": "Entraîné aujourd’hui",
   "trainingFlow.addExercise": "Choisir un autre exercice",
   "trainingFlow.chooseExercise": "Choisir un exercice",
+  "trainingFlow.generalTraining": "Entraînement général",
+  "trainingFlow.chooseExerciseToSave": "Choisis au moins un exercice pour enregistrer",
   "trainingFlow.optionalDetails": "Durée, date et autres détails · facultatif",
   "trainingFlow.nextHelp": "Tes rappels réapparaissent à la prochaine séance de ce chien dans la discipline concernée. Ils restent ouverts jusqu’à ce que tu les termines explicitement.",
   "trainingFlow.observed": "Observation du jour",
