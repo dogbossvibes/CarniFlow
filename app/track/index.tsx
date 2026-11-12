@@ -1,6 +1,7 @@
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
+import { GroupEntry } from '@/features/training-groups/GroupEntry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -242,6 +243,7 @@ export default function TrackOverviewScreen() {
 
         <DistractionEntry dogId={effectiveDogId} />
         <PlannerEntry />
+        <GroupEntry />
         <ExchangeEntry />
 
         {/* ── Verlauf ── */}

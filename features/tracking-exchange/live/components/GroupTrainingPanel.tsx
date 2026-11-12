@@ -147,8 +147,8 @@ function GroupDetails({ props }: { props: GroupTrainingPanelProps }) {
       label={`${item.title} · ${item.status === 'ended' ? t('ended') : t('expires', { time: item.expiresLabel })}`}
       testID={`session-${item.sessionId}`} selected={session?.sessionId === item.sessionId} disabled={props.busy}
       onPress={() => props.onSelectSession(item.sessionId)} />)}
-    <Action label={t('newSession')} expanded={opening} testID="new-session" disabled={props.busy} onPress={() => setOpening(!opening)} />
-    {opening && <>
+    {group.canStartSession !== false && <Action label={t('newSession')} expanded={opening} testID="new-session" disabled={props.busy} onPress={() => setOpening(!opening)} />}
+    {opening && group.canStartSession !== false && <>
       <Field label={t('sessionTitle')} value={title} onChange={setTitle} maxLength={80} busy={props.busy} testID="session-title" />
       <DogChoice props={props} dogId={dogId} onChange={setDogId} />
       <Duration value={minutes} onChange={setMinutes} busy={props.busy} />

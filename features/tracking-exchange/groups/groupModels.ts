@@ -1,5 +1,6 @@
 import { GroupApiError } from './groupRpc';
-export interface GroupMember { membershipId: string; userId: string; displayName: string; role: 'owner' | 'member'; joinedAtMs: number }
+/** role bleibt 'owner' | 'member' (ältere App-Versionen); Organisator:in kommt als isOrganizer. */
+export interface GroupMember { membershipId: string; userId: string; displayName: string; role: 'owner' | 'member'; isOrganizer: boolean; joinedAtMs: number }
 export interface TrainingGroup { groupId: string; title: string; ownerUserId: string; status: 'active' | 'ended'; createdAtMs: number; members: GroupMember[] }
 export interface GroupInvitation { invitationId: string; groupId: string; groupTitle: string; inviterUserId: string;
   recipientUserId: string; status: 'pending' | 'accepted' | 'revoked' | 'expired'; expiresAtMs: number }
@@ -36,7 +37,8 @@ export function parseGroup(value: unknown): TrainingGroup {
     createdAtMs: number(r.createdAtMs), members: values(r.members, member => {
       const m = record(member);
       if (m.role !== 'owner' && m.role !== 'member') throw new GroupApiError('GROUP_INVALID_RESPONSE');
-      return { membershipId: id(m.membershipId), userId: id(m.userId), displayName: text(m.displayName, 60), role: m.role, joinedAtMs: number(m.joinedAtMs) };
+      return { membershipId: id(m.membershipId), userId: id(m.userId), displayName: text(m.displayName, 60), role: m.role,
+        isOrganizer: m.role === 'member' && m.isOrganizer === true, joinedAtMs: number(m.joinedAtMs) };
     }, 50) };
 }
 export function parseInvitation(value: unknown): GroupInvitation {
@@ -69,4 +71,11 @@ export function parseLivePosition(value: unknown, sessionId: string, serverNow: 
     || p.sequence > 2147483647 || p.observedAtMs < serverNow - 10000 || p.observedAtMs > serverNow + 2000
     || p.receivedAtMs > serverNow || p.expiresAtMs <= serverNow) throw new GroupApiError('GROUP_INVALID_RESPONSE');
   return p;
+}
+
+/** Darf die Gruppe verwalten: einladen, Codes, Beitritte bestätigen, Gruppentraining starten. */
+export function canManageGroup(group: TrainingGroup, userId: string | null): boolean {
+  if (!userId || group.status !== 'active') return false;
+  const me = group.members.find(m => m.userId === userId);
+  return !!me && (group.ownerUserId === userId || me.isOrganizer);
 }
