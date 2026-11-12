@@ -169,7 +169,8 @@ function SessionDetails({ props }: { props: GroupTrainingPanelProps }) {
   const active = session.status === 'active';
   const participants = props.participants.filter(person => person.sessionId === session.sessionId);
   const joined = active && participants.some(person => person.isSelf);
-  const others = participants.filter(person => !person.isSelf);
+  // Mehrere Hunde pro Person: Empfänger:innen sind Personen, nicht Hunde.
+  const others = participants.filter((person, index) => !person.isSelf && participants.findIndex(p => p.userId === person.userId) === index);
   const recipientKey = (person: ParticipantView) => `${person.userId}:${person.participationId}`;
   const eligibleIds = others.map(recipientKey).sort().join('|');
   useEffect(() => {
@@ -195,7 +196,7 @@ function SessionDetails({ props }: { props: GroupTrainingPanelProps }) {
       onCancel={() => setConfirmEnd(false)} onConfirm={() => { props.onEndSession(session.sessionId); setConfirmEnd(false); }} />}
     {joined && <>
       <Heading>{t('participants')}</Heading>
-      {participants.map(person => <DogLabel key={person.userId} participant={person} />)}
+      {participants.map(person => <DogLabel key={person.participationId} participant={person} />)}
       {props.children && <View style={s.section}><Heading>{t('tracks')}</Heading>{props.children}</View>}
       <Heading>{t('recipients')}</Heading>
       {others.length === 0 && <Text style={s.text}>{t('noRecipients')}</Text>}
