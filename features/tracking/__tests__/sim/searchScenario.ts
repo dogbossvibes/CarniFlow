@@ -45,8 +45,8 @@ export interface SearchScenario {
 
 /**
  * Unterbrechung der Absuche. `atFrac` = Zeitpunkt als Anteil der Suchdauer.
- * - lock: Bildschirm gesperrt. Die Absuche fordert keine Hintergrund-Ortung an
- *   (positionStream: allowBackground false) → iOS liefert in dieser Zeit keine Positionen.
+ * - lock: Bildschirm gesperrt. Positionen kommen nur, wenn der Recorder Hintergrund-Ortung
+ *   anfordert (seit T-206 ja); sonst liefert iOS in dieser Zeit keine.
  * - call: Anruf; App im Hintergrund wie lock, laufende Ansage bricht ab.
  * - pause: Nutzer tippt Pause und später Weiter; GPS läuft weiter.
  * - kill: App beendet; nach `durationS` wieder geöffnet und «Fortsetzen».
@@ -134,26 +134,21 @@ export async function runSearchScenario(s: SearchScenario): Promise<SearchOutcom
   const carry = s.searchCarry ?? 'hand';
   const t0 = SIM_T0_MS + Math.round((lay.truth.durationS + (s.ageMin ?? 30) * 60) * 1000);
   const profile: GpsProfile = gpsProfile(s.device, s.env, carry);
-  let fixes = simulateGps(truth.handlerTimeline, profile, s.searchDelivery ?? LIVE_DELIVERY, makeRng(seedFrom(key, 'gps')), t0);
-  let motion = s.searchMotion === false ? [] : simulateMotion(truth.handlerTimeline, motionProfile(s.platform, carry, s.device), makeRng(seedFrom(key, 'motion')), seedFrom(key, 'chain'), t0);
+  const fixes = simulateGps(truth.handlerTimeline, profile, s.searchDelivery ?? LIVE_DELIVERY, makeRng(seedFrom(key, 'gps')), t0);
+  const motion = s.searchMotion === false ? [] : simulateMotion(truth.handlerTimeline, motionProfile(s.platform, carry, s.device), makeRng(seedFrom(key, 'motion')), seedFrom(key, 'chain'), t0);
   const appDistance = s.appHandlerDistanceM ?? (handler.lineM >= 8 ? 10 : handler.lineM >= 3 ? 5 : 1);
   // ── Unterbrechungen und Bedienung in Zeitfenster und Aktionen übersetzen.
   const actions: SearchAction[] = [];
-  const blackout: { from: number; to: number }[] = [];
+  const backgroundWindows: { fromMs: number; toMs: number }[] = [];
   for (const i of s.interruptions ?? []) {
     const from = t0 + Math.round(i.atFrac * truth.durationS * 1000), to = from + i.durationS * 1000;
-    if (i.kind === 'lock' || i.kind === 'call') blackout.push({ from, to });
+    if (i.kind === 'lock' || i.kind === 'call') backgroundWindows.push({ fromMs: from, toMs: to });
     if (i.kind === 'call') actions.push({ atMs: from, kind: 'interruptSpeech' });
     if (i.kind === 'pause') actions.push({ atMs: from, kind: 'pause' }, { atMs: to, kind: 'unpause' });
-    if (i.kind === 'kill') { actions.push({ atMs: from, kind: 'kill' }, { atMs: to, kind: 'restart' }); blackout.push({ from, to }); }
-  }
-  if (blackout.length) {
-    const inside = (ms: number) => blackout.some(b => ms >= b.from && ms < b.to);
-    fixes = fixes.filter(f => !inside(f.receivedMs));
-    motion = motion.filter(m => !inside(m.t));
+    if (i.kind === 'kill') actions.push({ atMs: from, kind: 'kill' }, { atMs: to, kind: 'restart' });   // Runner verwirft alles dazwischen
   }
   if (s.manualTap) for (const a of truth.articles) if (a.pickupStartTS != null) actions.push({ atMs: t0 + Math.round((a.pickupStartTS + s.manualTap.tapAfterS) * 1000), kind: 'markObject' });
-  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0 });
+  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0, backgroundWindows });
   return { scenario: s, lay, truth, search, score: scoreSearch(lay, truth, search, !!s.manualTap) };
 }
 

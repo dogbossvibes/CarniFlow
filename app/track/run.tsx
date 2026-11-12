@@ -226,11 +226,19 @@ export default function TrackRunScreen() {
   const [voiceOn, setVoiceOn] = useState(true);
   useTrackVoiceAudioSession(voiceOn);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
   const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
+  // T-206: «Gegenstand erkannt» je Fund genau einmal pro Absuche — auch nach einem App-Neustart.
+  // resumeSearch seedet die schon gefundenen Gegenstände; die Merkliste der Sprachausgabe selbst
+  // lebt nur im Speicher und wäre nach dem Neustart leer.
+  const announcedDwellRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!voiceOn || !s.recording) return;
-    autoDwellVoiceKey.split('|').filter(Boolean).forEach(id => requestVoice({ eventType: 'object',
-      text: t('track.voiceObjectDetected'), language: speechLanguage(i18n.language as never),
-      priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' }));
+    autoDwellVoiceKey.split('|').filter(Boolean).forEach(id => {
+      if (announcedDwellRef.current.has(id)) return;
+      announcedDwellRef.current.add(id);
+      requestVoice({ eventType: 'object',
+        text: t('track.voiceObjectDetected'), language: speechLanguage(i18n.language as never),
+        priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' });
+    });
   }, [voiceOn, s.recording, autoDwellVoiceKey, t]);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
@@ -377,6 +385,7 @@ export default function TrackRunScreen() {
     try { assertTransfer(renderTransferIdentity); boundRunId = assertTransfer(currentTransfer()); }
     catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     startedRef.current = true;
+    announcedDwellRef.current = new Set();   // T-206: frische Absuche
     approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
     if (approachQaRef.current && approachOriginRef.current != null)
       approachQaRef.current.searchStartedTSec = (Date.now() - approachOriginRef.current) / 1000;
@@ -559,6 +568,7 @@ export default function TrackRunScreen() {
     const runState = useTrackingStore.getState().searchRunState;
     prevOffTrackRef.current = runState.offTrackState;
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
+    announcedDwellRef.current = new Set(runState.autoDwellObjectIds);   // T-206: schon angesagte Funde
     const startedAtMs = pending.searchStartedAt ?? Date.now();
     s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
       pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState },

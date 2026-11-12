@@ -174,8 +174,8 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
   } else if (group === 'unterbrechungen') {
     const variants: [string, Partial<SearchScenario>][] = [
       ['Basis (keine Unterbrechung)', {}],
-      ['Bildschirm 20 s gesperrt (keine Positionen)', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 20 }] }],
-      ['Bildschirm 60 s gesperrt (keine Positionen)', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
+      ['Bildschirm 20 s gesperrt', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 20 }] }],
+      ['Bildschirm 60 s gesperrt', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
       ['Anruf 45 s', { interruptions: [{ kind: 'call', atFrac: 0.45, durationS: 45 }] }],
       ['Pause 20 s, Hund läuft weiter', { interruptions: [{ kind: 'pause', atFrac: 0.45, durationS: 20 }] }],
       ['App beendet, nach 30 s fortgesetzt', { interruptions: [{ kind: 'kill', atFrac: 0.45, durationS: 30 }] }],

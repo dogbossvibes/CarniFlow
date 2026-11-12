@@ -732,8 +732,11 @@ export function useSearchRecorder(opts: {
         else autoDwellStartRef.current.delete(i);
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
+          // T-206: Wiederanlauf der Pfote nur, wenn sie hier wirklich gehalten wurde (Status offen).
+          // Ein schon verpasster/unbeobachteter Gegenstand darf die Pfote nicht zurückziehen.
+          const heldHere = objectStatusesRef.current[i] === 'pending';
           objectStatusesRef.current[i] = 'auto_dwell_found';
-          setObjectResolvedAtS(prev => ({ ...prev, [i]: (Date.now() - startMsRef.current) / 1000 }));
+          if (heldHere) setObjectResolvedAtS(prev => ({ ...prev, [i]: (Date.now() - startMsRef.current) / 1000 }));
           useTrackingStore.getState().noteSearchAutoDwell(key);
           pushSnapshot();
         }
@@ -1107,6 +1110,9 @@ export function useSearchRecorder(opts: {
           onFixRef.current(sampleToLocationObject(s));
         },
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
+        // T-206: Absuche per Audio mit Handy in der Tasche — bei gesperrtem Bildschirm liefert iOS
+        // sonst keine Positionen, und die Sprachführung verstummt. Gilt, solange der Laufbildschirm offen ist.
+        { allowBackground: true },
       );
       if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
       watchRef.current = { remove: handle.stop };
@@ -1376,9 +1382,10 @@ export function useSearchRecorder(opts: {
     });
     if (bestI >= 0) {
       foundRef.current.add(bestI);
+      const heldHere = objectStatusesRef.current[bestI] === 'pending';   // T-206: siehe Auto-Fund
       objectStatusesRef.current[bestI] = 'manual_found';
       const resolvedIndex = bestI;
-      setObjectResolvedAtS(prev => ({ ...prev, [resolvedIndex]: (Date.now() - startMsRef.current) / 1000 }));
+      if (heldHere) setObjectResolvedAtS(prev => ({ ...prev, [resolvedIndex]: (Date.now() - startMsRef.current) / 1000 }));
       autoDwellRef.current.delete(bestI);
       autoDwellStartRef.current.delete(bestI);
       // Resolving this object must release its blocker even without another fix.
