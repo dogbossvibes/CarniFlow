@@ -496,6 +496,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "greeting.morning": "Bonjour",
   "greeting.day":     "Bonjour",
   "greeting.evening": "Bonsoir",
+  "activeDog.title": "Chien actif",
+  "activeDog.hint": "S'applique à l'analyse et à l'aperçu des pistes. Tu peux changer à tout moment.",
+  "activeDog.switchA11y": "Chien actif : {dog}. Changer",
 
   // Einführung beim ersten Start
   "onboarding.tagline": "L'entraînement, le pistage et la santé de ton chien au même endroit.",

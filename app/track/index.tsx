@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
+import { useActiveDog } from '@/hooks/useActiveDog';
 import { useSession } from '@/hooks/useSession';
 import { getTrackSessionById, deleteTrackSession } from '@/features/tracking/services/trackService';
 import { getTrackHistory } from '@/features/tracking/services/trackHistoryService';
@@ -64,13 +65,14 @@ export default function TrackOverviewScreen() {
   }, [faehrtenHydrated, router]);
   const { dogs } = useDogs();
 
-  const [dogId, setDogId]   = useState<string | null>(null);
   const [rows, setRows]     = useState<any[]>([]);
   const [hero, setHero]     = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const { showToast, toast } = useToast();
 
-  const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
+  // Aktiver Hund gilt app-weit (stores/activeDog.ts). Ohne Auswahl wie bisher
+  // der erste Hund der Liste.
+  const { activeDog, setActiveDog } = useActiveDog(dogs);
   const effectiveDogId = activeDog?.id ?? null;
 
   const load = useCallback(async () => {
@@ -165,7 +167,7 @@ export default function TrackOverviewScreen() {
       <FaehrtenHeader
         title="FÄHRTEN"
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training' as never))}
-        dog={activeDog} dogs={dogs} onDog={setDogId}
+        dog={activeDog} dogs={dogs} onDog={setActiveDog}
       />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>

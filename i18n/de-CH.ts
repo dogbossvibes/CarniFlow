@@ -683,6 +683,9 @@ export const deCH = {
   'greeting.morning': 'Guten Morgen',
   'greeting.day':     'Guten Tag',
   'greeting.evening': 'Guten Abend',
+  'activeDog.title': 'Aktiver Hund',
+  'activeDog.hint': 'Gilt für Analyse und Fährten-Übersicht. Du kannst jederzeit wechseln.',
+  'activeDog.switchA11y': 'Aktiver Hund: {dog}. Wechseln',
 
   // Einführung beim ersten Start
   'onboarding.tagline': 'Training, Fährte und Gesundheit deines Hundes an einem Ort.',
