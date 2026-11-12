@@ -4,5 +4,11 @@
   "redirects": [
     { "source": "/privacy", "destination": "/datenschutz", "permanent": true },
     { "source": "/terms", "destination": "/agb", "permanent": true }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  }
 }
