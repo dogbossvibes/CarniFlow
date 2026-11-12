@@ -73,6 +73,8 @@ Kundendaten: Build 49 speichert Entwürfe mit `workflowStep`. Vor dem Release au
 
 Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Store. Gleich wie iOS entscheiden heisst: Android-Nutzer:innen verlieren sie beim Update auf Build 60.
 
+**Nutzerentscheid 2026-11-12: alle vier nachziehen** (Android-Funktionen behalten).
+
 | Gruppe | OTA | Befund | iOS-Entscheid |
 |---|---|---|---|
 | `a7ec4e94` | Build 47: Teilen- und Gruppen-Hub, Erste Schritte, Hilfe | 51/867 Zeilen; Hilfe-Center, Erste-Schritte-Tour und `/track/sharing` fehlen | #32 nicht übernommen |
@@ -89,7 +91,7 @@ Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Stor
 
 **Native Teile von Build 49, die in der Build-60-Basis fehlen** (kein OTA-Thema, aber für den Android-Build entscheidend):
 
-- **`modules/anyvo-daily-widget`**: Android-Startbildschirm-Widget „Heute“ (`app/widgets/today.tsx`, `features/widgets/*`). Fehlt komplett. Ohne Nachziehen verschwindet das Widget bei Nutzer:innen, die es eingerichtet haben.
+- **`modules/anyvo-daily-widget`**: Android-Startbildschirm-Widget „Heute“ (`app/widgets/today.tsx`, `features/widgets/*`). Fehlt komplett. Ohne Nachziehen verschwindet das Widget bei Nutzer:innen, die es eingerichtet haben. **Nutzerentscheid 2026-11-12: nachziehen**; damit auch die Widget-Aktualisierung aus `4d3845d7`.
 - **`modules/anyvo-greeting-audio`**: Android-eigene Wiedergabe des Begrüssungstons. Build 60 spielt den Ton über `features/home/useGreetingSound.ts`; ob das auf Android gleich funktioniert (Audiofokus, Lautlos), auf dem Gerät prüfen.
 
 ## 1. Bestätigt fehlend – Android-eigene Änderungen (inhaltlich geprüft) (2)
