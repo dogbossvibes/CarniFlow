@@ -79,6 +79,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "analyse.running": "Smart Analyse is running …",
   "analyse.emptyTitle": "Log training and discover patterns",
   "analyse.emptyText": "Anyvo analyses your training from your training data, without you having to evaluate everything manually.",
+  "analyse.emptyTitleDog": "No analysis for {dog} yet",
+  "analyse.emptyHint": "Log a training with a rating. Score, trend and focus areas will then appear here.",
   "analyse.capture": "Log training",
   "analyse.cardTitle": "Smart Analyse",
   "analyse.cardSub": "Analysis & recommendation",
