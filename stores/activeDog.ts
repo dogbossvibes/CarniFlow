@@ -21,6 +21,9 @@ export function resolveActiveDogId(storedId: string | null, dogs: readonly { id:
 let currentUserId: string | null = null;
 let hydratedFor: string | null | undefined = undefined;
 let storedId: string | null = null;
+// Auswahl, die getroffen wurde, bevor der Speicher geladen war. Sie gewinnt
+// gegen den gespeicherten Wert, damit ein früher Tipp nicht verloren geht.
+let pendingChoice: string | null = null;
 const listeners = new Set<() => void>();
 const emit = () => { for (const l of listeners) l(); };
 
@@ -33,7 +36,10 @@ async function hydrate(userId: string | null) {
   } catch { next = null; }
   // Zwischenzeitlicher Nutzerwechsel: veraltetes Ergebnis verwerfen.
   if (currentUserId !== userId) return;
-  storedId = next;
+  const chosenEarly = pendingChoice;
+  storedId = chosenEarly ?? next;
+  pendingChoice = null;
+  if (chosenEarly && chosenEarly !== next) persist();
   hydratedFor = userId;
   emit();
 }
@@ -41,9 +47,16 @@ async function hydrate(userId: string | null) {
 // Aktiven Hund setzen (idempotent). Gilt sofort in allen Bildschirmen.
 export function setActiveDogId(dogId: string) {
   if (!dogId || storedId === dogId) return;
+  if (hydratedFor !== currentUserId) pendingChoice = dogId;
   storedId = dogId;
   emit();
-  AsyncStorage.setItem(activeDogKeyForUser(currentUserId), dogId).catch(() => { /* best-effort */ });
+  // Vor dem Laden ist der Nutzer evtl. noch unbekannt: dann speichert hydrate().
+  if (hydratedFor === currentUserId) persist();
+}
+
+function persist() {
+  if (!storedId) return;
+  AsyncStorage.setItem(activeDogKeyForUser(currentUserId), storedId).catch(() => { /* best-effort */ });
 }
 
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
@@ -56,7 +69,7 @@ export function useStoredActiveDogId(userId: string | null | undefined): string 
     const uid = userId ?? null;
     if (hydratedFor !== uid) void hydrate(uid);
   }, [userId]);
-  return hydratedFor === (userId ?? null) ? snap : null;
+  return hydratedFor === (userId ?? null) || pendingChoice !== null ? snap : null;
 }
 
 // Nur für Tests: Modulzustand zurücksetzen.
@@ -64,4 +77,5 @@ export function __resetActiveDogForTests() {
   currentUserId = null;
   hydratedFor = undefined;
   storedId = null;
+  pendingChoice = null;
 }
