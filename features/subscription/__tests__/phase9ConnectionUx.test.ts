@@ -31,12 +31,14 @@ describe('Health Sharing: "Person verbinden" is generic, not routed into Trainer
   it('no longer routes to /trainer', () => {
     expect(content).not.toMatch(/router\.push\('\/trainer'/);
   });
-  it('opens an in-screen generic person search instead, using searchAnyvoPeople/connectAnyvoPerson', () => {
-    expect(content).toMatch(/import \{ connectAnyvoPerson, searchAnyvoPeople, type AnyvoPersonResult \} from '@\/services\/connectionService'/);
-    expect(content).toMatch(/const openConnectionFlow = \(\) => setPersonSearchOpen\(true\)/);
+  // Seit den Kontaktanfragen (20261111220000): keine Namenssuche und keine
+  // Sofortverbindung mehr; neue Personen kommen über eine Anfrage dazu.
+  it('adds new people through a contact request, not through a name search with instant connection', () => {
+    expect(content).toMatch(/const openConnectionFlow = \(\) => router\.push\('\/contacts\/add' as never\)/);
+    expect(content).not.toMatch(/searchAnyvoPeople|connectAnyvoPerson/);
   });
-  it('"Person verbinden" remains reachable even once at least one person is already connected (not only in the empty state)', () => {
-    expect(content).toMatch(/onPress=\{openConnectionFlow\} accessibilityRole="button" accessibilityLabel=\{t\('health\.shareConnectPerson'\)\}/);
+  it('"Kontakt hinzufügen" remains reachable even once at least one person is already connected (not only in the empty state)', () => {
+    expect(content).toMatch(/onPress=\{openConnectionFlow\} accessibilityRole="button" accessibilityLabel=\{t\('health\.shareAddContact'\)\}/);
   });
 });
 
@@ -85,6 +87,7 @@ describe('Health grant connection source now covers both trainer_client and gene
     const fn = healthService.match(/export async function loadHealthGrantConnections[\s\S]*?\n\}/)?.[0] ?? '';
     expect(fn).toMatch(/listConnections\(user\.id, 'trainer_client'\)/);
     expect(fn).toMatch(/listConnections\(user\.id, PERSON_CONNECTION_TYPE\)/);
+    expect(fn).toMatch(/listConnections\(user\.id, 'contact'\)/);
   });
 });
 
