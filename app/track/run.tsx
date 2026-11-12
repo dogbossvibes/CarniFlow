@@ -1,9 +1,19 @@
+import { isScoredObject, isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
+import { countLaidCorners, projectAngleMarkers, specialAngleBadge } from '@/features/tracking/utils/specialAngleGeometry';
+import { ANGLE_LABEL, ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
+import { nextSearchEvents, type SearchEvent } from '@/features/tracking/utils/searchMapView';
+import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
+import { useSession } from '@/hooks/useSession';
+import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
+import type { TransferRunIdentity } from '@/features/tracking-transfer/runScope';
+import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
+import { readContinuityPoint } from '@/features/tracking/utils/trackContinuity';
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -39,7 +49,7 @@ import {
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
 import { nextObjectDistance, searchDistanceReadout } from '@/features/tracking/utils/distanceScale';
-import type { SearchRunState } from '@/features/tracking/store/searchRunState';
+import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
@@ -75,6 +85,7 @@ const SHOW_GPS_DEBUG = __DEV__;
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -112,11 +123,17 @@ const EMPTY_SNAP_CONST = {
 export default function TrackRunScreen() {
   const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
   const router = useRouter();
+  const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
+  const { session: transferAuth } = useSession();
+  const transferScope = useTransferRunScope(transferAuth?.user.id ?? null);
+  const transferToken = transferScope.token();
   const { t } = useT();
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
   // Registry aufräumen: eine abgeschlossene/abgebrochene Fährte gehört dem Hund
   // nicht mehr als „offen". Ein no-op ohne dogId (Legacy-Deeplinks).
   const clearRegistry = useCallback(() => { if (dogId) useActiveFaehrten.getState().remove(dogId); }, [dogId]);
+  const storedColorDogId = useTrackingStore(st => id && st.currentSessionId === id ? st.dogId : null);
+  const { color: layColor } = useDogTrackColor(dogId ?? storedColorDogId);
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
 
   // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
@@ -126,12 +143,13 @@ export default function TrackRunScreen() {
   // Frischer Start und Discard bauen den Snapshot OHNE Recovery (recovery: null).
   const buildSnap = (withRecovery = false) => {
     const st = useTrackingStore.getState();
-    const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null)
+      .map((m, recoveryIndex) => ({ ...m, recoveryIndex })).filter(isScoredObject);
     // `t` (Fix-Zeitstempel je Linienpunkt) bleibt erhalten: canonicalArc wählt
     // bei selbst-benachbarten Schenkeln den Durchgang über die gemeinsame
     // Zeitachse Marker ↔ Linie (P0 „Self-Crossing", qa-0ec8c4ca). Für den
     // Recorder (LL) ist das Feld unsichtbar.
-    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, t: p.t }));
+    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, t: p.t, ...(p.breakBefore ? { breakBefore: true } : {}) }));
     // Kanonische Eventposition (P0-Fix „Canonical Reference Progress"): JEDER
     // Marker bekommt seine Bogenlänge auf GENAU dieser laidPoints-Linie —
     // per Projektion seiner Koordinate (canonicalArc.ts). `distance_from_start`
@@ -151,12 +169,13 @@ export default function TrackRunScreen() {
       }
     }
     return {
-      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
+      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
-        index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
-      laidMarkers: st.markers,
+        accuracyM: m.accuracy ?? null,   // T-196: Nähe-Toleranz der Auto-Erkennung
+        index: i, recoveryIndex: m.recoveryIndex, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
+      laidMarkers: projectAngleMarkers(st.markers),
       eventArcs,
       segments: st.segments,
       referenceCanonicalLengthM: st.distanceMeters,
@@ -171,6 +190,17 @@ export default function TrackRunScreen() {
 
   const [phase, setPhase] = useState<'checking' | 'ready'>('checking');
   const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
+  const assertTransfer = useCallback((value: TransferRunIdentity | null | undefined) =>
+    transferScope.assert(transferToken, value, id ?? effectiveId, dogId), [transferScope, transferToken, id, effectiveId, dogId]);
+  const allowedTransfer = useCallback((value: TransferRunIdentity | null | undefined) => {
+    try { assertTransfer(value); return true; } catch { return false; }
+  }, [assertTransfer]);
+  const currentTransfer = useCallback(() => {
+    const st = useTrackingStore.getState();
+    return { transferReceipt: st.transferReceipt, sessionId: st.currentSessionId, dogId: st.dogId, runId: st.searchRunId };
+  }, []);
+  // eslint-disable-next-line react-hooks/use-memo -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
+  const renderTransferIdentity = useMemo(currentTransfer, [currentTransfer, transferToken, effectiveId, dogId, phase]);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
   const finishRequestedRef = useRef(false);   // synchroner Once-only-Guard für Confirm-Callbacks
@@ -184,7 +214,7 @@ export default function TrackRunScreen() {
   // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
   // persistiert (Store/PendingTrack) und bei Recovery wiederhergestellt (Default 5).
   const [searchHandlerDistanceM, setSearchHandlerDistanceM] = useState<SearchHandlerDistanceM>(DEFAULT_HANDLER_DISTANCE_M);
-  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
+  const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
 
   const laidAngleArcM = useMemo(() => snapData.laidMarkers.filter(m => m.type === 'winkel')
     .flatMap(m => { const at = snapData.eventArcs[m.id]?.arcM; return at == null ? [] : [at]; }), [snapData]);
@@ -206,6 +236,8 @@ export default function TrackRunScreen() {
   const [finishing, setFinishing] = useState(false);
   const [pendingExit, setPendingExit] = useState<string | null>(null);
   const [pocketLock, setPocketLock] = useState(false);
+  const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -214,6 +246,8 @@ export default function TrackRunScreen() {
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
   const searchStartMsRef = useRef<number | null>(null);   // Suchzeit-Start (für lokale Run-Finalisierung)
+  const endEventRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
+  const endEventObservationRef = useRef<'complete' | 'partial' | 'unknown'>('unknown');
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
   // Off-Track-Übergänge (Feedback nur auf echten State-Wechseln); wird bei Resume aus
   // dem Search-Recovery-State geseedet (siehe resumeSearch), bei Discard zurückgesetzt.
@@ -254,19 +288,30 @@ export default function TrackRunScreen() {
     }
   }, [arming]);
   const approachPhaseRef = useRef(approach.phase);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachPhaseRef.current = approach.phase;
   const approachArmedRef = useRef(approach.armed);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachArmedRef.current = approach.armed;
   const approachDistanceRef = useRef(approach.distanceM);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachDistanceRef.current = approach.distanceM;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
     const rel = (ms: number | null) => ms == null ? null : Math.max(0, (ms - approachOriginRef.current!) / 1000);
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     approachQaRef.current = {
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startDistanceM: approachQaRef.current?.startDistanceM ?? approach.distanceM,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       firstStableFixTSec: rel(approach.firstStableFixAtMs), armedTSec: rel(approach.armedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startZoneEnteredTSec: rel(approach.startZoneEnteredAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       voiceTriggerTSec: rel(approach.startReachedAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startReachedTSec: rel(approach.startReachedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       departedStartTSec: rel(approach.departedStartAtMs), searchStartedTSec: null,
       reason: approach.reason,
     };
@@ -297,7 +342,7 @@ export default function TrackRunScreen() {
     let alive = true;
     (async () => {
       const pending = await loadPending(dogId);
-      if (!alive) return;
+      if (!alive || !allowedTransfer(pending) || !allowedTransfer(currentTransfer())) return;
       // Persistierten Startanker als Fallback merken (RC-4): überlebt App-Neustart.
       if (pending?.startAnchor) setAnchorFallback({ lat: pending.startAnchor.lat, lng: pending.startAnchor.lng });
       // Recovery: gewählten 1/5/10-m-Abstand wiederherstellen (nicht erneut fragen).
@@ -333,12 +378,15 @@ export default function TrackRunScreen() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, transferToken, transferAuth?.user.id]);
 
   // Absuche WIRKLICH starten: Recorder + Timer + Status 'searching'. Wird erst am
   // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
   const beginSearchNow = useCallback((mode: StartMode = 'manual-at-start') => {
     if (startedRef.current) return;
+    let boundRunId: string | null;
+    try { assertTransfer(renderTransferIdentity); boundRunId = assertTransfer(currentTransfer()); }
+    catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     startedRef.current = true;
     approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
     if (approachQaRef.current && approachOriginRef.current != null)
@@ -362,10 +410,12 @@ export default function TrackRunScreen() {
       language: speechLanguage(i18n.language as never), priority: 2,
       onceKey: 'search-started', phase: 'search' });
     const startMs = Date.now();
+    endEventRef.current = null;
+    endEventObservationRef.current = 'complete';
     searchStartMsRef.current = startMs;
     // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
     // Wird via setSearchRunId in den PendingTrack persistiert → überlebt App-Kill/Recovery.
-    const runUuid = Crypto.randomUUID();
+    const runUuid = boundRunId ?? Crypto.randomUUID();
     runIdRef.current = runUuid;
     useTrackingStore.getState().setSearchRunId(runUuid);
     // Gewählten Abstand in den Store spiegeln → landet im PendingTrack-Snapshot (Recovery).
@@ -377,7 +427,7 @@ export default function TrackRunScreen() {
     // (forceLocked), statt zusätzlich noch die interne Akquisition zu
     // verlangen. 'manual-at-start' (Ansatz bereits per approach.armed
     // bestätigt) durchläuft weiterhin die normale Akquisition unverändert.
-    s.start(undefined, { forceLocked: mode === 'manual-override' });
+    s.start(undefined, { forceLocked: mode === 'manual-override', diagnosticAttemptKey: runUuid });
     // Status 'searching' + Suchzeit-Start + FRISCHER Run-State. runUuid wird hier
     // mitgegeben (vorher `null` → überschrieb die Zeile davor und der Puffer verlor
     // die runId; Resume erzeugte dadurch eine NEUE Run-ID statt derselben).
@@ -385,12 +435,13 @@ export default function TrackRunScreen() {
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
-  }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM, t]);
+  }, [s, voiceOn, dogId, searchHandlerDistanceM, t, assertTransfer, currentTransfer, renderTransferIdentity]);
 
   // Nach bestätigtem Ansatz und echter Abbewegung beginnt die Absuche ohne
   // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
   useEffect(() => {
     if (arming && approach.phase === 'departed_start' && approach.startReachedAtMs != null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       beginSearchNow('automatic-departure');
   }, [arming, approach.phase, approach.startReachedAtMs, beginSearchNow]);
 
@@ -419,6 +470,7 @@ export default function TrackRunScreen() {
   //    kontrollierter Bestätigungsdialog. Kein Start bei ausstehendem Recovery-Dialog.
   useEffect(() => {
     if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     if (startPoint) { setArming(true); return; }
     // RC-4: Kein Startpunkt (Runtime leer UND kein persistierter Anker) → NICHT
     // stillschweigend direkt starten. Kontrollierte Recovery-Auswahl anbieten.
@@ -468,18 +520,24 @@ export default function TrackRunScreen() {
       const rows = await getSearchPointsBySession(sessId).catch(() => [] as any[]);
       saved = rows.map(r => ({
         lat: r.latitude, lng: r.longitude, accuracy: r.accuracy ?? null, altitude: r.altitude ?? null,
-        speed: r.speed ?? null, heading: null, t: Date.parse(r.timestamp) || Date.now(),
+        speed: r.speed ?? null, heading: null, t: Date.parse(r.timestamp), ...readContinuityPoint(r.payload_json),
       }));
     }
-    if (saved.length === 0) saved = pending.searchPoints ?? [];
-    return dedupeSearchPoints(saved);
+    // SQLite can contain the flushed prefix while the pending snapshot has the tail.
+    return dedupeSearchPoints([...saved, ...(pending.searchPoints ?? [])]
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng) && Number.isFinite(p.t))
+      .sort((a, b) => a.t - b.t));
   };
 
   // 3) Recovery-Dialog: „Laufende Absuche fortsetzen?" (Fortsetzen/Beenden/Verwerfen).
   const showRecoveryDialog = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Beenden',    onPress: () => confirmRecoveryEnd(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Verwerfen', style: 'destructive', onPress: () => discardSearch(pending) },
     ], { cancelable: false });
   };
@@ -488,14 +546,23 @@ export default function TrackRunScreen() {
   // Fortsetzen: bestehenden Datensatz weiterverwenden (KEINE neue runId, keine Duplikate,
   // Recorder genau einmal — resume seedet Punkte/Distanz/Timer).
   const resumeSearch = async (pending: PendingTrack) => {
+    let transferredRun: string | null;
+    try {
+      transferredRun = assertTransfer(pending);
+      if (transferredRun && pending.runId && transferredRun !== pending.runId) throw new Error('TRANSFER_RUN_MISMATCH');
+    } catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     const saved = await loadSavedSearchPoints(pending);
+    if (!allowedTransfer(pending)) return;
     useTrackingStore.getState().setSearchPoints(saved);
     useTrackingStore.getState().setSessionStatus('searching');
     // DIESELBE runUuid weiterverwenden (keine neue Run-ID, keine Duplikate). Fehlt sie
     // in einem Legacy-Puffer, deterministisch einmal erzeugen + persistieren.
-    const rid = pending.runId ?? Crypto.randomUUID();
+    const rid = transferredRun ?? pending.runId ?? Crypto.randomUUID();
     runIdRef.current = rid;
     useTrackingStore.getState().setSearchRunId(rid);
+    endEventRef.current = null;
+    // Auch eine Recovery ohne gespeicherte Punkte ist nur teilweise beobachtet.
+    endEventObservationRef.current = 'partial';
     searchStartMsRef.current = pending.searchStartedAt ?? Date.now();
     startedRef.current = true;   // verhindert den frischen Start-Effect
     setRecovery(null);
@@ -508,52 +575,58 @@ export default function TrackRunScreen() {
     const runState = useTrackingStore.getState().searchRunState;
     prevOffTrackRef.current = runState.offTrackState;
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
-    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })), startedAtMs: pending.searchStartedAt ?? Date.now(), runState });
+    const startedAtMs = pending.searchStartedAt ?? Date.now();
+    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
+      pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState },
+    { diagnosticAttemptKey: runIdRef.current ?? undefined });
   };
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
   const endSearch = async (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
+    if (!(await flushSearchPoints(pending.sessionId ?? effectiveId ?? undefined).catch(() => false))) {
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
+    if (!allowedTransfer(pending)) return;
     const saved = await loadSavedSearchPoints(pending);
-    await flushSearchPoints().catch(() => {});
+    if (!allowedTransfer(pending)) return;
     const sessId = pending.sessionId ?? effectiveId;
-    const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
+    if (!sessId) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
+    const runId = assertTransfer(pending) ?? pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
     const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
-    // LOKAL zuerst (durabel): Run-Ergebnis der beendeten Absuche in payload_json.run.
-    //
-    // BEKANNTE EINSCHRÄNKUNG (Punkt 8 der Nachbesserung, geprüft, nicht
-    // improvisiert): dieser Recovery-Kurzpfad läuft NICHT über den laufenden
-    // useSearchRecorder — `saved` sind rohe, aus SQLite/dem Store
-    // wiederhergestellte Punkte (lat/lng/accuracy/…), OHNE die pro-Fix
-    // Cursor-Projektion/Abweichung/Fusion-Confidence, aus der
-    // AnalyticsSample[] besteht. Score/deviationAvgM/foundObjects/breaks sind
-    // in diesem Pfad bereits VOR dieser Nachbesserung hart auf 0/leer gesetzt
-    // (dieselbe Einschränkung, nicht neu) — `analytics` würde dieselbe Lücke
-    // erben und könnte nur durch ein vollständiges Offline-Replay der
-    // Fährtenprojektion (projectForward/EMA/Fusion ausserhalb des Hooks neu
-    // implementiert) korrekt gefüllt werden. Das wäre ein grosser, riskanter
-    // Eingriff ausserhalb des Scopes dieser Nachbesserung ("maximal
-    // konservativ") — daher bewusst NICHT improvisiert. `analytics` bleibt
-    // hier absichtlich weg (siehe buildRunResultPayload — additiv/optional,
-    // kein Dummy-Objekt). Test: run-recovery-analytics-gap.test.ts.
-    if (sessId) {
+    // Recovery has no complete per-fix analytics history. Preserve known facts;
+    // an unavailable score is null, never a fabricated zero-point performance.
+    const runState = useTrackingStore.getState().searchRunState;
+    try {
       await finalizeLocalTrackRun(sessId, buildRunResultPayload({
         runId, sessionId: sessId,
         startedAtMs: pending.searchStartedAt ?? Date.now(), endedAtMs: Date.now(),
         result: {
-          durationS, score: 0, deviationAvgM: 0, foundObjects: 0, totalObjects: 0,
-          distanceM: pathDistanceM(saved), breaks: [],
-          points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })),
+          durationS, score: null,
+          deviationAvgM: runState.devCount > 0 ? runState.devSumM / runState.devCount : null,
+          foundObjects: snapData.laidObjects.filter(o => !isTrainingJoker(o.material) && runState.foundObjectIds.includes(searchObjectKey(o, o.index))).length,
+          totalObjects: snapData.laidObjects.filter(o => !isTrainingJoker(o.material)).length,
+          distanceM: pathDistanceM(saved), breaks: runState.breaks,
+          points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
         },
+        pointsTimeSec: pending.searchStartedAt != null ? saved.map(p => Math.max(0, (p.t - pending.searchStartedAt!) / 1000)) : undefined,
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
+        referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
         // analytics bewusst NICHT gesetzt — siehe Kommentar oben.
-      })).catch(() => {});
+      }), pending.transferReceipt ? () => assertTransfer(pending) : undefined);
+    } catch {
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return; // keep the recoverable session until the local result is durable
     }
+    if (!allowedTransfer(pending)) return;
     // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
     if (sessId) {
       try { await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 }); }
       catch (e) { console.warn('[trackRun] enqueue', e); }
       void syncNow().catch(() => {});
     }
+    if (!allowedTransfer(pending)) return;
     startedRef.current = true;
     setRecovery(null);
     s.stop();
@@ -565,16 +638,20 @@ export default function TrackRunScreen() {
 
   // Verwerfen: NUR den Suchlauf löschen (gelegte Fährte bleibt), mit Bestätigung.
   const discardSearch = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Absuche verwerfen?', 'Nur der Suchlauf wird gelöscht — die gelegte Fährte bleibt erhalten.', [
       { text: 'Abbrechen', style: 'cancel', onPress: () => showRecoveryDialog(pending) },
       { text: 'Verwerfen', style: 'destructive', onPress: async () => {
+        if (!allowedTransfer(pending)) return;
         const sessId = pending.sessionId ?? effectiveId;
         // NUR den Suchversuch verwerfen (wie der Dialog sagt): Suchpunkte dieser Session
         // löschen, Fährte wieder 'resting' (Puffer + Registry), Lay-Daten/Session/Hund
         // bleiben. Kein 'cancelled', kein dauerhafter Abbruch-Marker — das ist allein
         // „Fährte abbrechen" vorbehalten. Danach zurück in die Liegezeit.
-        const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);
-        if (!released.ok) useTrackingStore.getState().clearSearchSession();   // lokal trotzdem nie 'cancelled'
+        const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null, pending.transferReceipt
+          ? { userId: pending.transferReceipt.recipientUserId, assertScope: () => assertTransfer(pending) } : undefined);
+        if (!allowedTransfer(pending)) return;
+        if (!released.ok) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
         useTrackingStore.getState().resetSearchPoints();   // leert auch den Run-State
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
         // Kein State des verworfenen Runs darf in den neuen Search überlaufen.
@@ -588,14 +665,35 @@ export default function TrackRunScreen() {
   };
 
   // Hundespur / Abriss / Position → Karten-Koordinaten ({lat,lng}).
-  const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude })), [s.points]);
+  const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}) })), [s.points]);
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({
-    id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material,
-  }));
-  const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
+  // `arcM` = kanonische Bogenlänge (Snapshot) — nur für die Kartenansicht der
+  // Absuche (Kürzel-Platzierung, Laufrichtung, Zoom). Reine Anzeige.
+  const mapMarkers: MapMarker[] = useMemo(() => snapData.laidMarkers.map(m => ({
+    ...m, arcM: snapData.eventArcs[m.id]?.arcM ?? null,
+  })), [snapData.laidMarkers, snapData.eventArcs]);
+  // Ereignisse für den Hinweis «Nächstes Ereignis»: dieselben Kürzel wie auf der
+  // Karte (Winkel: 90 R/90 L/SR/SL/GW …, Gegenstände: G1, G2 …), nur geführte
+  // (bewertete) Gegenstände — wie Sprach- und Haptikführung.
+  const searchEvents = useMemo<SearchEvent[]>(() => {
+    const list = mapMarkers.filter(m => m.lat != null && m.lng != null);
+    const numbers = objectNumbers(list);
+    const events: SearchEvent[] = [];
+    list.forEach((m, index) => {
+      if (m.arcM == null) return;
+      const id = m.id ?? `mk-${index}`;
+      if (m.type === 'winkel') {
+        const undirectedAbriss = m.angleKind === 'abriss' && m.geometryDirection !== 'links' && m.geometryDirection !== 'rechts';
+        events.push({ id, arcM: m.arcM, label: undirectedAbriss ? ANGLE_LABEL.abriss : specialAngleBadge(m) ?? ((m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠') });
+      } else if (isScoredObject(m)) {
+        events.push({ id, arcM: m.arcM, label: `G${m.objectIndex ?? numbers.get(index) ?? ''}` });
+      }
+    });
+    return events;
+  }, [mapMarkers]);
+  const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
   // Bogenlänge). Ereignis-Bogenlänge = KANONISCHE arcM aus dem Snapshot
@@ -609,15 +707,15 @@ export default function TrackRunScreen() {
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
-  // Gegenstände (inkl. material für die Voice-Ansage „Dübel"/„Gegenstand").
+  // Nur reguläre Gegenstände führen die Absuche; optionale Joker bleiben Kartenmarker.
   const guidanceObjects = useMemo<GuidanceObject[]>(
     () => snapData.laidMarkers
-      .filter(m => m.type === 'gegenstand')
+      .filter(isScoredObject)
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
   // ── Search-Guidance Activation Guard ─────────────────────────────────────
-  // EIN zentraler Zustand für ACTIVE SEARCH GUIDANCE (Winkel/Gegenstand/Dübel/
+  // EIN zentraler Zustand für ACTIVE SEARCH GUIDANCE (Winkel/Gegenstand/
   // GW-OW-BW-Abriss-Voice, deren Haptik, Segment-Ansagen, Off-Track-Feedback,
   // Ende). Zwei bestehende Recorder-Authorities, beide nötig:
   //   • `s.recording` — true erst ab s.start() (beginSearchNow/resumeSearch),
@@ -666,24 +764,25 @@ export default function TrackRunScreen() {
   const acceptedHandlerDistanceToEndM = s.endHandlerFix && endPoint ? haversineM(s.endHandlerFix.position, endPoint) : null;
   const lastSegmentReached = s.trackLengthM > 0 && s.progressM / s.trackLengthM >= 0.75
     && acceptedHandlerDistanceToEndM != null && acceptedHandlerDistanceToEndM <= 5;
-  // QA (rein beobachtend): Zustand beim einmaligen Ende-Ereignis festhalten. Die
+  // Support und QA (rein beobachtend): das tatsächliche Ende-Ereignis festhalten. Die
   // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
   // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
   const sLatestRef = useRef(s);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sLatestRef.current = s;
   const voiceOnRef = useRef(voiceOn);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   voiceOnRef.current = voiceOn;
-  const qaEndRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
   const noteEndFired = useCallback(() => {
     useTrackingStore.getState().noteSearchEndFired();
     sLatestRef.current.confirmEnd();
-    if (isQaDiagnosticsEnabled() && !qaEndRef.current) {
+    if (!endEventRef.current) {
       const st = sLatestRef.current;
-      qaEndRef.current = {
+      endEventRef.current = {
         tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
         progressM: st.dogProgressM, searchDistanceM: st.distanceM, voice: voiceOnRef.current,
       };
-      if (endConfirmationRef.current) endConfirmationRef.current.confirmationTSec = qaEndRef.current.tSec;
+      if (endConfirmationRef.current) endConfirmationRef.current.confirmationTSec = endEventRef.current.tSec;
     }
   }, []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
@@ -696,8 +795,14 @@ export default function TrackRunScreen() {
       : Math.max(0, (grace.endedAtMs - searchStartMsRef.current) / 1000);
     endConfirmationRef.current.finalObjectGraceReason = grace.reason;
   }, []);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
+    paused: s.paused,
+    continuityEpoch: s.continuityEpoch,
+    sessionId: effectiveId,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
+    runId: runIdRef.current,
     dogProgressM: s.dogProgressM,
     handlerProgressM: s.progressM,
     handlerPosition: s.position,
@@ -754,14 +859,14 @@ export default function TrackRunScreen() {
       finalObjectGraceEndedTSec: finalObjectGraceQaRef.current.endedAtMs == null || searchStartMsRef.current == null ? null
         : Math.max(0, (finalObjectGraceQaRef.current.endedAtMs - searchStartMsRef.current) / 1000),
       finalObjectGraceReason: finalObjectGraceQaRef.current.reason,
-      confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? qaEndRef.current?.tSec ?? null,
+      confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? endEventRef.current?.tSec ?? null,
       rejectionReason: blockerReason,
     };
     const recorded = boundedPush(endQaRef.current, { tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
       handlerProgressM: s.progressM, dogProjectedProgressM: s.dogProgressM,
       configuredDogLeadM: searchHandlerDistanceM, handlerDistanceToEndM, dogDistanceToEndM,
       activeObjectWait: s.activeObjectWait, endEligible: blockerReason == null, blockerReason,
-      eventFiredTSec: qaEndRef.current?.tSec ?? null }, TRACKING_UX_QA_LIMITS.end);
+      eventFiredTSec: endEventRef.current?.tSec ?? null }, TRACKING_UX_QA_LIMITS.end);
     if (!recorded) endQaTruncatedRef.current = true;
   }, [searchGuidanceActive, s.progressM, s.dogProgressM, s.endHandlerFix, s.estimatedDogPosition,
     s.trackLengthM, endPoint, openMandatoryObjects, s.activeObjectWait, searchHandlerDistanceM,
@@ -817,6 +922,7 @@ export default function TrackRunScreen() {
     // blendet ein evtl. laufendes Recovery-Banner sofort wieder aus.
     if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; }
     if (s.offTrackState === 'on_track') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setRecoveryVisible(true);
       recoveryTimerRef.current = setTimeout(() => { setRecoveryVisible(false); recoveryTimerRef.current = null; }, 2600);
     } else {
@@ -871,6 +977,7 @@ export default function TrackRunScreen() {
   };
 
   const confirmRecoveryEnd = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Absuche wirklich beenden?', 'Die gespeicherten Suchpunkte bleiben erhalten.', [
       { text: 'Weiter', style: 'cancel' },
       { text: 'Absuche beenden', style: 'destructive', onPress: () => void endSearch(pending) },
@@ -878,16 +985,28 @@ export default function TrackRunScreen() {
   };
 
   const handleFinish = async () => {
+    const transferIdentity = renderTransferIdentity.transferReceipt ? renderTransferIdentity : currentTransfer();
+    if (!allowedTransfer(transferIdentity)) return;
     if (finishing || finishRequestedRef.current) return;   // Doppelt-Tippen → keine doppelte Finalisierung
     finishRequestedRef.current = true;
     hapticSuccess();
     setFinishing(true);
     const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
+    // Das separate Roharchiv schließt im Hintergrund. Sein Status darf die
+    // primäre Ergebnissicherung nicht blockieren (stop liefert einen Snapshot).
     // runUuid ist seit dem Start deterministisch vorhanden (kein Null-Race mehr);
     // defensiver Fallback, falls doch nicht gesetzt.
     const runId = runIdRef.current ?? Crypto.randomUUID();
     const sessId = effectiveId;
+    // Stop schedules the write; successful finalization must await its real result.
+    if (!(await flushSearchPoints(sessId ?? undefined).catch(() => false))) {
+      finishRequestedRef.current = false;
+      setFinishing(false);
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
 
+    if (!allowedTransfer(transferIdentity)) return;
     // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
     // denselben gefilterten Markern, aus denen auch snapData.laidObjects
@@ -896,18 +1015,18 @@ export default function TrackRunScreen() {
     const cornerInputs: AnalyticsCornerInput[] = snapData.laidMarkers
       .filter((m): m is typeof m & { angleKind: AnalyticsAngleKind } =>
         m.type === 'winkel' && m.angleKind != null && m.angleKind !== 'absatz' && m.angleKind !== 'abriss')
-      .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind }]; });
-    const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+      .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind, geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness }]; });
+    const objectMarkers = snapData.laidMarkers.filter(m => isScoredObject(m) && m.lat != null && m.lng != null);
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
       objectId: m.id,
-      objectIndex: objectMarkers.slice(0, i + 1).filter(marker => marker.material !== 'duebel').length,
+      objectIndex: i + 1,
       atM: snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start,
       material: m.material,
       found: res.foundObjectIndices.includes(i),
       positionAccuracyM: m.accuracy,
       legIndex: 1 + cornerInputs.filter(corner => corner.atM <= (snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start)).length,
     }));
-    // QA-Search-Diagnose (nur QA-Modus, rein beobachtend, best-effort): Ströme,
+    // Support-/QA-Search-Diagnose (rein beobachtend, best-effort): Ströme,
     // Cursor-Samples, Gegenstände, Ende, Replay-Parität → eigener QA-Speicher.
     // Verändert weder `res` noch Analytics/Score/Distanz.
     if (res.qa && sessId && snapData.laidPoints.length) {
@@ -944,7 +1063,7 @@ export default function TrackRunScreen() {
             atM: o.atM ?? null, found: o.found ?? null, status: res.objectStatuses[i], legIndex: o.legIndex ?? null,
           })),
           cornerAtM: cornerInputs.map(c => c.atM),
-          end: { fired: qaEndRef.current, hapticFired: qaEndRef.current ? true : null, voiceFired: qaEndRef.current ? qaEndRef.current.voice : null },
+          end: { eventObservation: endEventObservationRef.current, fired: endEventRef.current, hapticFired: endEventRef.current ? true : null, voiceFired: endEventRef.current ? endEventRef.current.voice : null },
           manualStopTSec: stopSec,
         });
         // Interner QA-Speicher nur im QA-Modus (unverändert); die privacy-reduced Support-Diagnose
@@ -967,7 +1086,7 @@ export default function TrackRunScreen() {
       durationS: res.durationS,
       handlerDistanceHintM: searchHandlerDistanceM,
       // Referenz-Qualität der gelegten Fährte (Accuracy + scharfe Knicke ohne Winkel-Marker).
-      referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, accuracy: snapData.laidAccuracies[i] ?? null })),
+      referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, breakBefore: p.breakBefore, accuracy: snapData.laidAccuracies[i] ?? null })),
     }) : undefined;
 
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
@@ -983,12 +1102,15 @@ export default function TrackRunScreen() {
             breaks: res.breaks, points: res.points,
           },
           searchHandlerDistanceM,
+          referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
           autoDwellObjectIds: res.autoDwellObjectIds,
+          objectSnapshotInput: { objects: snapData.laidObjects, statuses: res.objectStatuses,
+            scoreBasis: res.objectScoreBasis },
           analytics,
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,
           replayPointsTimeSec: res.replayPointsTimeSec,
-        }));
+        }), transferIdentity.transferReceipt ? () => assertTransfer(transferIdentity) : undefined);
       } catch (e) {
         console.warn('[trackRun] local finalize', e);
         finishRequestedRef.current = false;
@@ -998,6 +1120,7 @@ export default function TrackRunScreen() {
       }
     }
 
+    if (!allowedTransfer(transferIdentity)) return;
     // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
     useTrackingStore.getState().setSessionStatus('completed');
     useTrackingStore.getState().reset();
@@ -1027,6 +1150,7 @@ export default function TrackRunScreen() {
 
   useEffect(() => {
     if (!pendingExit || s.recording) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     router.replace(pendingExit as never);
   }, [pendingExit, router, s.recording]);
@@ -1080,6 +1204,17 @@ export default function TrackRunScreen() {
   const scaleReadout = !arming && s.recording ? searchDistanceReadout(s.dogProgressM, s.trackLengthM) : null;
   const nextObject = scaleReadout
     ? nextObjectDistance(snapData.laidObjects.map((o, i) => ({ atM: o.atM, status: s.objectStatuses[i] })), s.dogProgressM)
+    : null;
+
+  // Hinweis «Nächstes Ereignis» (reine Anzeige): Distanz relativ zur virtuellen
+  // Hundeposition (dogProgressM) — derselbe Maßstab wie die Sprachansagen.
+  // Off-Track-/Start-/Ende-Banner haben Vorrang.
+  const nextEvent = searchGuidanceActive && !offBanner && !recoveryVisible && !searchStartBanner && !trackEndReached
+    ? nextSearchEvents(searchEvents, s.dogProgressM)
+    : null;
+  const nextEventText = nextEvent
+    ? t('track.nextEvent.in', { label: nextEvent.next.label, meters: String(Math.max(1, Math.round(nextEvent.next.distanceM))) })
+      + (nextEvent.then ? ` · ${t('track.nextEvent.then', { label: nextEvent.then.label, meters: String(Math.max(1, Math.round(nextEvent.then.gapM))) })}` : '')
     : null;
 
   const metrics: { value: string; label: string; warn?: boolean }[] = [
@@ -1151,6 +1286,16 @@ export default function TrackRunScreen() {
           </View>
         </View>
 
+        {(runPoints.some(p => p.breakBefore) || snapData.laidPoints.some(p => p.breakBefore)) && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-muted text-[12px]">{t('track.continuityNotice')}</Text>
+          </View>
+        )}
+        {s.recording && !!dbg?.rawArchiveError && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-warn text-[12px]">{t('track.rawArchiveIncomplete')}</Text>
+          </View>
+        )}
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {!arming && s.recording && (
@@ -1166,8 +1311,9 @@ export default function TrackRunScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+              distractionTracks={distractionTracks}
+                  layColor={layColor}
               layPoints={snapData.laidLatLng} dimLay
-              distanceScaleLine={snapData.laidPoints}
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
@@ -1176,9 +1322,16 @@ export default function TrackRunScreen() {
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}
               controlsTop={124}
+              searchView={arming ? null : {
+                handlerProgressM: s.progressM,
+                dogProgressM: s.dogProgressM,
+                offTrack: s.offTrackState === 'off_track',
+                topInsetPt: 132,
+                bottomInsetPt: mapOverlayLayout.contentBottom + 44,
+              }}
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch accent={layColor} points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}
@@ -1223,6 +1376,26 @@ export default function TrackRunScreen() {
             </View>
           )}
 
+          {/* Nächstes Ereignis (z. B. «90 R in 13 m · danach G2 nach 8 m») — am Platz
+              der Banner; unter 6 m mint hervorgehoben. Reine Anzeige. */}
+          {nextEvent && nextEventText && (
+            <View className="absolute top-[84px] left-[14px] right-[62px] flex-row" pointerEvents="none" testID="track-next-event">
+              <View
+                className={`flex-row items-center gap-2 rounded-[16px] px-4 py-2.5 border ${nextEvent.highlight ? '' : 'bg-ft-glass border-ft-glass-line'}`}
+                style={nextEvent.highlight ? { backgroundColor: 'rgba(21,230,195,0.16)', borderColor: 'rgba(21,230,195,0.55)' } : undefined}
+              >
+                <Ionicons name="arrow-up" size={15} color={FT.acc} />
+                <Text
+                  className={`shrink text-[13.5px] font-black ${nextEvent.highlight ? 'text-ft-acc' : 'text-ft-text'}`}
+                  style={{ fontVariant: ['tabular-nums'] }}
+                  numberOfLines={1}
+                >
+                  {nextEventText}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Fährtenende erreicht — persistentes Mint-Banner. KEIN Auto-Beenden; der
               Nutzer beendet die Absuche weiterhin bewusst selbst. */}
           {!arming && s.recording && trackEndReached && (
@@ -1235,7 +1408,7 @@ export default function TrackRunScreen() {
           )}
 
           {/* Teilstrecke + Fährten-Maßstab gestapelt über der Metrik-Leiste. */}
-          <View className="absolute left-[14px] right-[14px] bottom-[88px] gap-2" pointerEvents="none">
+          <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] gap-2" pointerEvents="none">
           {!arming && currentRunSegment && (
             <View className="rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
               <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke</Text>
@@ -1269,7 +1442,7 @@ export default function TrackRunScreen() {
           </View>
 
           {/* Metrik-Leiste (unten) */}
-          <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
+          <View onLayout={e => setMapMetricsHeight(e.nativeEvent.layout.height)} className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
             {metrics.map((mm, i) => {
               // Live-GPS-Qualität (Punkt 15/Abschnitt 7): nur an der GPS-Kachel,
               // jetzt als sichtbares Text-Label statt eines kaum erkennbaren

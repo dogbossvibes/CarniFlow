@@ -111,6 +111,7 @@ export default function ProfilScreen() {
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
 
   const [aktiveSparten, setAktiveSparten] = useState<string[]>(DEFAULT_SPARTEN);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setAktiveSparten(profile?.aktive_sparten ?? DEFAULT_SPARTEN); }, [profile?.aktive_sparten]);
 
   const toggleSparte = async (id: string) => {
@@ -178,6 +179,7 @@ export default function ProfilScreen() {
   }, [user?.id]);
 
   const trialEnd = trialSub?.trialEndsAt ? new Date(trialSub.trialEndsAt) : null;
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const isActiveTrial = trialSub?.status === 'trialing' && (!trialEnd || trialEnd.getTime() > Date.now());
   const trialEndLabel = trialEnd ? trialEnd.toLocaleDateString('de-CH') : null;
   const trialCancelled = trialSub?.cancelAtPeriodEnd === true;
@@ -483,6 +485,12 @@ export default function ProfilScreen() {
           />
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="people-outline"
+            label={t('contacts.profileRow')}
+            onPress={() => router.push('/contacts' as never)}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="language-outline"
             label={t('profile.language')}
             wert={spracheLabel}
@@ -694,8 +702,8 @@ export default function ProfilScreen() {
           })}
         </View>
 
-        {/* Intern: Diagnose-Zugang NUR für interne Tester (profiles.is_internal_tester,
-            serverseitig per Trigger geschützt — siehe hooks/useDiagnosticsAccess.ts).
+        {/* Intern: Diagnose-Zugang NUR mit persönlicher Diagnoseberechtigung (
+            serverseitig geschützt — siehe hooks/useDiagnosticsAccess.ts).
             Für alle anderen wird der Bereich gar nicht gerendert (kein Platzhalter). */}
         {diagnosticsAccess.allowed && (
           <>
@@ -967,7 +975,7 @@ const s = StyleSheet.create({
     marginBottom: 24,
   },
   glassTransparent: { backgroundColor: "transparent" },
-  glassBg:          { ...StyleSheet.absoluteFillObject },
+  glassBg:          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   zeile: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
   zeileIcon: {
     width: 36,

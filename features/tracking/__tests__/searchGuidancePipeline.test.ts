@@ -161,7 +161,7 @@ describe('Absuche-Pipeline — Map-Renderer (Stufe 5)', () => {
   it('automatische Winkel werden NICHT herausgefiltert und korrekt gerendert', () => {
     const rendered = mapMarkerKinds(mapMarkersFromRunScreen(buildFixtureMarkers()) as MarkerSample[]);
     expect(rendered).toEqual([
-      { render: 'angle', label: '90 R' },
+      { render: 'angle', label: '90 R' },   // Kürzeltext: Produktentscheidung 2026-11-09 (Issue #33)
       { render: 'object' },
       { render: 'angle', label: 'SL' },
       { render: 'cylinder' },           // Dübel

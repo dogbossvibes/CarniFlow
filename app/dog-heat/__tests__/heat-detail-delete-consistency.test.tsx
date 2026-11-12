@@ -15,6 +15,7 @@ const mockGetDogById = jest.fn();
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (fn: () => unknown) => jest.requireActual('react').useEffect(fn, [fn]),
   useRouter: () => ({ back: mockBack, push: jest.fn(), replace: jest.fn() }),
   useLocalSearchParams: () => ({ id: 'cyc-1' }),
 }));
@@ -60,7 +61,7 @@ function findByText(node: ReactTestRenderer, text: string) {
 beforeEach(() => {
   mockBack.mockReset();
   mockGetHeatCycle.mockReset().mockResolvedValue(CYCLE);
-  mockGetDogById.mockReset().mockResolvedValue({ data: { id: 'dog-1', owner_id: 'owner-1' }, error: null });
+  mockGetDogById.mockReset().mockResolvedValue({ data: { id: 'dog-1', gender: 'female', owner_id: 'owner-1' }, error: null });
   mockDeleteHeatCycle.mockReset().mockResolvedValue({ data: null, error: null });
 });
 
@@ -72,7 +73,7 @@ describe('dog-heat detail: ownership consistency fix', () => {
   });
 
   it('a non-owner (connected trainer, read-only per dog_heat_cycles RLS) never sees the delete button', async () => {
-    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', owner_id: 'someone-else' }, error: null });
+    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', gender: 'female', owner_id: 'someone-else' }, error: null });
     const node = render();
     await flush();
     expect(findByText(node, 'common.delete')).toBeFalsy();
@@ -111,5 +112,18 @@ describe('dog-heat detail: error-handling consistency fix', () => {
     await flush();
     expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+});
+
+describe('historical detail load failures', () => {
+  it('shows a retry rather than a false missing record when the detail read fails after the profile gate', async () => {
+    mockGetHeatCycle.mockImplementation((_id: string, options?: { throwOnError?: boolean }) => options?.throwOnError ? Promise.reject(new Error('offline')) : Promise.resolve(CYCLE));
+    const node = render(); await flush();
+    expect(findByText(node, 'Erneut versuchen')).toBeTruthy();
+    expect(findByText(node, 'heat.notFound')).toBeFalsy();
+    mockGetHeatCycle.mockResolvedValue(CYCLE);
+    act(() => findByText(node, 'Erneut versuchen').props.onPress()); await flush();
+    expect(findByText(node, 'common.delete')).toBeTruthy();
+    act(() => node.unmount());
   });
 });

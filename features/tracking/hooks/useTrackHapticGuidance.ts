@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { useEffect, useRef } from 'react';
 import { forwardDistanceFromDog } from '@/features/tracking/utils/searchGeometry';
 import type { GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
@@ -7,7 +8,7 @@ let Haptics: typeof import('expo-haptics') | null = null;
 try { Haptics = require('expo-haptics'); } catch { Haptics = null; }
 
 // arcM = Bogenlänge des Gegenstands entlang der Fährte (= marker.distance_from_start).
-// material optional (nur für die Voice-Ansage „Dübel"/„Gegenstand"; Haptik ignoriert es).
+// material excludes optional jokers from search feedback; regular objects keep their pulse.
 export interface GuidanceObject { id: string; arcM: number; material?: string | null; lat?: number | null; lng?: number | null }
 
 const ANGLE_AHEAD_M  = 6;    // Winkel etwas voraus (~8 Schritte)
@@ -66,7 +67,7 @@ export function useTrackHapticGuidance(
       if (d != null && d <= ANGLE_AHEAD_M && d < bestD) { bestD = d; bestId = a.id; pulses = 2; }
     }
     for (const o of objects) {
-      if (firedRef.current.has(o.id)) continue;
+      if (isTrainingJoker(o.material) || firedRef.current.has(o.id)) continue;
       const d = forwardDistanceFromDog(o.arcM, dogProgressM);
       if (d != null && d <= OBJECT_AHEAD_M && d < bestD) { bestD = d; bestId = o.id; pulses = 1; }
     }

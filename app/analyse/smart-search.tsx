@@ -51,6 +51,7 @@ export default function SmartSearchScreen() {
 
   // Bei Navigation mit neuer Query (z. B. aus Insights) übernehmen.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (params.q != null) { setInput(params.q); setSubmitted(params.q); }
     if (params.category != null) setCategory(params.category || null);
   }, [params.q, params.category]);

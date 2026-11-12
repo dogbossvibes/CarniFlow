@@ -1,9 +1,12 @@
+import { mergeLayRecovery } from '@/features/tracking/utils/layRecovery';
+import { getLaySessionStatus } from '@/features/tracking/engine/laySessionRuntime';
 // Lifecycle-Recovery einer gelegten Fährte (I/O-Teil). Die Entscheidung liegt rein in
 // store/trackRecovery.ts. Dieser Service liest nur lokal (AsyncStorage + SQLite),
 // schreibt höchstens den hundebasierten Pending-Slot, die Aktive-Fährten-Registry und
 // den lokalen Lifecycle-Marker in payload_json. KEINE neue training_session, KEIN
 // Quota-Claim, KEIN Remote-Write, kein erfundener Suchlauf, keine Änderung an
-// Punkten/Markern/Suchläufen. Funktioniert offline.
+// Punkten/Markern/Suchläufen beim Wiederöffnen gelegter Fährten. Explizite Lay-Recovery
+// ergänzt ausschliesslich fehlende lokale Pufferdaten vor dem Start. Funktioniert offline.
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { clearPending, listPendingDogIds, loadPending, writePendingNow } from '@/features/tracking/store/trackPersist';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
@@ -16,8 +19,9 @@ import {
 } from '@/features/training/repositories/localTrainingRepository';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import {
-  deleteSearchPointsBySession, getLayTrackPointsBySession, getSearchPointsBySession, getTrackMarkersBySession,
+  deleteSearchPointsBySession, getLayTrackPointsBySession, getSearchPointsBySession, getTrackMarkersBySession, createLocalTrackPointsBatch, createLocalTrackMarker,
 } from '@/features/tracking/repositories/localTrackRepository';
+import { discardSearchBuffer } from '@/features/tracking/store/searchPersist';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 
 export interface TrackRecoveryArgs {
@@ -155,19 +159,30 @@ export type DiscardSearchResult = { ok: true; target: string } | { ok: false; re
  * 'cancelled', kein dauerhafter Marker, keine neue Session, kein Quota-Claim. Eine fremde
  * offene Fährte desselben Hundes wird nie berührt. Offline-fähig.
  */
-export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean } = {}): Promise<DiscardSearchResult> {
+export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean; userId?: string | null; assertScope?: () => void } = {}): Promise<DiscardSearchResult> {
   try {
     if (!sessionId) return { ok: false, reason: 'no_session' };
     if (!dogId) return { ok: false, reason: 'no_dog' };
+    opts.assertScope?.();
     await ensureHydrated();
+    opts.assertScope?.();
     const [pending, local] = await Promise.all([loadPending(dogId).catch(() => null), loadLocalSnapshot(sessionId)]);
+    opts.assertScope?.();
     const d = decideSearchDiscard({
       registry: useActiveFaehrten.getState().byDog, dogId, sessionId, pending, local,
-      hasRemoteSearchRun: opts.hasRemoteSearchRun, now: Date.now(),
+      hasRemoteSearchRun: opts.hasRemoteSearchRun, userId: opts.userId, now: Date.now(),
     });
     if (!d.ok) return d;
-    await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
+    if (opts.assertScope) await discardSearchBuffer(sessionId, opts.assertScope);
+    else await discardSearchBuffer(sessionId);
+    opts.assertScope?.();
+    const archiveAttemptId = typeof pending?.searchStartedAt === 'number' && Number.isFinite(pending.searchStartedAt) ? String(pending.searchStartedAt) : undefined;
+    if (archiveAttemptId) await deleteSearchPointsBySession(sessionId, opts.assertScope, archiveAttemptId);
+    else if (opts.assertScope) await deleteSearchPointsBySession(sessionId, opts.assertScope);
+    else await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
+    opts.assertScope?.();
     await writePendingNow(dogId, d.pending);
+    opts.assertScope?.();
     const reg = useActiveFaehrten.getState().get(dogId);
     if (reg?.sessionId === sessionId) useActiveFaehrten.getState().remove(dogId);   // alten Such-Eintrag ersetzen
     useActiveFaehrten.getState().upsert(dogId, d.registryPatch);
@@ -194,9 +209,10 @@ export type CompleteWithoutAppResult = { ok: true } | { ok: false; reason: 'no_s
  * Marker und Bewertung bleiben. Idempotent. Ohne erfolgreichen Marker wird nichts
  * aufgeräumt (sonst könnte die Recovery die Fährte später wieder anbieten).
  */
-export async function completeTrackWithoutApp(sessionId: string | null | undefined, dogId: string | null | undefined): Promise<CompleteWithoutAppResult> {
+export async function completeTrackWithoutApp(sessionId: string | null | undefined, dogId: string | null | undefined, userId?: string | null): Promise<CompleteWithoutAppResult> {
   if (!sessionId || !dogId) return { ok: false, reason: 'no_session' };
   try {
+    if (userId && (await getLocalTrainingSessionById(sessionId))?.user_id !== userId) return { ok: false, reason: 'not_found' };
     const marked = await setLocalTrackLifecycle(sessionId, dogId, 'completed_without_app');
     if (!marked) return { ok: false, reason: 'not_found' };
     await ensureHydrated();
@@ -244,4 +260,27 @@ export async function healActiveFaehrtenFromPending(currentUserDogIds: readonly 
     console.warn('[trackRecovery] self-heal', e);
     return 0;
   }
+}
+
+/** Explicit lay resume: validate identity, recover missing local tails, then arm on user action. */
+export async function loadLayRecovery(args: TrackRecoveryArgs): Promise<{ pending: PendingTrack; startedAt: string } | null> {
+  const decision = await evaluateTrackRecovery(args);
+  if (!decision.ok || decision.mode !== 'laying' || !decision.pendingToWrite) return null;
+  const st = useTrackingStore.getState();
+  if (st.isRunningTrack || (st.isRecording && (st.dogId !== args.dogId || getLaySessionStatus(args.sessionId) === 'active'))) return null;
+  const local = await getLocalTrainingSessionById(args.sessionId);
+  if (!local || local.user_id !== args.userId || local.dog_id !== args.dogId || local.status !== 'active' || local.ended_at || !local.started_at || !Number.isFinite(Date.parse(local.started_at))) return null;
+  const [points, markers] = await Promise.all([getLayTrackPointsBySession(args.sessionId), getTrackMarkersBySession(args.sessionId)]);
+  const merged = mergeLayRecovery(decision.pendingToWrite, points, markers);
+  if (!merged) return null;
+  // Restore only missing persisted tails. Retry reads both sources again; original rows remain untouched.
+  await createLocalTrackPointsBatch(args.sessionId, merged.pointsToPersist.map(p => ({ latitude: p.lat, longitude: p.lng,
+    accuracy: p.accuracy, altitude: p.altitude, speed: p.speed, heading: p.heading, timestamp: new Date(p.t).toISOString(),
+    breakBefore: p.breakBefore, measuredDistanceM: p.measuredDistanceM })));
+  for (const m of merged.markersToPersist) await createLocalTrackMarker(args.sessionId, {
+    marker_type: m.type, material: m.material, angle_kind: m.angleKind, latitude: m.lat, longitude: m.lng,
+    accuracy: m.accuracy, distance_from_start: m.distance_from_start, note: m.note,
+    sourceMarkerId: m.id, recordedAtMs: m.t, geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness, geometrySource: m.geometrySource,
+  });
+  return { pending: merged.pending, startedAt: local.started_at };
 }

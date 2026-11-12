@@ -1,0 +1,41 @@
+{
+  "audit": [],
+  "dogId": "00000000-0000-4000-8000-000000000010",
+  "runId": "00000000-0000-4000-8000-000000000302",
+  "source": "recording_snapshot",
+  "hasGaps": false,
+  "objects": [
+    {
+      "index": 0,
+      "material": "holz",
+      "objectId": "obj-0",
+      "recordedStatus": "missed",
+      "effectiveStatus": "not_found"
+    },
+    {
+      "index": 1,
+      "material": "gummi",
+      "objectId": "obj-1",
+      "recordedStatus": "missed",
+      "effectiveStatus": "not_found"
+    }
+  ],
+  "version": 2,
+  "outcomes": {
+    "obj-0": "not_found",
+    "obj-1": "not_found"
+  },
+  "revision": 0,
+  "sessionId": "00000000-0000-4000-8000-000000000202",
+  "scoreBasis": {
+    "version": 1,
+    "trackPoints": 70,
+    "totalObjects": 2,
+    "maxTrackPoints": 80,
+    "maxObjectPoints": 20
+  },
+  "totalScore": 70,
+  "articlesFound": 0,
+  "auditTruncated": false,
+  "excludedJokerObjectIds": []
+}

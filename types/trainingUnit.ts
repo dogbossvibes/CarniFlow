@@ -38,11 +38,18 @@ export interface TrainingUnit {
 }
 
 export interface TrainingExercise {
+  // Optional additive backend identity; absent legacy rows are never matched
+  // solely by their potentially ambiguous display name.
+  exercise_identity_id?: string | null;
+  discipline_key?: string | null;
   id?:           string;
   unit_id?:      string;
   discipline:    string;        // Fährte | Unterordnung | Schutzdienst | <eigene>
   exercise_name: string;
   rating:        number | null;
+  // Additiv (T-184): 'lernstufe' = rating ist Lernstufe 1/2/4/5.
+  // Leer/fehlend = alte Sternebewertung 1–5, wird nie umgedeutet.
+  rating_scale?: 'lernstufe' | null;
   notes:         string | null;
   duration_sec:  number | null;
   seq_index:     number;

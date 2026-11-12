@@ -17,13 +17,15 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 let mockParams: Record<string, string | undefined> = {};
-let mockBeforeRemove: ((e: unknown) => void) | null = null;
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
+const mockRepeat = jest.fn();
 const mockDispatch = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  usePreventRemove: (_condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => { mockPreventCallback = cb; return () => {}; },
   useNavigation: () => ({
-    addListener: (name: string, fn: (e: unknown) => void) => { if (name === 'beforeRemove') mockBeforeRemove = fn; return () => {}; },
+    addListener: () => () => {},
     dispatch: (...a: unknown[]) => mockDispatch(...a),
   }),
 }));
@@ -85,12 +87,12 @@ const holdAbort = () => {
     act(() => { jest.advanceTimersByTime(HOLD_TO_ABORT_MS); });
   } finally { jest.useRealTimers(); }
 };
-const leave = () => act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
+const leave = () => act(() => { mockPreventCallback!({ data: { action: { type: 'GO_BACK' } }, repeat: mockRepeat }); });
 
 beforeAll(async () => { await i18n.changeLanguage('de'); });
 beforeEach(async () => {
   await AsyncStorage.clear();
-  mockBeforeRemove = null;
+  mockPreventCallback = null; mockRepeat.mockClear();
   [mockDispatch, mockRecordCancelled].forEach(m => m.mockClear());
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   useTrackingStore.setState({ dogId: null, currentSessionId: null, sessionStatus: 'idle', trackPoints: [], layStartedAt: null, isRecording: false } as never);

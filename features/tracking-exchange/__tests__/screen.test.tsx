@@ -1,0 +1,27 @@
+import React from 'react';
+import TestRenderer,{act} from 'react-test-renderer';
+import ExchangeScreen from '../ExchangeScreen';
+import { offer,returned,ids } from './fixture';
+const mockScope={current:{userId:'owner',epoch:0}},mockPush=jest.fn(),mockImport=jest.fn(),mockAccept=jest.fn(),mockApply=jest.fn(),mockShare=jest.fn();
+let mockRows:unknown[]=[],mockParams:Record<string,string>={};
+jest.mock('expo-router',()=>({useRouter:()=>({push:mockPush,back:jest.fn(),canGoBack:()=>true}),useLocalSearchParams:()=>mockParams,useFocusEffect:(fn:()=>void)=>{jest.requireActual('react').useEffect(fn,[fn]);}}));
+jest.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
+jest.mock('react-i18next',()=>({useTranslation:()=>({t:(key:string)=>key})}));
+jest.mock('../i18n',()=>({exchangeErrorKey:()=> 'failure'}));
+jest.mock('@/features/tracking/components/TrackingMap',()=>({TrackingMap:'TrackingMap'}));
+jest.mock('@/features/tracking-distractions/useDistractions',()=>({useDistractions:()=>({userId:mockScope.current.userId,epoch:mockScope.current.epoch,scope:mockScope})}));
+jest.mock('@/features/tracking-distractions/repository',()=>({distractionRepository:()=>({list:async()=>[]})}));
+jest.mock('@/features/tracking/services/trackHistoryService',()=>({getTrackHistory:async()=>[]}));
+jest.mock('@/lib/entitlements/getUserAccess',()=>({getUserAccess:async()=>({hasActiveAccess:true})}));
+jest.mock('../source',()=>({readExchangeSource:async()=>jest.requireActual('./fixture').offer().reference}));
+jest.mock('../files',()=>({importTrackFile:(...a:unknown[])=>mockImport(...a),shareTrackFile:(...a:unknown[])=>mockShare(...a)}));
+jest.mock('../repository',()=>({exchangeRepository:()=>mockRepo}));
+const mockRepo={list:async()=>mockRows,get:async()=>mockRows[0],accept:(...a:unknown[])=>mockAccept(...a),applyReturn:(...a:unknown[])=>mockApply(...a)};
+let screen:ReturnType<typeof TestRenderer.create>;
+const button=(key:string)=>screen.root.findAll(n=>n.props.accessibilityRole==='button'&&n.findAll(x=>x.props.children===key).length>0)[0];
+async function press(key:string){await act(async()=>{button(key).props.onPress();});}
+beforeEach(()=>{jest.clearAllMocks();mockRows=[];mockParams={};mockScope.current={userId:'owner',epoch:0};mockAccept.mockResolvedValue({taskId:ids.task});mockApply.mockResolvedValue({duplicate:false});});
+afterEach(()=>{if(screen)act(()=>screen.unmount());});
+it('picking an offer shows preview and requires a separate acceptance',async()=>{mockImport.mockResolvedValue(offer());await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockAccept).not.toHaveBeenCalled();expect(button('accept')).toBeTruthy();expect(screen.root.findAll(n=>n.props.children==='unverified').length).toBeGreaterThan(0);await press('accept');expect(mockAccept).toHaveBeenCalledTimes(1);});
+it('return preview includes both lines and does not apply before confirmation',async()=>{mockRows=[{taskId:ids.task,parentId:ids.parent,role:'outgoing',offer:offer()}];mockImport.mockResolvedValue(returned());await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockApply).not.toHaveBeenCalled();expect(screen.root.findAll(n=>n.props.distractionTracks?.length===1).length).toBeGreaterThan(0);await press('add');expect(mockApply).toHaveBeenCalledTimes(1);});
+it('account epoch change during picker completion does not display stale coordinates',async()=>{mockImport.mockImplementation(async()=>{mockScope.current={userId:'other',epoch:1};return offer();});await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockAccept).not.toHaveBeenCalled();expect(screen.root.findAll(n=>n.props.layPoints).length).toBe(0);});

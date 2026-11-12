@@ -14,5 +14,5 @@ export function AnyvoStatCard({ value, label, accent, style }: { value: string; 
 const s = StyleSheet.create({
   wrap:  { alignItems: 'center', justifyContent: 'center', paddingVertical: 4, flex: 1 },
   value: { fontSize: 24, color: C.trackText, fontWeight: '900', letterSpacing: -0.8 },
-  label: { fontSize: 9.5, color: C.trackTextMut, fontWeight: '700', letterSpacing: 1, marginTop: 3 },
+  label: { fontSize: 9.5, color: C.textMuted, fontWeight: '700', letterSpacing: 1, marginTop: 3 },
 });

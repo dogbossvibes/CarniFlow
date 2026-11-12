@@ -1,3 +1,6 @@
+import { classifyLiveFixTime, GPS_FUTURE_TOLERANCE_MS } from '../utils/liveFixOrdering';
+import { QaMotionCapture } from '@/features/tracking/utils/qaMotionCapture';
+import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
 import type * as Location from 'expo-location';
 import type { AngleKind, MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import {
@@ -12,15 +15,15 @@ import {
   DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
 import { fuseTurns, nearestCompatibleTurnEvidence, type FusedTurn } from '@/features/tracking/utils/turnFusion';
+import { LONG_BASELINE_EXCLUSION_M } from '@/features/tracking/utils/longBaselineCorner';
 import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { pushQaCandidateLine } from '@/features/tracking/utils/qaCandidateLog';
 import {
-  QA_MOTION_CONTEXT_MS,
-  type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaCandidateMotion, type QaSessionCapture,
+  type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaSessionCapture,
 } from '@/features/tracking/utils/qaSessionCapture';
-import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS, motionTurnDirection, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
+import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
 import { recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
 import { layStartBlockingReason } from '@/features/tracking/utils/layStartLock';
 import { confirmLayMovement } from '@/features/tracking/utils/layMovementConfirmation';
@@ -69,6 +72,7 @@ export const START_ANCHOR_MAX_ACC_M  = 20;     // nur Fixes ≤ 20 m fliessen in
 export const START_FIX_MAX_AGE_MS    = 5000;   // gecachte/stale Fixes bestätigen keine Bewegung
 
 export interface AcceptedPoint extends LatLng { t: number; accuracy: number | null; cumDist: number; }
+export type QaFixDelivery = { receivedAtMs: number; source: 'foreground' | 'background' | 'unknown'; positionSource?: 'native' | 'expo' | 'external' | 'unknown' };
 export type Raw = { lat: number; lng: number; accuracy: number | null; altitude: number | null; speed: number | null; t: number };
 
 export type Box<T> = { current: T };
@@ -81,6 +85,11 @@ export interface AngleDebug {
 
 /** Fachlicher (und verarbeitungsnaher Diagnose-)Zustand EINER Lay-Session. */
 export interface LayProcessingState {
+  liveMeasurementRef: Box<number | null>;
+  resumeNotBeforeRef: Box<number | null>;
+  continuityPendingRef: Box<boolean>;
+  detectorOffsetRef: Box<number>;
+  completedDetectorSectionsRef: Box<ShortLegPoint[][]>;
   pointsRef: Box<AcceptedPoint[]>;
   emaRef: Box<LatLng | null>;
   lineEmaRef: Box<LatLng | null>;
@@ -105,9 +114,9 @@ export interface LayProcessingState {
   angleDbgRef: Box<AngleDebug>;
   liveTurnsRef: Box<Map<number, FusedTurn>>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
-  qaMotionSeenRef: Box<Set<number>>;
-  qaCandidateMotionRef: Box<QaCandidateMotion[]>;
+  qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
+  qaDetectorDeliveryRef: Box<WeakMap<ShortLegPoint, { receivedMs: number | null; processedMs: number | null; deliverySource: QaFixDelivery['source'] }>>;
   qaOriginRef: Box<{ lat: number; lng: number; t: number } | null>;
   qaRawFixesRef: Box<QaCapturePoint[]>;
   qaRawCountRef: Box<number>;
@@ -117,6 +126,11 @@ export interface LayProcessingState {
 /** Anfangszustand — identisch zu den bisherigen useRef-Initialwerten. */
 export function createLayProcessingState(): LayProcessingState {
   return {
+    liveMeasurementRef: box<number | null>(null),
+    resumeNotBeforeRef: box<number | null>(null),
+    continuityPendingRef: box(false),
+    detectorOffsetRef: box(0),
+    completedDetectorSectionsRef: box<ShortLegPoint[][]>([]),
     pointsRef: box<AcceptedPoint[]>([]),
     emaRef: box<LatLng | null>(null),
     lineEmaRef: box<LatLng | null>(null),
@@ -141,9 +155,9 @@ export function createLayProcessingState(): LayProcessingState {
     angleDbgRef: box<AngleDebug>({ count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null }),
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
-    qaMotionSeenRef: box<Set<number>>(new Set()),
-    qaCandidateMotionRef: box<QaCandidateMotion[]>([]),
+    qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
+    qaDetectorDeliveryRef: box(new WeakMap()),
     qaOriginRef: box<{ lat: number; lng: number; t: number } | null>(null),
     qaRawFixesRef: box<QaCapturePoint[]>([]),
     qaRawCountRef: box(0),
@@ -164,7 +178,7 @@ export interface LayStoreFacade {
 
 export type LayPointRow = {
   latitude: number; longitude: number; accuracy: number | null; altitude: number | null;
-  speed: number | null; heading: number | null; timestamp: string;
+  speed: number | null; heading: number | null; timestamp: string; breakBefore?: boolean; measuredDistanceM?: number;
 };
 
 /** Vom Owner (heute: useTrackRecorder) bereitgestellte Ein-/Ausgänge. */
@@ -192,7 +206,7 @@ export interface LayCornerEvent {
   source: 'auto' | 'auto_split_apex' | 'build40';
 }
 
-export type LayRejectReason = 'start_lock_active' | 'accuracy' | 'gps_outlier' | 'distance_gate';
+export type LayRejectReason = 'start_lock_active' | 'accuracy' | 'gps_outlier' | 'distance_gate' | 'time_late' | 'time_duplicate' | 'time_future' | 'time_invalid';
 
 /** Explizites Ergebnis eines Fixes (vorher implizit im Hook). */
 export interface LayFixResult {
@@ -214,8 +228,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionSeenRef,
-    qaCandidateMotionRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = session;
   const {
     store, localSessionId, ptBuffer, flushPoints, commitMarker, onAngleRef, recordingRef, qaRef,
@@ -224,6 +237,18 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
 
   // Relativkoordinaten für den QA-Mitschnitt. Der Ursprung ist der erste
   // Rohfix; er selbst wird NICHT mitgeschrieben, nur die Differenzen.
+  const interruptContinuity = () => {
+    if (!recordingRef.current) return;
+    session.continuityPendingRef.current = pointsRef.current.length > 0;
+    emaRef.current = null; lineEmaRef.current = null; lastRawRef.current = null;
+    if (detectPointsRef.current.length) session.completedDetectorSectionsRef.current.push(detectPointsRef.current);
+    session.detectorOffsetRef.current = detectPointsRef.current.at(-1)?.cumDist ?? session.detectorOffsetRef.current;
+    detectPointsRef.current = []; detectEmaRef.current = null; rawTailRef.current = [];
+    liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
+    lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
+    canonDistRef.current.interrupt();
+  };
+
   const qaRel = (lat: number, lng: number, t: number, accuracy: number | null, cumDistM?: number): QaCapturePoint => {
     const o = qaOriginRef.current;
     const mPerLat = 111320;
@@ -291,63 +316,11 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     }
     if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection }));
 
-    // ── QA v2.1: Motion-Evidenz LIVE je Kandidat festhalten ────────────────
-    // Rein beobachtend. Greift nur im QA-Diagnosemodus und nur, solange Core
-    // Motion ohnehin läuft. Es wird NICHTS neu berechnet — die Aggregate
-    // stammen aus derselben Auswertung, die der Detektor gerade benutzt hat,
-    // und die Rohsamples kommen unverändert aus dem Ringpuffer.
+    // Observation only, including candidates rejected before a heading exists.
     if (qaRef.current && motionActiveRef.current) {
-      for (const d of diagnostics) {
-        const tCand = d.t;
-        if (tCand == null) continue;
-        // Nur Kandidaten, bei denen Motion überhaupt eine Rolle spielen kann:
-        // die Geometrie muss bis zur Richtungsmessung gekommen sein.
-        if (d.headingDeltaDeg == null) continue;
-        const ev = motionBufRef.current.evidenceForTrailing(tCand);
-        const previousIndex = qaCandidateMotionRef.current.findIndex(c => c.apexIndex === d.apexIndex);
-        if (previousIndex >= 0 && (qaCandidateMotionRef.current[previousIndex].turnEvidence ?? 0) >= (ev.evidence ?? 0)) continue;
-        qaMotionSeenRef.current.add(d.apexIndex);
-        const samples = motionBufRef.current.samplesIn(
-          tCand - (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
-          tCand + (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
-        );
-        const t0 = qaOriginRef.current?.t ?? tCand;
-        const candidate: QaCandidateMotion = {
-          apexIndex: d.apexIndex,
-          evaluatedAtMs: Math.round(tCand - t0),
-          windowStartMs: Math.round(ev.windowStartMs - tCand),
-          windowEndMs: Math.round(ev.windowEndMs - tCand),
-          sampleCount: ev.sampleCount,
-          firstSampleAgeMs: samples.length ? Math.round(samples[0].t - tCand) : null,
-          lastSampleAgeMs: samples.length ? Math.round(samples[samples.length - 1].t - tCand) : null,
-          motionAvailable: ev.available,
-          netYawDeg: Math.round(ev.netYawDeg * 100) / 100,
-          signedNetYawDeg: Math.round(ev.signedNetYawDeg * 100) / 100,
-          direction: motionTurnDirection(ev),
-          grossYawDeg: Math.round(ev.grossYawDeg * 100) / 100,
-          monotonicity: Math.round(ev.monotonicity * 1000) / 1000,
-          yawShare: Math.round(ev.yawShare * 1000) / 1000,
-          accelerationEvidence: Math.round(ev.gaitAccelFraction * 1000) / 1000,
-          stepDelta: ev.steps,
-          cadence: ev.cadence,
-          movementState: ev.movementState,
-          locomotionEvidence: ev.locomotionSource,
-          turnEvidence: ev.evidence,
-          adjustmentApplied: d.motionAdjustment ?? 0,
-          samples: samples.map(x => ({
-            dtMs: Math.round(x.t - tCand),
-            headingDelta: Math.round(x.headingDelta * 100) / 100,
-            rotationMagnitude: Math.round(x.rotationMagnitude * 1000) / 1000,
-            accelerationMagnitude: Math.round(x.accelerationMagnitude * 1000) / 1000,
-            stepDelta: x.stepDelta,
-            cadence: x.cadence,
-            movementState: x.movementState,
-          })),
-          source: 'live',
-        };
-        if (previousIndex >= 0) qaCandidateMotionRef.current[previousIndex] = candidate;
-        else qaCandidateMotionRef.current.push(candidate);
-      }
+      qaMotionCaptureRef.current.observe(diagnostics, motionBufRef.current,
+        qaOriginRef.current?.t ?? null, new Set(corners.map(c => c.apexIndex)),
+        session.completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0));
     }
     if (__DEV__ && diagnostics.length) {
       const last = diagnostics[diagnostics.length - 1];
@@ -386,10 +359,14 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     for (const c of corners) {
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
       const fused = turns.find(t => t.apexIndex === c.apexIndex) ?? null;
-      // Eine gepaarte (Split-Apex-)Ecke wird früh gemeldet; entdeckt der Regelpfad
-      // mit mehr Punkten einen Nachbarscheitel in derselben Ecke, darf daraus keine
-      // zweite Markierung werden.
-      if (lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
+      // Apply the detector's existing exclusion across evaluations as well as
+      // within a sweep. Ordinary GPS apexes can shift with new evidence too.
+      // Keep detector metres here; display/reference metres are a different scale.
+      if (c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
+      // Der Scheitel einer Long-Baseline-Ecke ist nur auf einige Meter genau und
+      // kann sich mit neuen Fixen verschieben. Innerhalb ihres Sperrabstands zur
+      // zuletzt gemeldeten Ecke ist sie dieselbe Ecke — nie ein zweiter Marker.
+      if (fused?.source === 'gps_long_baseline' && c.atM - lastCornerAtRef.current < LONG_BASELINE_EXCLUSION_M) continue;
       if (fused) liveTurnsRef.current.set(c.apexIndex, fused);
       lastCornerRescuedRef.current = fused?.source === 'gps_split_apex';
       lastCornerAtRef.current = c.atM;
@@ -439,7 +416,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
 
   const detectCorner = (): LayCornerEvent[] => {
     // BUILD40: unveränderte historische Einzelschuss-Erkennung.
-    if (getTrackingEngineMode() === 'build40') { return persistLegacyCorner(pointsRef.current); }
+    if (getTrackingEngineMode() === 'build40') { return persistLegacyCorner(splitContinuousPoints(pointsRef.current).at(-1) ?? []); }
     // CURRENT: adaptive Short-Leg-Erkennung auf dem dichteren Detektor-Puffer.
     // Die frühere, an LEG_MIN_M = 4 m gebundene Confirmation-Kaskade
     // (feedCornerBuffer/classifyCornerCandidate) konnte Schenkel unter 4 m
@@ -550,14 +527,20 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     s.addTrackPoint({ lat: p0.lat, lng: p0.lng, accuracy: p0.accuracy, altitude: null, speed: null, heading: null, t: now });
     ptBuffer.current.push({
       latitude: p0.lat, longitude: p0.lng, accuracy: p0.accuracy ?? null,
-      altitude: null, speed: null, heading: null, timestamp: new Date(now).toISOString(),
+      altitude: null, speed: null, heading: null, timestamp: new Date(now).toISOString(), measuredDistanceM: 0,
     });
     void recordBackgroundLayEvent(localSessionId.current, 'onFixAccepted').catch(() => {});
     return true;
   };
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
-  const runFix = (loc: Location.LocationObject, out: LayFixResult) => {
+  const runFix = (loc: Location.LocationObject, out: LayFixResult, delivery?: QaFixDelivery) => {
+    const receivedAtMs = delivery?.receivedAtMs ?? Date.now();
+    const processedAtMs = qaRef.current ? Date.now() : null;
+    let timing = classifyLiveFixTime({ measurementMs: loc.timestamp, receivedMs: receivedAtMs,
+      lastLiveMeasurementMs: session.liveMeasurementRef.current, allowedFutureSkewMs: GPS_FUTURE_TOLERANCE_MS });
+    if (timing.disposition === 'live' && session.resumeNotBeforeRef.current != null && loc.timestamp < session.resumeNotBeforeRef.current)
+      timing = { disposition: 'late', nextLiveMeasurementMs: session.liveMeasurementRef.current };
     startupRef.current!.firstRawFixTSec ??= startupSec();
     if (loc.coords.accuracy != null && loc.coords.accuracy <= START_ANCHOR_MAX_ACC_M)
       startupRef.current!.firstStableFixTSec ??= startupSec();
@@ -565,17 +548,28 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const s = store.getState();
     const raw: Raw = {
       lat: c.latitude, lng: c.longitude, accuracy: c.accuracy ?? null,
-      altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp || Date.now(),
+      altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp,
     };
+
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
     // ── QA-Mitschnitt: JEDER eingegangene Rohfix, vor allen Gates. Nur im
     // Diagnosemodus; ausserhalb passiert hier nichts. ──
-    if (qaRef.current) {
+    if (qaRef.current && Number.isFinite(raw.t)) {
       if (!qaOriginRef.current) qaOriginRef.current = { lat: raw.lat, lng: raw.lng, t: raw.t };
       qaRawCountRef.current++;
-      qaRawFixesRef.current.push(qaRel(raw.lat, raw.lng, raw.t, raw.accuracy));
+      const relative = (value: number | null | undefined) => value != null && Number.isFinite(value) && Math.abs(value - qaOriginRef.current!.t) < 1e8 ? value - qaOriginRef.current!.t : null;
+      qaRawFixesRef.current.push({ ...qaRel(raw.lat, raw.lng, raw.t, raw.accuracy), timingDisposition: timing.disposition, receivedMs: relative(receivedAtMs), processedMs: relative(processedAtMs), deliverySource: delivery?.source ?? 'unknown' });
     }
+
+    if (timing.disposition !== 'live') {
+      out.outcome = 'rejected';
+      out.rejectReason = `time_${timing.disposition}`;
+      return;
+    }
+    session.liveMeasurementRef.current = timing.nextLiveMeasurementMs;
+    if (recordingRef.current && !startLockRef.current
+      && (s.isPaused || isRecordingGap(lastRawRef.current?.t ?? null, raw.t))) interruptContinuity();
 
     // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
     // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
@@ -589,11 +583,15 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
       : { lat: raw.lat, lng: raw.lng };
     emaRef.current = ema;
-    // Geometrie-Kette der LINIE (turn-aware, s. o.).
+    // Warmup, Pause und abgelehnte Fixes behalten ihren bisherigen EMA-Verlauf.
+    // Nach einem zugelassenen Detektor-Fix wird unten dessen aktuelle Zone genutzt.
+    // Bei einem Zonenwechsel immer vom Zustand VOR diesem Fix neu berechnen,
+    // damit derselbe Rohfix nicht zweimal in die Glättung eingeht.
     const prevLine = lineEmaRef.current;
-    const lineEma: LatLng = prevLine
-      ? { lat: prevLine.lat + (raw.lat - prevLine.lat) * lineAlpha, lng: prevLine.lng + (raw.lng - prevLine.lng) * lineAlpha }
+    const smoothLine = (alpha: number): LatLng => prevLine
+      ? { lat: prevLine.lat + (raw.lat - prevLine.lat) * alpha, lng: prevLine.lng + (raw.lng - prevLine.lng) * alpha }
       : { lat: raw.lat, lng: raw.lng };
+    let lineEma = smoothLine(lineAlpha);
     lineEmaRef.current = lineEma;
 
     // Live-Puck getrennt und LEICHTER glätten (PUCK_ALPHA > EMA_ALPHA): er folgt
@@ -672,17 +670,28 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const dLast = dPts[dPts.length - 1];
       const dStep = dLast ? calculateDistance(dLast, dEma) : 0;
       if (!dLast || dStep >= DETECTOR_INPUT.minStepM) {
-        dPts.push({ lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? 0) + dStep, accuracy: raw.accuracy, t: raw.t });
+        const detectorPoint = { lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? session.detectorOffsetRef.current) + dStep, accuracy: raw.accuracy, t: raw.t };
+        dPts.push(detectorPoint);
+        if (qaRef.current && qaOriginRef.current) {
+          const origin = qaOriginRef.current.t;
+          const relative = (value: number | null | undefined) => value != null && Number.isFinite(value) && Math.abs(value - origin) < 1e8 ? value - origin : null;
+          session.qaDetectorDeliveryRef.current.set(detectorPoint, { receivedMs: relative(receivedAtMs), processedMs: relative(processedAtMs), deliverySource: delivery?.source ?? 'unknown' });
+        }
       }
       // Rohfix-Ring für den Stop-Flush (ungeglättet, kein Gate). Nur die
       // letzten Meter werden gebraucht — bewusst klein gehalten.
       const rt = rawTailRef.current;
       const rLast = rt[rt.length - 1];
       const rStep = rLast ? calculateDistance(rLast, { lat: raw.lat, lng: raw.lng }) : 0;
-      rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? 0) + rStep, accuracy: raw.accuracy, t: raw.t });
+      rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? session.detectorOffsetRef.current) + rStep, accuracy: raw.accuracy, t: raw.t });
       if (rt.length > 60) rt.splice(0, rt.length - 60);
-      // Kurvenzone für Linien-Gate (dieser Fix) und Linien-Glättung (nächster Fix).
+      // Linien-Gate und Linien-Glättung nutzen beide den aktuellen Detektor-Fix.
       lineTurnZoneRef.current = inTurnZone(dPts, lastCornerAtRef.current);
+    }
+    const currentLineAlpha = getTrackingEngineMode() === 'build40' ? EMA_ALPHA : lineEmaAlpha(lineTurnZoneRef.current);
+    if (currentLineAlpha !== lineAlpha) {
+      lineEma = smoothLine(currentLineAlpha);
+      lineEmaRef.current = lineEma;
     }
 
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
@@ -695,12 +704,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     }
     const pts = pointsRef.current;
     const last = pts[pts.length - 1];
-    const step = last ? calculateDistance(last, lineEma) : 0;
+    const beginsSection = session.continuityPendingRef.current && !!last;
+    const step = last && !beginsSection ? calculateDistance(last, lineEma) : 0;
     // Turn-aware Gate (CURRENT): 2,0 m auf gerader Strecke wie bisher, in der
     // Kurvenzone dichter (turnAwareLineGate.ts). BUILD40 bleibt beim festen Gate.
     const gateM = getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current);
     out.rejectReason = 'distance_gate';
-    if (last && step < gateM) {
+    if (last && !beginsSection && step < gateM) {
       void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'distance_gate').catch(() => {});
       return;
     }
@@ -708,7 +718,9 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const accepted: AcceptedPoint = {
       lat: lineEma.lat, lng: lineEma.lng, t: raw.t, accuracy: raw.accuracy,
       cumDist: (last?.cumDist ?? 0) + step,
+      ...(beginsSection ? { breakBefore: true } : {}),
     };
+    session.continuityPendingRef.current = false;
     pts.push(accepted);
     out.outcome = 'accepted'; out.rejectReason = null; out.acceptedPoint = accepted;
     void recordBackgroundLayEvent(localSessionId.current, 'onFixAccepted').catch(() => {});
@@ -717,12 +729,15 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const sample: TrackPointSample = {
       lat: accepted.lat, lng: accepted.lng, accuracy: accepted.accuracy,
       altitude: raw.altitude, speed: raw.speed, heading: null, t: accepted.t,
+      measuredDistanceM: canonDistRef.current.total,
+      ...(beginsSection ? { breakBefore: true } : {}),
     };
     s.addTrackPoint(sample, { skipDistance: true });   // Distanz kommt aus canonDistRef (Punktdichte-unabhängig); Store aktualisiert Qualität
     ptBuffer.current.push({
       latitude: sample.lat, longitude: sample.lng, accuracy: sample.accuracy ?? null,
       altitude: sample.altitude ?? null, speed: sample.speed ?? null, heading: null,
-      timestamp: new Date(sample.t).toISOString(),
+      timestamp: new Date(sample.t).toISOString(), measuredDistanceM: canonDistRef.current.total,
+      ...(beginsSection ? { breakBefore: true } : {}),
     });
     if (ptBuffer.current.length >= 25) void flushPoints();
 
@@ -735,16 +750,16 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
   };
 
   /** Einen Fix verarbeiten — synchron, wie bisher der Fix-Handler im Hook. */
-  const processFix = (loc: Location.LocationObject): LayFixResult => {
+  const processFix = (loc: Location.LocationObject, delivery?: QaFixDelivery): LayFixResult => {
     const out: LayFixResult = {
       outcome: 'warmup', rejectReason: null, anchorReleased: false, acceptedPoint: null,
       corners: [], distanceM: 0, rejectedCount: 0,
     };
-    runFix(loc, out);
+    runFix(loc, out, delivery);
     out.distanceM = canonDistRef.current.total;
     out.rejectedCount = rejectedRef.current;
     return out;
   };
 
-  return { processFix, qaRel };
+  return { processFix, qaRel, interruptContinuity };
 }

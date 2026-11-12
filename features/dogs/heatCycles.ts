@@ -173,9 +173,12 @@ const rowToObservation = (r: any): HeatObservation => ({
 
 // ── CRUD: Heat Cycles ───────────────────────────────────────────────────────
 
-export async function getHeatCycles(dogId: string): Promise<HeatCycle[]> {
-  const { data } = await supabase.from('dog_heat_cycles')
+export async function getHeatCycles(dogId: string, options: { throwOnError?: boolean } = {}): Promise<HeatCycle[]> {
+  const { data, error } = await supabase.from('dog_heat_cycles')
     .select('*').eq('dog_id', dogId).order('start_date', { ascending: false });
+  // Aggregate health reads must distinguish failure from a genuinely empty history.
+  // Keep legacy Home callers compatible; they do not all catch rejected reads.
+  if (error && options.throwOnError) throw error;
   return (data ?? []).map(rowToCycle);
 }
 
@@ -188,7 +191,7 @@ export async function getHeatCycleDetails(dogId: string): Promise<{
   phases: HeatPhase[];
   observations: HeatObservation[];
 }> {
-  const cycles = await getHeatCycles(dogId);
+  const cycles = await getHeatCycles(dogId, { throwOnError: true });
   if (cycles.length === 0) return { cycles, phases: [], observations: [] };
 
   const cycleIds = cycles.map(cycle => cycle.id);
@@ -205,9 +208,10 @@ export async function getHeatCycleDetails(dogId: string): Promise<{
   };
 }
 
-export async function getHeatCycle(id: string): Promise<HeatCycle | null> {
-  const { data } = await supabase.from('dog_heat_cycles')
+export async function getHeatCycle(id: string, options: { throwOnError?: boolean } = {}): Promise<HeatCycle | null> {
+  const { data, error } = await supabase.from('dog_heat_cycles')
     .select('*').eq('id', id).single();
+  if (error && options.throwOnError) throw error;
   return data ? rowToCycle(data) : null;
 }
 
@@ -252,9 +256,10 @@ export async function deleteHeatCycle(id: string) {
 
 // ── CRUD: Phases ────────────────────────────────────────────────────────────
 
-export async function getHeatPhases(heatCycleId: string): Promise<HeatPhase[]> {
-  const { data } = await supabase.from('dog_heat_phases')
+export async function getHeatPhases(heatCycleId: string, options: { throwOnError?: boolean } = {}): Promise<HeatPhase[]> {
+  const { data, error } = await supabase.from('dog_heat_phases')
     .select('*').eq('heat_cycle_id', heatCycleId).order('start_date', { ascending: true });
+  if (error && options.throwOnError) throw error;
   return (data ?? []).map(rowToPhase);
 }
 
@@ -292,9 +297,10 @@ export async function deleteHeatPhase(id: string) {
 
 // ── CRUD: Observations ──────────────────────────────────────────────────────
 
-export async function getHeatObservations(heatCycleId: string): Promise<HeatObservation[]> {
-  const { data } = await supabase.from('dog_heat_observations')
+export async function getHeatObservations(heatCycleId: string, options: { throwOnError?: boolean } = {}): Promise<HeatObservation[]> {
+  const { data, error } = await supabase.from('dog_heat_observations')
     .select('*').eq('heat_cycle_id', heatCycleId).order('date', { ascending: true });
+  if (error && options.throwOnError) throw error;
   return (data ?? []).map(rowToObservation);
 }
 

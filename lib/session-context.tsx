@@ -1,8 +1,11 @@
+import { setGpsCaptureAccount } from '@/features/tracking/storage/gpsCaptureScope';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { supabase } from './supabase';
+import { setDiagnosticsSession } from '@/lib/diagnosticsAccessState';
 import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
+import { useSubscriptionSyncRecovery } from '@/hooks/useSubscriptionSyncRecovery';
 
 type SessionCtx = {
   session: Session | null;
@@ -17,6 +20,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  useSubscriptionSyncRecovery(session?.user.id);
 
   useEffect(() => {
     // Bootstrap-Abschluss GARANTIEREN: `loading` darf niemals dauerhaft true
@@ -27,6 +31,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const finish = (s: Session | null) => {
       if (done) return;
       done = true;
+      setGpsCaptureAccount(s?.user.id ?? null);
+      setDiagnosticsSession(s?.user.id ?? null);
       setSession(s);
       setLoading(false);
       if (s?.user) initLocaleSync(s.user.id);   // Sprache aus Profil (falls Sync aktiv)
@@ -46,6 +52,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Keep in sync with Supabase auth events (login, logout, token refresh).
     // Das erste INITIAL_SESSION-Event schließt den Bootstrap ebenfalls ab.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // A delayed bootstrap response must not restore an earlier account after logout/switch.
+      done = true;
+      clearTimeout(safety);
+      setGpsCaptureAccount(session?.user.id ?? null, event === 'SIGNED_OUT');
+      setDiagnosticsSession(session?.user.id ?? null);
       setSession(session);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') {
@@ -57,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (session?.user) initLocaleSync(session.user.id); else stopLocaleSync();
     });
 
-    return () => { clearTimeout(safety); subscription.unsubscribe(); };
+    return () => { clearTimeout(safety); subscription.unsubscribe(); setGpsCaptureAccount(null); setDiagnosticsSession(null); };
   }, []);
 
   return (

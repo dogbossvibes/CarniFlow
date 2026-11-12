@@ -2,19 +2,20 @@
 // Run-Struktur für local_training_sessions.payload_json.run. Enthält alles, was heute
 // nur an finishTrackRun (remote) übergeben wird, plus die stabile client-Run-UUID.
 
+import { buildTrackObjectSnapshot } from './trackObjectReview';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import type { TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 
 export interface RunResultSource {
   durationS:     number;
-  score:         number;
-  deviationAvgM: number;
+  score:         number | null;
+  deviationAvgM: number | null;
   foundObjects:  number;
   totalObjects:  number;
   distanceM:     number;
   breaks:        unknown[];   // Länge = Abriss/Off-Track-Ereignisse
-  points:        { latitude: number; longitude: number }[];
+  points:        { latitude: number; longitude: number; breakBefore?: boolean }[];
 }
 
 export function buildRunResultPayload(args: {
@@ -24,7 +25,9 @@ export function buildRunResultPayload(args: {
   endedAtMs:             number;
   result:                RunResultSource;
   searchHandlerDistanceM?: number;
+  referenceHasGaps?: boolean;
   autoDwellObjectIds?: string[];
+  objectSnapshotInput?: Omit<Parameters<typeof buildTrackObjectSnapshot>[0], 'foundObjects' | 'totalObjects'>;
   // Punkt 10/12/13: additiv, KEINE Migration nötig — payload_json ist schemalos
   // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
   // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
@@ -40,10 +43,15 @@ export function buildRunResultPayload(args: {
   // Turn-aware Replay-/Display-Geometrie (rein darstellend). Additiv im
   // schemalosen payload_json.run — `run_points` (Metriken/Analyse-Vertrag) bleibt
   // UNVERÄNDERT. Nur gesetzt, wenn Punkte und Zeiten gleich lang sind (≥ 2).
-  replayPoints?: { latitude: number; longitude: number }[];
+  replayPoints?: { latitude: number; longitude: number; breakBefore?: boolean }[];
   replayPointsTimeSec?: number[];
 }): Record<string, unknown> {
   const r = args.result;
+  const objectSnapshot = args.objectSnapshotInput ? buildTrackObjectSnapshot({ ...args.objectSnapshotInput, foundObjects: r.foundObjects, totalObjects: r.totalObjects }) : undefined;
+  const searchHasGaps = r.points.some(p => p.breakBefore === true);
+  const referenceHasGaps = args.referenceHasGaps === true;
+  const continuity = searchHasGaps || referenceHasGaps
+    ? { version: 1, hasGaps: true, searchHasGaps, referenceHasGaps } : undefined;
   const hasReplayTimestamps = !!args.pointsTimeSec && args.pointsTimeSec.length === r.points.length && r.points.length > 0;
   const hasReplayGeometry = !!args.replayPoints && !!args.replayPointsTimeSec
     && args.replayPoints.length >= 2 && args.replayPoints.length === args.replayPointsTimeSec.length;
@@ -53,7 +61,9 @@ export function buildRunResultPayload(args: {
     started_at:                new Date(args.startedAtMs).toISOString(),
     ended_at:                  new Date(args.endedAtMs).toISOString(),
     duration_seconds:          r.durationS,
-    score:                     r.score,
+    // A partial observation must not enter overall training averages as a complete score.
+    score:                     continuity ? null : r.score,
+    ...(continuity ? { continuity } : {}),
     average_deviation_meters:  r.deviationAvgM,
     articles_found:            r.foundObjects,
     total_objects:             r.totalObjects,
@@ -61,12 +71,13 @@ export function buildRunResultPayload(args: {
     breaks:                    r.breaks.length,
     search_handler_distance_m: args.searchHandlerDistanceM ?? null,
     ...(args.autoDwellObjectIds?.length ? { object_detections: args.autoDwellObjectIds.map(id => ({ id, source: 'auto_dwell' })) } : {}),
+    ...(objectSnapshot ? { object_snapshot: objectSnapshot } : {}),
     run_points:                hasReplayTimestamps
-      ? r.points.map((p, i) => ({ lat: p.latitude, lng: p.longitude, t: args.pointsTimeSec![i] }))
-      : r.points.map(p => ({ lat: p.latitude, lng: p.longitude })),
-    ...(args.analytics ? { analytics: args.analytics } : {}),
+      ? r.points.map((p, i) => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}), t: args.pointsTimeSec![i] }))
+      : r.points.map(p => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}) })),
+    ...(args.analytics ? { analytics: continuity ? { ...args.analytics, trackScore: null, continuity } : args.analytics } : {}),
     ...(hasReplayGeometry
-      ? { replay_points: args.replayPoints!.map((p, i) => ({ lat: p.latitude, lng: p.longitude, t: args.replayPointsTimeSec![i] })) }
+      ? { replay_points: args.replayPoints!.map((p, i) => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}), t: args.replayPointsTimeSec![i] })) }
       : {}),
   };
 }

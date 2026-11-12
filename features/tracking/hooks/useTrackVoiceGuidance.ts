@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { useEffect, useRef } from 'react';
 import { angleEvent, objectEvent, trackEventGuidanceKey } from '@/features/tracking/utils/trackEventVoice';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
@@ -125,7 +126,7 @@ export function useTrackVoiceGuidance(
 
     const all = [
       ...angles.map(a => ({ ...a, kind: 'angle' as const })),
-      ...objects.map(o => ({ ...o, kind: 'object' as const })),
+      ...objects.filter(o => !isTrainingJoker(o.material)).map(o => ({ ...o, kind: 'object' as const })),
     ];
     const candidates: GuidanceFeature[] = all.filter(feature => {
       const aheadM = feature.arcM - dogProgressM;

@@ -34,6 +34,26 @@ export interface SmartTrackCameraInput {
   initialPitched?: boolean;
   /** false ⇒ Kamera rührt sich nicht (z. B. Karte noch nicht bereit). */
   enabled?: boolean;
+  /**
+   * Absuche (Issue #33): Blickrichtung der GELEGTEN Fährte am aktuellen
+   * Fortschritt. Gesetzt ⇒ im Modus «Laufrichtung» massgeblich (ruhig, auch im
+   * Stand). null ⇒ Rückfall auf GPS-Kurs/Positionsfolge (z. B. Off-Track).
+   */
+  trackHeadingDeg?: number | null;
+  /** Mindestschritt (m) der Positionsfolge für den GPS-Rückfall. */
+  courseMinStepM?: number;
+  /** Sichtbare Kartenhöhe (m): koppelt den Look-ahead an den tatsächlichen Ausschnitt. */
+  viewportSpanM?: number;
+  /** Look-ahead als Anteil der Kartenhöhe (Position oberhalb der unteren Karten). */
+  lookAheadFraction?: number;
+  /**
+   * Zoom zum Ausschnitt: `altitude` wirkt unter Apple Maps (iOS), `zoom` unter
+   * Google Maps (Android). Wird nur gesetzt, wenn sich `viewportSpanM` ändert
+   * oder ein Bedienelement betätigt wird — eigenes Zoomen bleibt dazwischen erhalten.
+   */
+  cameraZoom?: { altitude: number; zoom: number | null } | null;
+  /** true ⇒ `travelHeadingDeg` (für den Positionspfeil) als State melden. */
+  reportTravelHeading?: boolean;
 }
 
 export interface SmartTrackCameraApi {
@@ -51,10 +71,14 @@ export interface SmartTrackCameraApi {
   recenter: () => void;
   /** Vom Kartencontainer aufzurufen, sobald die MapView-Ref steht. */
   attachMap: (map: any | null) => void;
+  /** Angestrebte Laufrichtung (auf 5° gerundet); nur mit `reportTravelHeading`. */
+  travelHeadingDeg: number | null;
 }
 
 export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCameraApi {
   const { position, deviceHeadingDeg, courseDeg, speedMps, enabled = true } = input;
+  const { trackHeadingDeg = null, courseMinStepM, viewportSpanM, lookAheadFraction, cameraZoom = null, reportTravelHeading = false } = input;
+  const zoomAltitude = cameraZoom?.altitude ?? null, zoomLevel = cameraZoom?.zoom ?? null;
 
   const [mode, setModeState] = useState<MapCameraMode>(input.initialMode ?? 'heading');
   const [following, setFollowing] = useState(true);
@@ -62,51 +86,51 @@ export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCam
   const [pitched, setPitched] = useState(input.initialPitched ?? false);
 
   const mapRef = useRef<any>(null);
+  const [controlRevision, refreshControls] = useState(0);
+  const appliedControlRevision = useRef(-1);
   const cameraHeadingRef = useRef<number | null>(null);   // aktuell angezeigte Blickrichtung
   const travelHeadingRef = useRef<number | null>(null);   // letzte BELASTBARE Laufrichtung
   const courseAnchorRef = useRef<CameraLatLng | null>(null);
   const lastCenterRef = useRef<CameraLatLng | null>(null);
   const lastUpdateMsRef = useRef<number | null>(null);
-  const lastPositionRef = useRef<CameraLatLng | null>(null);
+  const appliedSpanRef = useRef<number | null>(null);
+  const [travelHeadingDeg, setTravelHeadingDeg] = useState<number | null>(null);
 
   // Aktuelle Steuerwerte in Refs — damit der Kamera-Effect NICHT von wechselnden
   // Callback-Identitäten abhängt (das war die Ursache des Search-Recorder-Bugs).
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const modeRef = useRef(mode); modeRef.current = mode;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const followingRef = useRef(following); followingRef.current = following;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const pitchedRef = useRef(pitched); pitchedRef.current = pitched;
 
-  const attachMap = useCallback((map: any | null) => { mapRef.current = map; }, []);
+  const attachMap = useCallback((map: any | null) => {
+    if (mapRef.current === map) return;
+    mapRef.current = map; refreshControls(n => n + 1);
+  }, []);
 
   const onUserGesture = useCallback(() => {
     // Sofort pausieren — KEIN automatisches Zurückspringen nach kurzer Zeit.
     if (modeRef.current === 'free') return;
+    followingRef.current = false;
     setFollowing(prev => (prev ? false : prev));
     setPaused(true);
   }, []);
 
   const recenter = useCallback(() => {
-    setPaused(false);
-    setFollowing(true);
-    lastUpdateMsRef.current = null;   // nächster Frame darf sofort animieren
-    const pos = lastPositionRef.current;
-    const map = mapRef.current;
-    if (!map || !pos) return;
-    const heading = modeRef.current === 'north' ? 0 : (cameraHeadingRef.current ?? travelHeadingRef.current ?? 0);
-    const target = computeCameraTarget({
-      position: pos, headingDeg: heading, mode: modeRef.current,
-      pitchDeg: pitchedRef.current ? CAMERA_DEFAULTS.pitch3D : 0,
-    });
-    // Weich zurück (längere Dauer als ein normales Nachführen).
-    map.animateCamera?.({
-      center: { latitude: target.center.lat, longitude: target.center.lng },
-      heading: target.headingDeg, pitch: target.pitchDeg,
-    }, { duration: 600 });
-    lastCenterRef.current = target.center;
+    if (modeRef.current === 'free') { modeRef.current = 'heading'; setModeState('heading'); }
+    followingRef.current = true;
+    setPaused(false); setFollowing(true);
+    lastUpdateMsRef.current = null;
+    refreshControls(n => n + 1);
   }, []);
 
   const setMode = useCallback((m: MapCameraMode) => {
     setModeState(m);
     modeRef.current = m;
+    followingRef.current = m !== 'free';
+    refreshControls(n => n + 1);
     if (m === 'free') {
       setFollowing(false);
       setPaused(false);   // im freien Modus ist „pausiert" kein Sonderzustand
@@ -119,16 +143,11 @@ export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCam
   }, []);
 
   const togglePitch = useCallback(() => {
-    setPitched(p => {
-      const next = !p;
-      pitchedRef.current = next;
-      lastUpdateMsRef.current = null;   // Neigung sofort anwenden
-      return next;
-    });
+    const next = !pitchedRef.current;
+    pitchedRef.current = next; setPitched(next);
+    lastUpdateMsRef.current = null;
+    refreshControls(n => n + 1);
   }, []);
-
-  // Position in einer Ref mitführen (für recenter ohne Dependency-Kette).
-  useEffect(() => { lastPositionRef.current = position ?? null; }, [position]);
 
   // ── Kamera-Nachführung ──
   // Deps bewusst nur die Werte, die ein Update auslösen dürfen. Alle
@@ -146,6 +165,7 @@ export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCam
       lastAnchor: courseAnchorRef.current,
       deviceHeadingDeg,
       lastCourseDeg: travelHeadingRef.current,
+      minStepM: courseMinStepM,
     });
     if (resolved.trustworthy && resolved.headingDeg != null) {
       travelHeadingRef.current = resolved.headingDeg;
@@ -155,32 +175,53 @@ export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCam
     }
 
     // 2) Weiche Drehung entlang des kürzesten Wegs.
-    const desired = modeRef.current === 'north' ? 0 : (resolved.headingDeg ?? cameraHeadingRef.current ?? 0);
+    // Absuche: die Soll-Fährte führt, solange sie eine Richtung liefert.
+    const travel = trackHeadingDeg != null ? normalizeHeading(trackHeadingDeg) : resolved.headingDeg;
+    if (reportTravelHeading && travel != null) {
+      const rounded = normalizeHeading(Math.round(travel / 5) * 5);
+      setTravelHeadingDeg(prev => (prev === rounded ? prev : rounded));
+    }
+    const desired = modeRef.current === 'north' ? 0 : (travel ?? cameraHeadingRef.current ?? 0);
     const current = cameraHeadingRef.current ?? desired;
-    const smoothed = smoothHeading(current, desired, CAMERA_DEFAULTS.headingAlpha, CAMERA_DEFAULTS.headingDeadzoneDeg);
+    const controlChanged = appliedControlRevision.current !== controlRevision;
+    // A control action has one animation, not a stream of fixes to converge over.
+    // Animate to the known direction directly; ordinary fix updates retain smoothing.
+    const smoothed = controlChanged ? desired : smoothHeading(current, desired, CAMERA_DEFAULTS.headingAlpha, CAMERA_DEFAULTS.headingDeadzoneDeg);
 
     // 3) Ziel inkl. Look-ahead (Position ins untere Drittel).
     const target = computeCameraTarget({
       position, headingDeg: smoothed, mode: modeRef.current,
       pitchDeg: pitchedRef.current ? CAMERA_DEFAULTS.pitch3D : 0,
+      viewportSpanM, lookAheadFraction,
     });
+    // Zoomstufe nur bei Wechsel des Ausschnitts bzw. Bedienaktion mitsenden.
+    const spanChanged = viewportSpanM != null && appliedSpanRef.current !== viewportSpanM;
 
     // 4) UI-Drosselung (~4–5 Updates/s) — betrifft NUR animateCamera.
     const now = Date.now();
     const movedM = lastCenterRef.current ? cameraDistanceM(lastCenterRef.current, target.center) : Infinity;
     const headingDelta = shortestAngleDelta(cameraHeadingRef.current ?? target.headingDeg, target.headingDeg);
-    if (!shouldUpdateCamera({ nowMs: now, lastUpdateMs: lastUpdateMsRef.current, headingDeltaDeg: headingDelta, centerMovedM: movedM })) {
+    // Explicit controls must apply even at rest or after a manual camera gesture.
+    if (!controlChanged && !spanChanged && !shouldUpdateCamera({ nowMs: now, lastUpdateMs: lastUpdateMsRef.current, headingDeltaDeg: headingDelta, centerMovedM: movedM })) {
       return;
     }
 
+    appliedControlRevision.current = controlRevision;
     cameraHeadingRef.current = normalizeHeading(target.headingDeg);
     lastCenterRef.current = target.center;
     lastUpdateMsRef.current = now;
+    const zoomProps: { altitude?: number; zoom?: number } = {};
+    if ((controlChanged || spanChanged) && viewportSpanM != null) {
+      appliedSpanRef.current = viewportSpanM;
+      if (zoomAltitude != null) zoomProps.altitude = zoomAltitude;
+      if (zoomLevel != null) zoomProps.zoom = zoomLevel;
+    }
     map.animateCamera({
       center: { latitude: target.center.lat, longitude: target.center.lng },
-      heading: target.headingDeg, pitch: target.pitchDeg,
+      heading: target.headingDeg, pitch: target.pitchDeg, ...zoomProps,
     }, { duration: 350 });
-  }, [position, courseDeg, speedMps, deviceHeadingDeg, enabled]);
+  }, [position, courseDeg, speedMps, deviceHeadingDeg, enabled, controlRevision,
+    trackHeadingDeg, courseMinStepM, viewportSpanM, lookAheadFraction, zoomAltitude, zoomLevel, reportTravelHeading]);
 
-  return { mode, setMode, following, paused, pitched, togglePitch, onUserGesture, recenter, attachMap };
+  return { mode, setMode, following, paused, pitched, togglePitch, onUserGesture, recenter, attachMap, travelHeadingDeg };
 }

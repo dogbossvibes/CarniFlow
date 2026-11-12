@@ -82,6 +82,8 @@ export async function getLiveConditions(): Promise<LiveConditions | null> {
 export interface CurrentWeather {
   temperature:      number;   // °C
   windSpeed:        number;   // km/h
+  /** Richtung, AUS der der Wind kommt (Grad, 0 = Nord); null, wenn der Dienst sie nicht liefert. */
+  windDirection?:   number | null;
   humidity:         number;   // %
   weatherCode:      number;   // WMO-Code
   weatherCondition: string;   // deutsche Wetterlage
@@ -112,7 +114,7 @@ export async function fetchCurrentWeather(lat: number, lng: number): Promise<Cur
   try {
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
-      `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`;
+      `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const json = await res.json();
@@ -122,6 +124,7 @@ export async function fetchCurrentWeather(lat: number, lng: number): Promise<Cur
     return {
       temperature:      c.temperature_2m,
       windSpeed:        c.wind_speed_10m ?? 0,
+      windDirection:    typeof c.wind_direction_10m === 'number' && Number.isFinite(c.wind_direction_10m) ? c.wind_direction_10m : null,
       humidity:         c.relative_humidity_2m ?? 0,
       weatherCode:      code,
       weatherCondition: weatherLabel(code),

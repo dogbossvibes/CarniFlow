@@ -1,6 +1,7 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Share,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Share,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

@@ -36,3 +36,14 @@ it('does not turn a single inside jump into an approach history', () => {
   const second = advanceEndFixHistory(first, fix(2000, 0.5));
   expect(second.approachSeen).toBe(false);
 });
+
+it('a delayed replay of an older inside fix cannot rebuild support after leaving the end radius', () => {
+  let history = advanceEndFixHistory(INITIAL_END_FIX_HISTORY, fix(1000, 5));
+  history = advanceEndFixHistory(history, fix(2000, 0.5));
+  history = advanceEndFixHistory(history, fix(3000, 5));
+  const outside = history;
+  history = advanceEndFixHistory(history, fix(2000, 0.5));
+  expect(history).toBe(outside);
+  history = advanceEndFixHistory(history, fix(3100, 0.5));
+  expect(history).toMatchObject({ insideCount: 1, firstInsideMs: 3100 });
+});

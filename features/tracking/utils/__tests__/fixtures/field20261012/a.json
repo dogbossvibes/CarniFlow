@@ -1,0 +1,1460 @@
+{
+  "sourceSha256": "7765849a140bbddc29adba8c48b4d30e471ea100d8ee1afa483eb6a72bf33748",
+  "note": "Anonymized saved geometry and markers only; NOT raw detector or motion input. Relative x/y metres and tMs. Source/build unknown.",
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "accuracy": 4.75,
+      "tMs": 0
+    },
+    {
+      "x": -2.487,
+      "y": 0.409,
+      "accuracy": 4.75,
+      "tMs": 5000
+    },
+    {
+      "x": -5.153,
+      "y": 0.822,
+      "accuracy": 4.75,
+      "tMs": 7000
+    },
+    {
+      "x": -7.585,
+      "y": 1.263,
+      "accuracy": 4.75,
+      "tMs": 10000
+    },
+    {
+      "x": -10.313,
+      "y": 1.773,
+      "accuracy": 4.75,
+      "tMs": 12000
+    },
+    {
+      "x": -11.211,
+      "y": 1.913,
+      "accuracy": 4.75,
+      "tMs": 13000
+    },
+    {
+      "x": -14.148,
+      "y": 2.375,
+      "accuracy": 4.75,
+      "tMs": 16000
+    },
+    {
+      "x": -15.244,
+      "y": 2.236,
+      "accuracy": 4.75,
+      "tMs": 18000
+    },
+    {
+      "x": -17.249,
+      "y": 2.1,
+      "accuracy": 4.75,
+      "tMs": 19000
+    },
+    {
+      "x": -19.605,
+      "y": 2.636,
+      "accuracy": 4.75,
+      "tMs": 22000
+    },
+    {
+      "x": -21.575,
+      "y": 3.346,
+      "accuracy": 4.75,
+      "tMs": 23000
+    },
+    {
+      "x": -24.545,
+      "y": 3.892,
+      "accuracy": 4.75,
+      "tMs": 27000
+    },
+    {
+      "x": -26.999,
+      "y": 4.417,
+      "accuracy": 4.75,
+      "tMs": 30000
+    },
+    {
+      "x": -30.02,
+      "y": 4.763,
+      "accuracy": 4.75,
+      "tMs": 33999
+    },
+    {
+      "x": -31.958,
+      "y": 5.174,
+      "accuracy": 4.75,
+      "tMs": 35999
+    },
+    {
+      "x": -34.06,
+      "y": 5.662,
+      "accuracy": 4.75,
+      "tMs": 38999
+    },
+    {
+      "x": -36.399,
+      "y": 6.25,
+      "accuracy": 4.75,
+      "tMs": 42999
+    },
+    {
+      "x": -38.54,
+      "y": 6.593,
+      "accuracy": 4.75,
+      "tMs": 53999
+    },
+    {
+      "x": -41.192,
+      "y": 7.054,
+      "accuracy": 4.75,
+      "tMs": 58999
+    },
+    {
+      "x": -43.795,
+      "y": 7.487,
+      "accuracy": 4.75,
+      "tMs": 61999
+    },
+    {
+      "x": -45.336,
+      "y": 8.681,
+      "accuracy": 4.75,
+      "tMs": 64999
+    },
+    {
+      "x": -45.697,
+      "y": 11.098,
+      "accuracy": 4.75,
+      "tMs": 66999
+    },
+    {
+      "x": -45.735,
+      "y": 13.227,
+      "accuracy": 4.75,
+      "tMs": 69999
+    },
+    {
+      "x": -45.695,
+      "y": 16.525,
+      "accuracy": 4.75,
+      "tMs": 73999
+    },
+    {
+      "x": -45.687,
+      "y": 19.215,
+      "accuracy": 4.75,
+      "tMs": 76999
+    },
+    {
+      "x": -45.75,
+      "y": 21.32,
+      "accuracy": 4.75,
+      "tMs": 79000
+    },
+    {
+      "x": -45.686,
+      "y": 23.844,
+      "accuracy": 4.75,
+      "tMs": 83000
+    },
+    {
+      "x": -45.519,
+      "y": 26.937,
+      "accuracy": 4.75,
+      "tMs": 89000
+    },
+    {
+      "x": -45.389,
+      "y": 30.396,
+      "accuracy": 4.75,
+      "tMs": 93000
+    },
+    {
+      "x": -45.283,
+      "y": 34.176,
+      "accuracy": 4.75,
+      "tMs": 97000
+    },
+    {
+      "x": -45.179,
+      "y": 37.23,
+      "accuracy": 4.75,
+      "tMs": 100000
+    },
+    {
+      "x": -45.153,
+      "y": 40.348,
+      "accuracy": 4.75,
+      "tMs": 103000
+    },
+    {
+      "x": -45.098,
+      "y": 43.583,
+      "accuracy": 4.75,
+      "tMs": 107000
+    },
+    {
+      "x": -43.313,
+      "y": 45.862,
+      "accuracy": 4.75,
+      "tMs": 112000
+    },
+    {
+      "x": -40.938,
+      "y": 46.389,
+      "accuracy": 4.75,
+      "tMs": 114000
+    },
+    {
+      "x": -38.393,
+      "y": 47.122,
+      "accuracy": 4.75,
+      "tMs": 119000
+    },
+    {
+      "x": -38.049,
+      "y": 47.975,
+      "accuracy": 4.75,
+      "tMs": 120000
+    },
+    {
+      "x": -37.645,
+      "y": 50.188,
+      "accuracy": 4.75,
+      "tMs": 122000
+    },
+    {
+      "x": -37.673,
+      "y": 52.543,
+      "accuracy": 4.75,
+      "tMs": 126000
+    },
+    {
+      "x": -37.758,
+      "y": 55.265,
+      "accuracy": 4.75,
+      "tMs": 133000
+    },
+    {
+      "x": -37.607,
+      "y": 57.672,
+      "accuracy": 4.75,
+      "tMs": 136000
+    },
+    {
+      "x": -37.379,
+      "y": 59.948,
+      "accuracy": 4.75,
+      "tMs": 139000
+    },
+    {
+      "x": -37.288,
+      "y": 61.998,
+      "accuracy": 4.75,
+      "tMs": 142000
+    },
+    {
+      "x": -37.244,
+      "y": 64.985,
+      "accuracy": 4.75,
+      "tMs": 147000
+    },
+    {
+      "x": -37.189,
+      "y": 67.07,
+      "accuracy": 4.75,
+      "tMs": 150000
+    },
+    {
+      "x": -37.29,
+      "y": 69.353,
+      "accuracy": 4.75,
+      "tMs": 153000
+    },
+    {
+      "x": -37.371,
+      "y": 71.665,
+      "accuracy": 4.75,
+      "tMs": 156000
+    },
+    {
+      "x": -37.437,
+      "y": 74.035,
+      "accuracy": 4.75,
+      "tMs": 159000
+    },
+    {
+      "x": -37.651,
+      "y": 76.419,
+      "accuracy": 4.75,
+      "tMs": 162000
+    },
+    {
+      "x": -38.85,
+      "y": 76.469,
+      "accuracy": 4.75,
+      "tMs": 167000
+    },
+    {
+      "x": -40.314,
+      "y": 74.642,
+      "accuracy": 4.75,
+      "tMs": 169000
+    },
+    {
+      "x": -41.727,
+      "y": 72.971,
+      "accuracy": 4.75,
+      "tMs": 172000
+    },
+    {
+      "x": -43.394,
+      "y": 70.936,
+      "accuracy": 4.75,
+      "tMs": 174000
+    },
+    {
+      "x": -43.919,
+      "y": 70.305,
+      "accuracy": 4.75,
+      "tMs": 175000
+    },
+    {
+      "x": -45.214,
+      "y": 68.672,
+      "accuracy": 4.75,
+      "tMs": 177000
+    },
+    {
+      "x": -46.839,
+      "y": 66.355,
+      "accuracy": 4.75,
+      "tMs": 181000
+    },
+    {
+      "x": -48.258,
+      "y": 64.238,
+      "accuracy": 4.75,
+      "tMs": 184000
+    },
+    {
+      "x": -50.281,
+      "y": 62.361,
+      "accuracy": 4.75,
+      "tMs": 187000
+    },
+    {
+      "x": -52.679,
+      "y": 61.756,
+      "accuracy": 4.75,
+      "tMs": 190000
+    },
+    {
+      "x": -55.258,
+      "y": 61.59,
+      "accuracy": 4.75,
+      "tMs": 192000
+    },
+    {
+      "x": -57.349,
+      "y": 61.705,
+      "accuracy": 4.75,
+      "tMs": 194000
+    },
+    {
+      "x": -60.286,
+      "y": 61.869,
+      "accuracy": 4.75,
+      "tMs": 198000
+    },
+    {
+      "x": -62.365,
+      "y": 61.97,
+      "accuracy": 4.75,
+      "tMs": 200000
+    },
+    {
+      "x": -64.554,
+      "y": 62.564,
+      "accuracy": 4.75,
+      "tMs": 204001
+    },
+    {
+      "x": -65.099,
+      "y": 63.363,
+      "accuracy": 4.75,
+      "tMs": 205001
+    },
+    {
+      "x": -65.565,
+      "y": 65.598,
+      "accuracy": 4.75,
+      "tMs": 207001
+    },
+    {
+      "x": -65.75,
+      "y": 68.095,
+      "accuracy": 4.75,
+      "tMs": 216001
+    },
+    {
+      "x": -65.902,
+      "y": 71.222,
+      "accuracy": 4.75,
+      "tMs": 220001
+    },
+    {
+      "x": -65.974,
+      "y": 74.141,
+      "accuracy": 4.75,
+      "tMs": 222001
+    },
+    {
+      "x": -65.923,
+      "y": 77.198,
+      "accuracy": 4.75,
+      "tMs": 225001
+    },
+    {
+      "x": -65.828,
+      "y": 79.487,
+      "accuracy": 4.75,
+      "tMs": 227001
+    },
+    {
+      "x": -65.785,
+      "y": 81.654,
+      "accuracy": 4.75,
+      "tMs": 229001
+    },
+    {
+      "x": -65.716,
+      "y": 84.381,
+      "accuracy": 4.75,
+      "tMs": 232001
+    },
+    {
+      "x": -65.643,
+      "y": 87.29,
+      "accuracy": 4.75,
+      "tMs": 235001
+    },
+    {
+      "x": -65.549,
+      "y": 89.981,
+      "accuracy": 4.75,
+      "tMs": 238000
+    },
+    {
+      "x": -65.419,
+      "y": 92.622,
+      "accuracy": 4.75,
+      "tMs": 242000
+    },
+    {
+      "x": -65.284,
+      "y": 95.472,
+      "accuracy": 4.75,
+      "tMs": 245000
+    },
+    {
+      "x": -65.253,
+      "y": 97.88,
+      "accuracy": 4.75,
+      "tMs": 247000
+    },
+    {
+      "x": -65.178,
+      "y": 100.303,
+      "accuracy": 4.75,
+      "tMs": 250000
+    },
+    {
+      "x": -65.11,
+      "y": 103.287,
+      "accuracy": 4.75,
+      "tMs": 253000
+    },
+    {
+      "x": -64.154,
+      "y": 105.596,
+      "accuracy": 4.75,
+      "tMs": 257000
+    },
+    {
+      "x": -60.885,
+      "y": 106.216,
+      "accuracy": 4.75,
+      "tMs": 261000
+    },
+    {
+      "x": -59.458,
+      "y": 106.401,
+      "accuracy": 4.75,
+      "tMs": 262000
+    },
+    {
+      "x": -57.325,
+      "y": 106.643,
+      "accuracy": 4.75,
+      "tMs": 263000
+    },
+    {
+      "x": -55.03,
+      "y": 106.653,
+      "accuracy": 4.75,
+      "tMs": 266000
+    },
+    {
+      "x": -52.579,
+      "y": 106.72,
+      "accuracy": 4.75,
+      "tMs": 269000
+    },
+    {
+      "x": -50.123,
+      "y": 106.729,
+      "accuracy": 4.75,
+      "tMs": 272000
+    },
+    {
+      "x": -47.491,
+      "y": 106.87,
+      "accuracy": 4.75,
+      "tMs": 276000
+    },
+    {
+      "x": -45.262,
+      "y": 106.924,
+      "accuracy": 4.75,
+      "tMs": 279000
+    },
+    {
+      "x": -44.351,
+      "y": 108.866,
+      "accuracy": 4.75,
+      "tMs": 283000
+    },
+    {
+      "x": -44.028,
+      "y": 111.731,
+      "accuracy": 4.75,
+      "tMs": 286000
+    },
+    {
+      "x": -43.837,
+      "y": 114.594,
+      "accuracy": 4.75,
+      "tMs": 289000
+    },
+    {
+      "x": -43.726,
+      "y": 117.826,
+      "accuracy": 4.75,
+      "tMs": 292000
+    },
+    {
+      "x": -43.653,
+      "y": 121.26,
+      "accuracy": 4.75,
+      "tMs": 296000
+    },
+    {
+      "x": -43.531,
+      "y": 124.562,
+      "accuracy": 4.75,
+      "tMs": 299000
+    },
+    {
+      "x": -43.453,
+      "y": 126.743,
+      "accuracy": 4.75,
+      "tMs": 301000
+    },
+    {
+      "x": -43.355,
+      "y": 129.761,
+      "accuracy": 4.75,
+      "tMs": 307000
+    },
+    {
+      "x": -43.324,
+      "y": 132.526,
+      "accuracy": 4.75,
+      "tMs": 310000
+    },
+    {
+      "x": -43.253,
+      "y": 135.154,
+      "accuracy": 4.75,
+      "tMs": 313000
+    },
+    {
+      "x": -43.085,
+      "y": 137.749,
+      "accuracy": 4.75,
+      "tMs": 316000
+    },
+    {
+      "x": -43.019,
+      "y": 139.9,
+      "accuracy": 4.75,
+      "tMs": 321000
+    },
+    {
+      "x": -42.621,
+      "y": 142.809,
+      "accuracy": 4.75,
+      "tMs": 326000
+    },
+    {
+      "x": -42.488,
+      "y": 145.43,
+      "accuracy": 4.75,
+      "tMs": 329001
+    },
+    {
+      "x": -42.167,
+      "y": 148.51,
+      "accuracy": 4.75,
+      "tMs": 333001
+    },
+    {
+      "x": -41.971,
+      "y": 151.29,
+      "accuracy": 4.75,
+      "tMs": 336001
+    },
+    {
+      "x": -41.749,
+      "y": 154.149,
+      "accuracy": 4.75,
+      "tMs": 339001
+    },
+    {
+      "x": -40.644,
+      "y": 156.242,
+      "accuracy": 4.75,
+      "tMs": 344001
+    },
+    {
+      "x": -38.915,
+      "y": 156.792,
+      "accuracy": 4.75,
+      "tMs": 345001
+    },
+    {
+      "x": -36.884,
+      "y": 156.718,
+      "accuracy": 4.75,
+      "tMs": 347001
+    },
+    {
+      "x": -34.784,
+      "y": 156.52,
+      "accuracy": 4.75,
+      "tMs": 350001
+    },
+    {
+      "x": -32.606,
+      "y": 156.156,
+      "accuracy": 4.75,
+      "tMs": 352001
+    },
+    {
+      "x": -30.319,
+      "y": 156.194,
+      "accuracy": 4.75,
+      "tMs": 355001
+    },
+    {
+      "x": -28.229,
+      "y": 156.171,
+      "accuracy": 4.75,
+      "tMs": 360001
+    },
+    {
+      "x": -28.938,
+      "y": 157.647,
+      "accuracy": 4.75,
+      "tMs": 367001
+    },
+    {
+      "x": -30.697,
+      "y": 159.562,
+      "accuracy": 4.75,
+      "tMs": 371001
+    },
+    {
+      "x": -32.244,
+      "y": 161.361,
+      "accuracy": 4.75,
+      "tMs": 374000
+    },
+    {
+      "x": -33.773,
+      "y": 163.078,
+      "accuracy": 4.75,
+      "tMs": 376000
+    },
+    {
+      "x": -35.76,
+      "y": 165.508,
+      "accuracy": 4.75,
+      "tMs": 380000
+    },
+    {
+      "x": -37.641,
+      "y": 167.898,
+      "accuracy": 4.75,
+      "tMs": 383000
+    },
+    {
+      "x": -39.738,
+      "y": 170.628,
+      "accuracy": 4.75,
+      "tMs": 387000
+    },
+    {
+      "x": -41.837,
+      "y": 173.452,
+      "accuracy": 4.75,
+      "tMs": 391000
+    },
+    {
+      "x": -43.332,
+      "y": 175.696,
+      "accuracy": 4.75,
+      "tMs": 394000
+    },
+    {
+      "x": -44.557,
+      "y": 177.863,
+      "accuracy": 4.75,
+      "tMs": 397000
+    },
+    {
+      "x": -46.043,
+      "y": 179.317,
+      "accuracy": 4.75,
+      "tMs": 399000
+    },
+    {
+      "x": -48.507,
+      "y": 180.558,
+      "accuracy": 4.75,
+      "tMs": 402000
+    },
+    {
+      "x": -51.25,
+      "y": 181.634,
+      "accuracy": 4.75,
+      "tMs": 404000
+    },
+    {
+      "x": -54.044,
+      "y": 182.506,
+      "accuracy": 4.75,
+      "tMs": 408000
+    },
+    {
+      "x": -55.321,
+      "y": 182.872,
+      "accuracy": 4.75,
+      "tMs": 409000
+    },
+    {
+      "x": -57.998,
+      "y": 183.64,
+      "accuracy": 4.75,
+      "tMs": 411000
+    },
+    {
+      "x": -58.892,
+      "y": 183.865,
+      "accuracy": 4.75,
+      "tMs": 412000
+    },
+    {
+      "x": -61.593,
+      "y": 184.727,
+      "accuracy": 4.75,
+      "tMs": 415000
+    },
+    {
+      "x": -64.429,
+      "y": 185.493,
+      "accuracy": 4.75,
+      "tMs": 419000
+    },
+    {
+      "x": -67.112,
+      "y": 185.91,
+      "accuracy": 4.75,
+      "tMs": 422000
+    },
+    {
+      "x": -69.395,
+      "y": 186.175,
+      "accuracy": 4.75,
+      "tMs": 427000
+    },
+    {
+      "x": -70.829,
+      "y": 185.142,
+      "accuracy": 4.75,
+      "tMs": 434000
+    },
+    {
+      "x": -71.457,
+      "y": 182.36,
+      "accuracy": 4.75,
+      "tMs": 437000
+    },
+    {
+      "x": -71.671,
+      "y": 181.24,
+      "accuracy": 4.75,
+      "tMs": 438000
+    },
+    {
+      "x": -72.219,
+      "y": 178.546,
+      "accuracy": 4.75,
+      "tMs": 440000
+    },
+    {
+      "x": -72.658,
+      "y": 175.855,
+      "accuracy": 4.75,
+      "tMs": 443000
+    },
+    {
+      "x": -72.982,
+      "y": 173.606,
+      "accuracy": 4.75,
+      "tMs": 445000
+    },
+    {
+      "x": -73.024,
+      "y": 171.366,
+      "accuracy": 4.75,
+      "tMs": 448000
+    },
+    {
+      "x": -72.425,
+      "y": 170.481,
+      "accuracy": 4.75,
+      "tMs": 449000
+    },
+    {
+      "x": -69.904,
+      "y": 168.884,
+      "accuracy": 4.75,
+      "tMs": 452000
+    },
+    {
+      "x": -68.839,
+      "y": 168.527,
+      "accuracy": 4.75,
+      "tMs": 453000
+    },
+    {
+      "x": -66.301,
+      "y": 167.77,
+      "accuracy": 4.75,
+      "tMs": 455001
+    },
+    {
+      "x": -63.553,
+      "y": 167.21,
+      "accuracy": 4.75,
+      "tMs": 459001
+    },
+    {
+      "x": -60.424,
+      "y": 166.573,
+      "accuracy": 4.75,
+      "tMs": 462001
+    },
+    {
+      "x": -57.644,
+      "y": 166.081,
+      "accuracy": 4.75,
+      "tMs": 464001
+    },
+    {
+      "x": -56.741,
+      "y": 165.667,
+      "accuracy": 4.75,
+      "tMs": 466001
+    },
+    {
+      "x": -55.898,
+      "y": 163.041,
+      "accuracy": 4.75,
+      "tMs": 469001
+    },
+    {
+      "x": -55.981,
+      "y": 161.787,
+      "accuracy": 4.75,
+      "tMs": 470001
+    },
+    {
+      "x": -56.116,
+      "y": 159.072,
+      "accuracy": 4.75,
+      "tMs": 472001
+    },
+    {
+      "x": -56.152,
+      "y": 156.404,
+      "accuracy": 4.75,
+      "tMs": 475001
+    },
+    {
+      "x": -56.136,
+      "y": 154.297,
+      "accuracy": 4.75,
+      "tMs": 476001
+    },
+    {
+      "x": -56.171,
+      "y": 151.806,
+      "accuracy": 4.75,
+      "tMs": 479001
+    },
+    {
+      "x": -56.387,
+      "y": 149.023,
+      "accuracy": 4.75,
+      "tMs": 481001
+    },
+    {
+      "x": -56.643,
+      "y": 146.027,
+      "accuracy": 4.75,
+      "tMs": 485001
+    },
+    {
+      "x": -57.204,
+      "y": 144.85,
+      "accuracy": 4.75,
+      "tMs": 487001
+    },
+    {
+      "x": -59.773,
+      "y": 143.619,
+      "accuracy": 4.75,
+      "tMs": 489001
+    },
+    {
+      "x": -62.203,
+      "y": 143.409,
+      "accuracy": 4.75,
+      "tMs": 492001
+    },
+    {
+      "x": -64.28,
+      "y": 143.259,
+      "accuracy": 4.75,
+      "tMs": 494001
+    },
+    {
+      "x": -66.468,
+      "y": 143.297,
+      "accuracy": 4.75,
+      "tMs": 500001
+    },
+    {
+      "x": -69.33,
+      "y": 143.314,
+      "accuracy": 4.75,
+      "tMs": 503001
+    },
+    {
+      "x": -71.708,
+      "y": 143.534,
+      "accuracy": 4.75,
+      "tMs": 505000
+    },
+    {
+      "x": -74.195,
+      "y": 143.711,
+      "accuracy": 4.75,
+      "tMs": 509000
+    },
+    {
+      "x": -76.309,
+      "y": 143.546,
+      "accuracy": 4.75,
+      "tMs": 512000
+    },
+    {
+      "x": -77.031,
+      "y": 142.781,
+      "accuracy": 4.75,
+      "tMs": 513000
+    },
+    {
+      "x": -77.908,
+      "y": 140.945,
+      "accuracy": 4.75,
+      "tMs": 514000
+    },
+    {
+      "x": -78.418,
+      "y": 138.066,
+      "accuracy": 4.75,
+      "tMs": 518000
+    },
+    {
+      "x": -78.954,
+      "y": 134.708,
+      "accuracy": 4.75,
+      "tMs": 521000
+    },
+    {
+      "x": -79.413,
+      "y": 131.886,
+      "accuracy": 4.75,
+      "tMs": 523000
+    },
+    {
+      "x": -79.58,
+      "y": 129.222,
+      "accuracy": 4.75,
+      "tMs": 531000
+    },
+    {
+      "x": -79.861,
+      "y": 126.348,
+      "accuracy": 4.75,
+      "tMs": 535000
+    },
+    {
+      "x": -80.256,
+      "y": 122.797,
+      "accuracy": 4.75,
+      "tMs": 539000
+    },
+    {
+      "x": -80.83,
+      "y": 119.466,
+      "accuracy": 4.75,
+      "tMs": 542000
+    },
+    {
+      "x": -81.261,
+      "y": 116.783,
+      "accuracy": 4.75,
+      "tMs": 544000
+    },
+    {
+      "x": -79.852,
+      "y": 115.921,
+      "accuracy": 4.75,
+      "tMs": 548000
+    },
+    {
+      "x": -77.46,
+      "y": 115.419,
+      "accuracy": 4.75,
+      "tMs": 550000
+    },
+    {
+      "x": -75.318,
+      "y": 115.222,
+      "accuracy": 4.75,
+      "tMs": 553000
+    },
+    {
+      "x": -72.855,
+      "y": 114.958,
+      "accuracy": 4.75,
+      "tMs": 556000
+    },
+    {
+      "x": -71.019,
+      "y": 113.137,
+      "accuracy": 4.75,
+      "tMs": 560000
+    },
+    {
+      "x": -70.535,
+      "y": 110.191,
+      "accuracy": 4.75,
+      "tMs": 562000
+    },
+    {
+      "x": -70.615,
+      "y": 108.174,
+      "accuracy": 4.75,
+      "tMs": 565000
+    },
+    {
+      "x": -71.433,
+      "y": 105.115,
+      "accuracy": 4.75,
+      "tMs": 571000
+    },
+    {
+      "x": -71.964,
+      "y": 103.956,
+      "accuracy": 4.75,
+      "tMs": 572000
+    },
+    {
+      "x": -73.367,
+      "y": 101.539,
+      "accuracy": 4.75,
+      "tMs": 574000
+    },
+    {
+      "x": -74.979,
+      "y": 99.335,
+      "accuracy": 4.75,
+      "tMs": 578000
+    },
+    {
+      "x": -75.736,
+      "y": 98.303,
+      "accuracy": 4.75,
+      "tMs": 579000
+    },
+    {
+      "x": -76.932,
+      "y": 96.647,
+      "accuracy": 4.75,
+      "tMs": 580001
+    },
+    {
+      "x": -78.135,
+      "y": 95.038,
+      "accuracy": 4.75,
+      "tMs": 586001
+    }
+  ],
+  "markers": [
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "holz",
+      "x": -38.154,
+      "y": 6.58,
+      "atM": 37.8,
+      "tMs": 51500,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -45.954,
+      "y": 8.359,
+      "atM": 46.7,
+      "tMs": 67130,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "duebel",
+      "x": -45.581,
+      "y": 25.857,
+      "atM": 61.6,
+      "tMs": 85655,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -44.976,
+      "y": 46.166,
+      "atM": 84.5,
+      "tMs": 112156,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -37.522,
+      "y": 47.493,
+      "atM": 92.2,
+      "tMs": 122148,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "teppich",
+      "x": -37.752,
+      "y": 54.208,
+      "atM": 94.3,
+      "tMs": 129182,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "spitz_links",
+      "material": null,
+      "x": -37.777,
+      "y": 77.742,
+      "atM": 122.5,
+      "tMs": 167188,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -64.886,
+      "y": 62.083,
+      "atM": 157.5,
+      "tMs": 207143,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "plastik",
+      "x": -65.636,
+      "y": 66.522,
+      "atM": 154.3,
+      "tMs": 211367,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -64.912,
+      "y": 106.3,
+      "atM": 202,
+      "tMs": 261242,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -44.127,
+      "y": 106.953,
+      "atM": 222.8,
+      "tMs": 283246,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "diverses",
+      "x": -43.016,
+      "y": 140.12,
+      "atM": 245.1,
+      "tMs": 320129,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -41.555,
+      "y": 156.753,
+      "atM": 272.7,
+      "tMs": 345287,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "spitz_links",
+      "material": null,
+      "x": -27.57,
+      "y": 156.225,
+      "atM": 286.8,
+      "tMs": 367286,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "diverses",
+      "x": -69.395,
+      "y": 186.175,
+      "atM": 327.9,
+      "tMs": 428149,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -70.198,
+      "y": 186.296,
+      "atM": 341.9,
+      "tMs": 434306,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -72.98,
+      "y": 170.154,
+      "atM": 358.6,
+      "tMs": 452318,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -55.922,
+      "y": 165.327,
+      "atM": 376.4,
+      "tMs": 469339,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -56.777,
+      "y": 144.459,
+      "atM": 397.4,
+      "tMs": 489330,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -57.664,
+      "y": 143.497,
+      "atM": 398.7,
+      "tMs": 492217,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "duebel",
+      "x": -64.28,
+      "y": 143.259,
+      "atM": 385.9,
+      "tMs": 495511,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -77.416,
+      "y": 143.385,
+      "atM": 418.6,
+      "tMs": 514346,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "diverses",
+      "x": -79.572,
+      "y": 130.655,
+      "atM": 413.2,
+      "tMs": 527387,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "links",
+      "material": null,
+      "x": -81.344,
+      "y": 116.272,
+      "atM": 446.1,
+      "tMs": 548352,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": -70.38,
+      "y": 113.966,
+      "atM": 457.6,
+      "tMs": 562357,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "plastik",
+      "x": -78.06,
+      "y": 95.119,
+      "atM": 456.5,
+      "tMs": 584714,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    }
+  ]
+}

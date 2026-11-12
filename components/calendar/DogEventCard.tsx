@@ -6,7 +6,7 @@ import { eventMeta, STATUS_LABEL, type CalendarEvent } from '@/types/calendar';
 export function DogEventCard({ event, onPress }: { event: CalendarEvent; onPress?: () => void }) {
   const m = eventMeta(event.type);
   return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} disabled={!onPress}>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={`${event.title}, ${fmtTime(event.start_at)}`}>
       <View style={[s.stripe, { backgroundColor: m.color }]} />
       <View style={[s.icon, { backgroundColor: `${m.color}1A` }]}>
         <Text style={{ fontSize: 18 }}>{m.emoji}</Text>

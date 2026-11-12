@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { splitContinuousPoints } from '../utils/trackContinuity';
+import { Fragment, memo, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { C, FT } from '@/constants/colors';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
-import { trackOverlayColor, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { trackOverlayColor, trackColorForeground, isTrackOverlayColorKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 // Referenz-Fährten anderer eigener Hunde (read-only), jeweils in der Fährtenfarbe
 // DIESES Hundes (overlay.colorKey, aus seiner dogId aufgelöst). Auf Satellitenkarten
@@ -23,7 +24,7 @@ export const REFERENCE_TRACK_LINE = {
 } as const;
 
 /** Linienstil einer Referenz-Fährte in der Farbe ihres Hundes. */
-export function referenceTrackStroke(colorKey: TrackOverlayColorKey) {
+export function referenceTrackStroke(colorKey: TrackOverlayColorValue) {
   return {
     strokeColor: `${trackOverlayColor(colorKey)}${REFERENCE_TRACK_LINE.alphaHex}`,
     strokeWidth: REFERENCE_TRACK_LINE.strokeWidth,
@@ -53,14 +54,16 @@ const ReferenceStartLabel = memo(function ReferenceStartLabel({ Marker, lat, lng
 const ReferencePolyline = memo(function ReferencePolyline({ Polyline, overlay }: { Polyline: MapComponent; overlay: TrackReferenceOverlay }) {
   // Koordinaten einmal je Overlay-Objekt (Overlays ändern sich nur beim Neuladen,
   // nicht pro GPS-Fix der laufenden Aufnahme).
-  const coords = useMemo(() => overlay.points.map(p => ({ latitude: p.lat, longitude: p.lng })), [overlay.points]);
+  const parts = useMemo(() => splitContinuousPoints(overlay.points).filter(part => part.length > 1)
+    .map(part => part.map(p => ({ latitude: p.lat, longitude: p.lng }))), [overlay.points]);
   const stroke = referenceTrackStroke(overlay.colorKey);
   return (
     <>
+      {parts.map((coords, index) => <Fragment key={index}>
       {/* Halo zuerst (darunter), dann die Hundefarbe */}
       <Polyline
         coordinates={coords}
-        strokeColor={REFERENCE_TRACK_HALO.strokeColor}
+        strokeColor={!isTrackOverlayColorKey(overlay.colorKey) && trackColorForeground(trackOverlayColor(overlay.colorKey)) === '#FFFFFF' ? 'rgba(255,255,255,0.8)' : REFERENCE_TRACK_HALO.strokeColor}
         strokeWidth={REFERENCE_TRACK_HALO.strokeWidth}
         lineCap="round"
         lineJoin="round"
@@ -76,6 +79,7 @@ const ReferencePolyline = memo(function ReferencePolyline({ Polyline, overlay }:
         zIndex={stroke.zIndex}
         tappable={false}
       />
+      </Fragment>)}
     </>
   );
 });

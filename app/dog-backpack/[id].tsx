@@ -1,5 +1,6 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Keyboard, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,6 +64,7 @@ export default function DogBackpackScreen() {
   const openEdit = (it: DogBackpackItem) => { setEditId(it.id); setDraftLabel(it.label); setDraftCat(it.category); setLabelError(false); setEditorOpen(true); };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (openAddParam === '1' && userId && dogId) openAdd();
   }, [dogId, openAddParam, userId]);
 

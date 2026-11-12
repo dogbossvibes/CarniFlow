@@ -1,5 +1,6 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
 import { DOC_CATEGORIES, HEALTH_DOC_SUBTYPES } from '@/features/dogs/documentCategories';
 import { useT } from '@/i18n';
+import { haptic } from '@/lib/haptics';
 
 type PickedFile = { uri: string; name: string; mime: string };
 
@@ -54,6 +56,7 @@ export default function DogDocumentEditor() {
         ...(healthMode ? { category: 'health', subtype } : {}),
       });
       if (error) throw error;
+      haptic.success();
       router.back();
     } catch {
       showToast(t('media.uploadFailed'));
@@ -71,7 +74,7 @@ export default function DogDocumentEditor() {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
           <Text style={s.label}>{healthMode ? 'Gesundheitskategorie' : t('dog.category')}</Text>
           <View style={s.kinds}>
             {DOC_CATEGORIES.map(k => {

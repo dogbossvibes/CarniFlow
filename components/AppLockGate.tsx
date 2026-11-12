@@ -43,6 +43,7 @@ export function AppLockGate() {
 
   // Kaltstart / neues Login: sperren, wenn aktiviert + eingeloggt + verfügbar.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (active) { setLocked(true); promptedRef.current = false; }
   }, [active]);
 

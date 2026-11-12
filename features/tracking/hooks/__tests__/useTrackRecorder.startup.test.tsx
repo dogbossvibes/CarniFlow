@@ -1,14 +1,26 @@
+
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useTrackRecorder } from '../useTrackRecorder';
 import { useTrackingStore } from '../../store/trackingStore';
 import { requestVoice, resetVoiceEvents } from '../../utils/voiceEvents';
 import { saveQaSessionCapture } from '../../utils/qaSessionCapture';
-import { createLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { createLocalTrainingSession, finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackMarker, createLocalTrackPointsBatch } from '@/features/tracking/repositories/localTrackRepository';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { motionClient } from '../../native/motionClient';
+import { markMotionSample } from '../../utils/trackingWarmupState';
+import type { MotionSample } from '@/modules/anyvo-motion';
+jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ getFirstAsync: async (_sql: string, id: string, _remote: string, owner: string) => ({ local_id: id, user_id: owner, deleted_at: null }) }) }));
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => mockAccessToken,
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'owner', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 jest.mock('expo-speech', () => ({ speak: jest.fn(), stop: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -25,6 +37,8 @@ jest.mock('expo-location', () => ({
 }));
 let feedFix: ((sample: any) => void) | null = null;
 let mockQaEnabled = false;
+let mockAutoDetect = false;
+let mockAccessToken: string | null = 'authorized-fixture';
 jest.mock('../../utils/positionSource', () => ({
   sampleToLocationObject: (s: any) => ({ coords: {
     latitude: s.lat, longitude: s.lng, accuracy: s.accuracy,
@@ -39,6 +53,7 @@ jest.mock('../../store/trackingStore', () => {
   const state = {
     isPaused: false, distanceMeters: 0, durationSeconds: 0, trackPoints: [] as any[],
     markers: [] as any[], segments: [] as any[], startLockActive: false, gpsAccuracy: 5,
+    restoreLayRecording: jest.fn((p: any) => { state.trackPoints = [...p.trackPoints]; state.markers = [...p.markers]; state.distanceMeters = p.distanceMeters; state.startLockActive = false; }),
     startRecording: jest.fn(), setStartLockActive: jest.fn((active: boolean) => { state.startLockActive = active; }),
     setStartAnchor: jest.fn(), setStartDriftRejectedCount: jest.fn(),
     setCurrentPosition: jest.fn(), addTrackPoint: jest.fn((p: any) => { state.trackPoints.push(p); }),
@@ -46,11 +61,12 @@ jest.mock('../../store/trackingStore', () => {
     setDuration: jest.fn(), setHeading: jest.fn(),
     stopRecording: jest.fn(), setLayFinishedAt: jest.fn(), setSaveState: jest.fn(),
     addMarker: jest.fn((m: any) => { state.markers.push(m); }),
+    annotateAngleGeometry: jest.fn((entries: unknown) => { state.markers = jest.requireActual('../../utils/specialAngleGeometry').attachSpecialGeometry(state.markers, entries); }),
   };
   return { useTrackingStore: { getState: () => state } };
 });
 jest.mock('../../utils/qaModeBootstrap', () => ({ hydrateQaModes: jest.fn(async () => {}) }));
-jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaEnabled }));
+jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaEnabled, subscribeQaDiagnostics: () => () => {} }));
 jest.mock('../../utils/qaSessionCapture', () => ({
   ...jest.requireActual('../../utils/qaSessionCapture'),
   saveQaSessionCapture: jest.fn(async () => {}),
@@ -58,11 +74,12 @@ jest.mock('../../utils/qaSessionCapture', () => ({
 jest.mock('../../utils/trackingEngineMode', () => ({ getTrackingEngineMode: () => 'current' }));
 jest.mock('../../utils/locationSourceMode', () => ({ getLocationSourceMode: () => 'expo' }));
 jest.mock('../../utils/trackingWarmupState', () => ({
+  ...jest.requireActual('../../utils/trackingWarmupState'),
   markWarmupStarted: jest.fn(), markReportedSource: jest.fn(), markWarmupStopped: jest.fn(),
   markMotionStarted: jest.fn(), markMotionSample: jest.fn(),
 }));
 jest.mock('../../native/motionClient', () => ({ motionClient: {
-  start: jest.fn(async () => {}), stop: jest.fn(), onSample: jest.fn(() => ({ remove: jest.fn() })),
+  start: jest.fn(async () => true), stop: jest.fn(), onSample: jest.fn(() => ({ remove: jest.fn() })),
 } }));
 jest.mock('../../native/precisionLocationClient', () => ({ precisionLocationClient: { requestTemporaryFullAccuracy: jest.fn(async () => {}) } }));
 jest.mock('../../native/backgroundLocationTask', () => ({
@@ -86,7 +103,7 @@ let renderer: ReactTestRenderer | null = null;
 let current: Recorder;
 let clockMs = 1_000_000;
 const metersToLatitude = (m: number) => m / 111_320;
-function Harness() { current = useTrackRecorder({ autoDetect: false }); return null; }
+function Harness() { current = useTrackRecorder({ autoDetect: mockAutoDetect }); return null; }
 async function start(onSessionStarted?: () => void) {
   await act(async () => { renderer = TestRenderer.create(<Harness />); });
   await act(async () => { expect((await current.startWarmup()).error).toBeNull(); });
@@ -102,8 +119,13 @@ function feed(afterTapMs: number, accuracy: number, northM: number, speed = 0, a
 }
 beforeEach(() => {
   clockMs = 1_000_000;
+  (motionClient.start as jest.Mock).mockReset().mockResolvedValue(true);
+  (motionClient.onSample as jest.Mock).mockClear();
+  (markMotionSample as jest.Mock).mockClear();
   feedFix = null;
   mockQaEnabled = false;
+  mockAutoDetect = false;
+  mockAccessToken = 'authorized-fixture';
   (saveQaSessionCapture as jest.Mock).mockClear();
   (createLocalTrainingSession as jest.Mock).mockReset().mockResolvedValue(undefined);
   (createLocalTrackMarker as jest.Mock).mockClear();
@@ -112,6 +134,7 @@ beforeEach(() => {
   (Speech.speak as jest.Mock).mockClear();
   jest.spyOn(Date, 'now').mockImplementation(() => clockMs);
   const state = useTrackingStore.getState();
+  state.isPaused = false;
   state.trackPoints.length = 0;
   state.markers.length = 0;
   state.distanceMeters = 0;
@@ -123,6 +146,17 @@ function diagnosticEvents(): { name: string; count: number; reason?: string }[] 
     .filter(([key]) => typeof key === 'string' && key.includes('::event::'))
     .map(([, value]) => JSON.parse(value));
 }
+
+it('adds one recording-start metadata snapshot without enabling internal QA', async () => {
+  await start();
+  const calls = (AsyncStorage.setItem as jest.Mock).mock.calls.filter(([key]) => key === 'anyvo.support.provenance.v2::' + JSON.stringify(['owner', 'local']));
+  expect(calls).toHaveLength(1);
+  const phase = JSON.parse(calls[0][1]).lay;
+  expect(phase.availability).toBe('available');
+  expect(phase.segments[0].source).toBe('recording_start');
+  expect(phase.segments[0].environment.platform).toBe('ios');
+  expect(mockQaEnabled).toBe(false);
+});
 
 it('counts accepted fixes, existing rejects and successful point flush without changing geometry', async () => {
   await start();
@@ -341,4 +375,261 @@ it('does not start a session with poor warmup accuracy, then starts when it beco
       .toBeNull();
   });
   expect(visible).toHaveBeenCalledTimes(1);
+});
+
+it('resumes the same laid geometry and canonical distance with a fresh section after process restart', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); await Promise.resolve(); });
+  await act(async () => { await current.startWarmup(); });
+  feed(0, 5, 100);
+  const points = [0, 10].map(n => ({ lat: metersToLatitude(n), lng: 0, t: 900000 + n * 1000, accuracy: 5 }));
+  const pending = { sessionId: 'local', dogId: 'dog', status: 'laying' as const, trackPoints: points, markers: [], runPoints: [],
+    distanceMeters: 9, durationSeconds: 12, layFinishedAt: null, startAnchor: points[0], savedAt: 920000 };
+  await act(async () => { expect((await current.beginRecording({ localId: 'local', ownerId: 'owner', dogId: 'dog',
+    resume: { pending, startedAt: new Date(900000).toISOString() } })).error).toBeNull(); });
+  expect(useTrackingStore.getState().trackPoints).toHaveLength(2);
+  feed(1000, 5, 100, 1);
+  expect(useTrackingStore.getState().trackPoints[2].breakBefore).toBe(true);
+  expect(useTrackingStore.getState().distanceMeters).toBe(9);
+  feed(2000, 5, 104, 1); feed(3000, 5, 108, 1);
+  expect(useTrackingStore.getState().distanceMeters).toBeGreaterThan(9);
+  expect(useTrackingStore.getState().distanceMeters).toBeLessThan(18);
+  expect(createLocalTrainingSession).toHaveBeenCalledWith(expect.objectContaining({ local_id: 'local', started_at: new Date(900000).toISOString() }));
+});
+
+it('never finalizes a laid track as saved when its point flush fails', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  (finalizeLocalTrainingSession as jest.Mock).mockClear();
+  (createLocalTrackPointsBatch as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
+  await act(async () => { current.finish(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  expect(finalizeLocalTrainingSession).not.toHaveBeenCalled();
+  expect(useTrackingStore.getState().setSaveState).toHaveBeenCalledWith('error');
+});
+
+
+it('keeps both private QA detector sections and marks the unobserved boundary after pause', async () => {
+  mockQaEnabled = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  for (let i = 0; i < 8; i++) feed(3500 + i * 1000, 5, 14 + i * 2);
+  const state = useTrackingStore.getState();
+  Object.assign(state, { pauseRecording: () => { state.isPaused = true; }, resumeRecording: () => { state.isPaused = false; } });
+  act(() => { current.pause(); });
+  act(() => { current.resume(); });
+  for (let i = 0; i < 8; i++) feed(20_000 + i * 1000, 5, 60 + i * 2);
+  act(() => { current.pause(); });
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  const boundary = capture.detectorPoints.findIndex((point: { breakBefore?: boolean }) => point.breakBefore);
+  expect(boundary).toBeGreaterThan(0);
+  expect(capture.detectorPoints[boundary].cumDistM).toBe(capture.detectorPoints[boundary - 1].cumDistM);
+  expect(capture.linePoints.some((point: { breakBefore?: boolean }) => point.breakBefore)).toBe(true);
+  expect(capture.distances.detectorPathM).toBeGreaterThan(0);
+  expect(capture.distances.detectorPathM).toBeCloseTo(capture.detectorPoints[capture.detectorPoints.length - 1].cumDistM, 2);
+  expect(capture.reconstructionScope).toBe('current_detector_section');
+});
+
+
+it('drops a deferred capture and marker metadata after authority is revoked and regranted', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(1000, 5, 8, 1);
+  let releaseMarker!: (id: string) => void;
+  (createLocalTrackMarker as jest.Mock).mockImplementationOnce(() => new Promise<string>(resolve => { releaseMarker = resolve; }));
+  let pending!: Promise<void>;
+  await act(async () => { pending = current.addMarker('gegenstand'); });
+  act(() => current.finish());
+  mockAccessToken = null;
+  mockAccessToken = 'regranted-generation';
+  await act(async () => { releaseMarker('late-marker'); await pending; await Promise.resolve(); });
+  expect(saveQaSessionCapture).not.toHaveBeenCalled();
+});
+
+it.each(['bw','ow','gw','abriss'] as const)('finish preserves %s direction and existing objects through the real recorder', async angleKind => {
+ await start();
+ const state=useTrackingStore.getState();state.currentPosition={lat:47,lng:8};
+ await act(async()=>{await current.addMarker('gegenstand',{material:'holz'});clockMs++;await current.addMarker('winkel',{angleKind,geometryDirection:'links',geometrySharpness:angleKind==='abriss'?'unresolved':'sharp',geometrySource:'manual'});});
+ const markerIds=state.markers.map(m=>m.id);
+ await act(async()=>{current.finish();for(let i=0;i<30;i++)await Promise.resolve();});
+ expect(useTrackingStore.getState().markers.map(m=>m.id)).toEqual(markerIds);
+ expect(useTrackingStore.getState().markers[1]).toMatchObject({angleKind,geometryDirection:'links',geometrySource:'manual'});
+ expect(finalizeLocalTrainingSession).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({articlesTotal:1,cornersTotal:angleKind==='abriss'?0:1,manualAngleGeometry:[expect.objectContaining({manualMarkerType:angleKind,geometryDirection:'links'})]}));
+ expect(createLocalTrackMarker).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({sourceMarkerId:markerIds[1],geometryDirection:'links',geometrySource:'manual'}));
+});
+
+
+it('ignores a queued native callback after stop, including after a new warm-up', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  const oldCallback = (motionClient.onSample as jest.Mock).mock.calls[0][0];
+  const sample: MotionSample = { timestamp: clockMs, headingDelta: 90, stepDelta: 3,
+    accelerationMagnitude: 0.2, rotationMagnitude: 1, cadence: 2,
+    movementState: 'walking', motionConfidence: 1, activityConfidence: 'high' };
+  act(() => { current.stopAll(); oldCallback(sample); });
+  expect(markMotionSample).not.toHaveBeenCalled();
+  await act(async () => { await current.startWarmup(); });
+  act(() => { oldCallback(sample); });
+  expect(markMotionSample).not.toHaveBeenCalled();
+  const currentCallback = (motionClient.onSample as jest.Mock).mock.calls.at(-1)[0];
+  act(() => { currentCallback(sample); });
+  expect(markMotionSample).toHaveBeenCalledTimes(1);
+});
+
+it('does not advertise motion readiness when the native start fails', async () => {
+  mockQaEnabled = true;
+  (motionClient.start as jest.Mock).mockResolvedValue(false);
+  await start();
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
+});
+
+it('does not let a previous warm-up start completion mark a new warm-up ready', async () => {
+  mockQaEnabled = true;
+  let resolveOld!: (started: boolean) => void;
+  (motionClient.start as jest.Mock).mockImplementationOnce(() => new Promise<boolean>(resolve => { resolveOld = resolve; }));
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  act(() => { current.stopAll(); });
+  (motionClient.start as jest.Mock).mockResolvedValue(false);
+  await act(async () => { await current.startWarmup(); resolveOld(true); await Promise.resolve(); });
+  feed(0, 5, 0);
+  await act(async () => { await current.beginRecording({ localId: 'new', ownerId: 'owner' }); });
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
+});
+
+// A real hook/processor route: the same GPS evidence must survive a marker at its apex.
+async function walkMarkedCorner(kind: 'links' | 'rechts' | 'spitz_links' | 'spitz_rechts', special?: 'bw' | 'ow' | 'gw') {
+  mockAutoDetect = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 2, 0);
+  let elapsed = 1000;
+  const fix = (east: number, north: number) => {
+    clockMs = 1_000_000 + elapsed; elapsed += 1000;
+    act(() => { feedFix?.({ lat: metersToLatitude(north), lng: metersToLatitude(east), accuracy: 2, speed: 1, t: clockMs }); });
+  };
+  for (let n = 0; n <= 40; n++) fix(0, n);
+  const state = useTrackingStore.getState();
+  state.currentPosition = { lat: metersToLatitude(40), lng: 0 };
+  await act(async () => { await current.addMarker('gegenstand', { material: 'gummi' }); });
+  if (special) await act(async () => { await current.addMarker('winkel', { angleKind: special }); });
+  const sign = kind.endsWith('rechts') ? 1 : -1;
+  const sharp = kind.startsWith('spitz');
+  for (let i = 1; i <= 40; i++) fix(sign * i * (sharp ? Math.SQRT1_2 : 1), 40 - (sharp ? i * Math.SQRT1_2 : 0));
+  return useTrackingStore.getState();
+}
+it.each(['links', 'rechts', 'spitz_links', 'spitz_rechts'] as const)('retains an object on the %s apex AND independently recognizes its angle', async kind => {
+  const state = await walkMarkedCorner(kind);
+  const corners = state.markers.filter(m => m.type === 'winkel');
+  expect(corners.map(m => m.angleKind)).toEqual([kind]);
+  expect(state.markers.filter(m => m.type === 'gegenstand').map(m => m.material)).toEqual(['gummi']);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  expect(useTrackingStore.getState().markers.filter(m => m.type === 'winkel').map(m => m.angleKind)).toEqual([kind]);
+}, 15000);
+it.each(['bw','ow','gw'] as const)('updates %s geometry while laying even with an object at the same apex', async special => {
+  const state = await walkMarkedCorner('spitz_rechts', special);
+  expect(state.markers.find(m => m.angleKind === special)).toMatchObject({ geometryDirection: 'rechts', geometrySharpness: 'sharp', geometrySource: 'gps' });
+  expect(state.markers.filter(m => m.type === 'gegenstand')).toHaveLength(1);
+}, 15000);
+
+it('persists all Joker markers while finalizing only rubber as a scored article',async()=>{
+ await start();
+ for(const material of ['duebel','ball','gummi'] as const){clockMs+=1;await act(async()=>{await current.addMarker('gegenstand',{material});});}
+ await act(async()=>{current.finish();for(let i=0;i<10;i++)await Promise.resolve();});
+ expect(useTrackingStore.getState().markers.map(m=>m.material)).toEqual(['duebel','ball','gummi']);
+ expect(finalizeLocalTrainingSession).toHaveBeenLastCalledWith('local',expect.objectContaining({articlesTotal:1}));
+});
+
+
+it('captures a QA reference at the tap, independently of selection and without creating a track marker', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  feed(1500, 5, 10);
+  clockMs = 1_002_000;
+  const handle = current.markQaReference();
+  expect(handle).not.toBeNull();
+  const expectedTime = handle!.mark.tMs;
+  expect(expectedTime).toBe(1900);
+  clockMs = 1_006_000;
+  current.labelQaReference(handle!, 'spitz_links');
+  expect(handle!.mark).toEqual({ tMs: expectedTime, kind: 'spitz_links' });
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+  useTrackingStore.getState().isPaused = true;
+  expect(current.markQaReference()).toBeNull();
+  useTrackingStore.getState().isPaused = false;
+  await act(async () => { await current.finish(); });
+  expect((saveQaSessionCapture as jest.Mock).mock.calls[0][0].referenceMarks).toEqual([{ tMs: expectedTime, kind: 'spitz_links' }]);
+});
+
+it('rejects reference marking without diagnostic authorization and while paused', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  mockAccessToken = null;
+  expect(current.markQaReference()).toBeNull();
+  mockAccessToken = 'authorized-fixture';
+  useTrackingStore.getState().isPaused = true;
+  expect(current.markQaReference()).toBeNull();
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+});
+
+it('bounds reference marks, rejects changed authority, and stops labeling after finish', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  feed(1500, 5, 10);
+  clockMs = 1_002_000;
+  const handle = current.markQaReference()!;
+  expect(handle).not.toBeNull();
+  mockAccessToken = 'changed-authority';
+  current.labelQaReference(handle, 'rechts');
+  expect(handle.mark.kind).toBe('unbekannt');
+  mockAccessToken = 'authorized-fixture';
+  for (let i = 1; i < 256; i++) expect(current.markQaReference()).not.toBeNull();
+  expect(current.markQaReference()).toBeNull();
+  await act(async () => { await current.finish(); });
+  current.labelQaReference(handle, 'links');
+  expect(handle.mark.kind).toBe('unbekannt');
+  expect(current.markQaReference()).toBeNull();
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.referenceMarks).toHaveLength(256);
+  expect(capture.referenceMarksTruncated).toBe(true);
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+});
+
+it('captures GPS delivery separately from measurement for raw and detector points only in QA', async () => {
+  mockQaEnabled = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10);
+  feed(2500, 5, 12, 0, 100);
+  await act(async () => { current.finish(); for (let i = 0; i < 10; i++) await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.rawFixes.at(-1)).toMatchObject({ tMs: 2300, receivedMs: 2400, processedMs: 2400, deliverySource: 'foreground' });
+  expect(capture.detectorPoints.at(-1)).toMatchObject({ tMs: 2300, receivedMs: 2400, processedMs: 2400, deliverySource: 'foreground' });
+});
+
+it('does not move the laid live position for a cached fix measured during an explicit pause', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  const state = useTrackingStore.getState();
+  Object.assign(state, { pauseRecording: () => { state.isPaused = true; }, resumeRecording: () => { state.isPaused = false; } });
+  act(() => current.pause());
+  clockMs += 5000;
+  act(() => current.resume());
+  const count = (state.setCurrentPosition as jest.Mock).mock.calls.length;
+  const distance = state.distanceMeters;
+  const stored = state.trackPoints.length;
+  feed(8000, 5, 99, 1, 2000);
+  expect(state.setCurrentPosition).toHaveBeenCalledTimes(count);
+  expect(state.distanceMeters).toBe(distance);
+  expect(state.trackPoints).toHaveLength(stored);
+  feed(9000, 5, 14, 1);
+  expect((state.setCurrentPosition as jest.Mock).mock.calls.length).toBeGreaterThan(count);
 });

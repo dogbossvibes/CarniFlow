@@ -23,7 +23,8 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { ActiveFaehrtenSelfHeal } from '@/features/tracking/components/ActiveFaehrtenSelfHeal';
 import { AppIntentRouteHandler } from '@/features/appIntents/AppIntentRouteHandler';
 import { RestingLiveActivitySync } from '@/features/tracking/components/RestingLiveActivitySync';
-import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
+import { LiveShareProvider } from '@/features/tracking-exchange/live/LiveShareProvider';
+import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { useT } from '@/i18n';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
@@ -34,13 +35,6 @@ void initMonitoring();
 // Die Selbstheilung aus Pending-Puffern läuft NICHT hier, sondern erst mit bekannter
 // Session + Hunden (ActiveFaehrtenSelfHeal im SessionProvider).
 void useActiveFaehrten.getState().hydrate();
-
-// QA-Einstellungen (Location-Source, Tracking-Engine, Diagnosemodus) aus dem
-// lokalen Speicher laden. Ohne das standen sie nach jedem App-Neustart wieder
-// auf ihren Defaults, obwohl der Diagnose-Screen etwas anderes gespeichert
-// hatte — ein Feldtest lief dann unbemerkt in der falschen Konfiguration.
-// Rein lokal, kein Netz, kein Login; verändert ohne gesetzte QA-Werte nichts.
-void hydrateQaModes();
 
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).
@@ -73,11 +67,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
+      <DiagnosticsAccessSync />
       <StatusBar style="light" />
       <SyncProvider />
       <ActiveFaehrtenSelfHeal />
       <AppIntentRouteHandler />
       <RestingLiveActivitySync />
+      <LiveShareProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -114,6 +110,7 @@ export default function RootLayout() {
         <Stack.Screen name="connect/vorschau" />
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
+      </LiveShareProvider>
       <AppLockGate />
     </SessionProvider>
     </QueryClientProvider>

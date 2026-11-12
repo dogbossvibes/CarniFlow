@@ -74,43 +74,10 @@ export async function listConnections(userId: string, connectionType: string = '
   });
 }
 
-export interface AnyvoPersonResult { id: string; fullName: string | null; username: string | null }
-
-// Bounded, authenticated-only Suche nach einer ANYVO-Person via ANYVO-ID/
-// Benutzername oder Name — für Health Sharing „Person verbinden" (Phase 9).
-// Nutzt die neue search_anyvo_people-RPC (20260928080000): kein Browsen ohne
-// Suchbegriff, keine private Spalte (nie phone_number/plan/email), nie anonym
-// ausführbar. NICHT dieselbe RPC wie get_profile_display_names (die löst nur
-// bereits bekannte ids auf, hier wird gesucht).
-export async function searchAnyvoPeople(query: string): Promise<AnyvoPersonResult[]> {
-  const q = query.trim();
-  if (q.length < 2) return [];
-  const { data, error } = await supabase.rpc('search_anyvo_people', { p_query: q }) as
-    { data: { id: string; full_name: string | null; username: string | null }[] | null; error: unknown };
-  if (error || !data) return [];
-  return data.map(p => ({ id: p.id, fullName: p.full_name, username: p.username }));
-}
-
-// Owner-initiierte generische Personen-Verbindung (z. B. für Health Sharing):
-// sofort 'accepted', kein Code/Redeem-RPC nötig — die Ziel-Person wird über
-// searchAnyvoPeople gefunden, keine privaten Felder verlassen dabei je den
-// Server. Kein „Trainer werden", keine Trainer-Capability, keine automatische
-// Track-Sharing-Berechtigung (can_view_shared_track prüft weiterhin exakt
-// connection_type = 'trainer_client').
-export async function connectAnyvoPerson(ownerUserId: string, personId: string): Promise<{ data: Connection | null; error: string | null }> {
-  if (ownerUserId === personId) return { data: null, error: 'Du kannst dich nicht mit dir selbst verbinden.' };
-  const existing = await supabase
-    .from('connections').select('*')
-    .eq('owner_user_id', ownerUserId).eq('connected_user_id', personId).eq('connection_type', PERSON_CONNECTION_TYPE)
-    .maybeSingle();
-  if (existing.data) return { data: existing.data as Connection, error: null };
-  const { data, error } = await supabase
-    .from('connections')
-    .insert({ owner_user_id: ownerUserId, connected_user_id: personId, status: 'accepted', created_by: 'owner', connection_type: PERSON_CONNECTION_TYPE })
-    .select('*').single();
-  if (error) return { data: null, error: error.message };
-  return { data: data as Connection, error: null };
-}
+// Die frühere Namenssuche mit Sofortverbindung (searchAnyvoPeople /
+// connectAnyvoPerson) ist entfernt: neue Personen kommen über Kontaktanfragen
+// dazu (services/contactService.ts). Bestehende Verbindungen der Art
+// PERSON_CONNECTION_TYPE bleiben gültig und lesbar.
 
 export function respondToConnection(id: string, status: ConnectionStatus) {
   return supabase.from('connections').update({ status }).eq('id', id).select('*').single();

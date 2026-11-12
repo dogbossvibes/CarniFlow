@@ -246,6 +246,7 @@ export function parseNativeBuild(buildJson) {
     channel: buildJson.updateChannel?.name ?? buildJson.channel ?? null,
     buildProfile: buildJson.buildProfile ?? null,
     gitCommitHash: buildJson.gitCommitHash ?? null,
+    fingerprintHash: buildJson.fingerprint?.hash ?? null,
   };
 }
 
@@ -283,9 +284,10 @@ export function resolveProductionBuildProfile(easJson, name, platform) {
 const appVersionFrom = (config, platform) => config?.expo?.[platform]?.version ?? config?.expo?.version ?? null;
 
 /** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis.
- * Abweichende Runtime/Profil nur mit Konfiguration vom unveränderlichen EAS-Build-Commit.
+ * Override proof: immutable build config OR fresh exact native fingerprint.
+ * Both paths retain all platform/runtime/channel/profile/ancestry guards.
  */
-export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion }) {
+export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion, nativeFingerprint }) {
   if (!build) return [`EAS-Build ${buildId ?? '—'} nicht gefunden/lesbar`];
   const problems = [];
   if (build.id !== buildId) problems.push(`EAS-Build-ID ${build.id} ≠ angefragt ${buildId}`);
@@ -297,9 +299,17 @@ export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nat
     && resolveReleaseRuntime(nativeConfig.appJson, platform) === runtime
     && appVersionFrom(nativeConfig.appJson, platform) === build.appVersion
     && releaseAppVersion === build.appVersion;
-  if (build.appVersion !== runtime && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override)`);
+  const fingerprintMatches = !!nativeFingerprint
+    && /^[0-9a-f]{40}$/.test(build.fingerprintHash ?? '')
+    && nativeFingerprint.hash === build.fingerprintHash
+    && nativeFingerprint.buildId === build.id
+    && nativeFingerprint.platform === platform
+    && nativeFingerprint.runtime === runtime
+    && nativeFingerprint.buildProfile === build.buildProfile
+    && !!releaseAppVersion && nativeFingerprint.releaseAppVersion === releaseAppVersion;
+  if (build.appVersion !== runtime && !configMatches && !fingerprintMatches) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override)`);
   if (build.channel !== PRODUCTION_CHANNEL) problems.push(`Basis-Build ${build.id}: Channel ${build.channel ?? '—'} ≠ ${PRODUCTION_CHANNEL}`);
-  if (needsConfig && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version/Runtime nicht durch Build-Commit-Konfiguration und Release-App-Version belegt`);
+  if (needsConfig && !configMatches && !fingerprintMatches) problems.push(`Basis-Build ${build.id}: App-Version/Runtime nicht durch Build-Commit-Konfiguration und Release-App-Version belegt`);
   if (needsConfig && !resolveProductionBuildProfile(nativeConfig?.easJson, build.buildProfile, platform))
     problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ist kein belegtes Production-Store-Profil`);
   if (!/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) problems.push(`Basis-Build ${build.id}: kein gültiger gitCommitHash`);
@@ -538,8 +548,37 @@ function readBaseline(platform, runtime, initial, buildId) {
   const nativeConfig = needsConfig ? readNativeBuildConfig(build.gitCommitHash) : undefined;
   const releaseAppVersion = needsConfig && existsSync('app.json')
     ? appVersionFrom(JSON.parse(readFileSync('app.json', 'utf8')), platform) : undefined;
-  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion });
+  const input = { build, buildId, platform, runtime, nativeConfig, releaseAppVersion };
+  const nativeFingerprint = evaluateNativeBaseBuild(input).length
+    ? readLocalNativeFingerprint(build, platform, runtime, releaseAppVersion) : null;
+  if (nativeFingerprint) console.log(`Native Fingerprint (fresh build/profile comparison): PASS ${nativeFingerprint.hash}`);
+  const problems = evaluateNativeBaseBuild({ ...input, nativeFingerprint });
   return { active: build?.gitCommitHash ? nativeBaseline(build) : null, ownOta: null, problems };
+}
+
+/** Fresh native contract proof, never a user-supplied hash or relaxed version check.
+ * EAS computes this from the current dependency tree/config under the exact
+ * production store build profile. The second initial-baseline read reruns it.
+ * Capture stdout only: fingerprints include source/env contents, never log them.
+ */
+export function readLocalNativeFingerprint(build, platform, runtime, releaseAppVersion) {
+  try {
+    if (!build || build.status !== 'FINISHED' || build.platform !== platform
+      || build.channel !== PRODUCTION_CHANNEL || build.runtimeVersion !== runtime
+      || !/^[0-9a-f]{40}$/.test(build.fingerprintHash ?? '')
+      || !/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '') || !releaseAppVersion) return null;
+    const appJson = JSON.parse(readFileSync('app.json', 'utf8'));
+    const easJson = JSON.parse(readFileSync('eas.json', 'utf8'));
+    if (resolveReleaseRuntime(appJson, platform) !== runtime
+      || appVersionFrom(appJson, platform) !== releaseAppVersion
+      || !resolveProductionBuildProfile(easJson, build.buildProfile, platform)) return null;
+    const local = parseJsonOutput(execFileSync('eas', ['fingerprint:generate', '--platform', platform,
+      '--build-profile', build.buildProfile, '--json', '--non-interactive'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024, timeout: 180000 }));
+    if (!/^[0-9a-f]{40}$/.test(local.hash ?? '') || local.hash !== build.fingerprintHash) return null;
+    return { hash: local.hash, buildId: build.id, platform, runtime,
+      releaseAppVersion, buildProfile: build.buildProfile };
+  } catch { return null; }
 }
 
 function readChannel() {

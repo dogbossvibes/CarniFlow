@@ -4,18 +4,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
-import { getActiveTrialOffer, buyActiveTrial } from '@/lib/purchases';
+import { getActiveTrialOffer, buyActiveTrial, isPurchaseAccountCurrent } from '@/lib/purchases';
 import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
 import { activatePlan } from '@/services/subscriptionService';
 import {
-  getActiveTrialStatus, markActiveTrialOffered, markActiveTrialStarted, logActiveTrialEvent,
+  getActiveTrialStatus, markActiveTrialOffered, logActiveTrialEvent,
 } from '@/services/activeTrialService';
 import {
   evaluateActiveTrialEligibility, shouldProactivelyShowOffer, displayTrialDays,
   ACTIVE_TRIAL_EVENTS, type ActiveTrialIneligibleReason,
 } from '@/features/subscription/activeTrial';
 
-export interface StartTrialResult { ok: boolean; cancelled?: boolean; error?: string }
+export interface StartTrialResult { ok: boolean; cancelled?: boolean; error?: string; pending?: boolean }
 
 // Bündelt Capability-, Trainings-, Konto-, Server-Status- und Store-Angebotsdaten
 // zur ANYVO-internen ACTIVE-Trial-Eligibility. Der Store/RevenueCat bleibt die
@@ -83,23 +83,26 @@ export function useActiveTrialOffer() {
   // Start serverseitig (plattformübergreifend, idempotent) markiert.
   const startTrial = useCallback(async (): Promise<StartTrialResult> => {
     if (!uid) return { ok: false, error: 'no_user' };
-    const res = await buyActiveTrial();
+    const res = await buyActiveTrial(uid);
     if (res.cancelled) return { ok: false, cancelled: true };
     if (!res.ok) {
       logActiveTrialEvent(ACTIVE_TRIAL_EVENTS.purchaseFailed, { error: res.error ?? null });
       return { ok: false, error: res.error };
     }
-    await activatePlan({
+    const activation = await activatePlan({
       userId: uid, plan: 'active', status: 'active',
       periodEndsAt: res.expiration ?? null, providerProductId: PRODUCT_IDS.activeMonthly,
     });
-    await markActiveTrialStarted(uid, Platform.OS);
+    if (activation.error) return { ok: false, error: activation.error, pending: activation.pending };
+    if (!isPurchaseAccountCurrent(uid)) return { ok: false, error: 'SUBSCRIPTION_ACCOUNT_CHANGED' };
+    // Verified server reconciliation records the real Store trial start.
     logActiveTrialEvent(ACTIVE_TRIAL_EVENTS.started, { platform: Platform.OS });
     await Promise.all([
       caps.refresh(),
       qc.invalidateQueries({ queryKey: ['activeTrialStatus', uid] }),
       qc.invalidateQueries({ queryKey: ['activeTrialOffer'] }),
     ]);
+    if (!isPurchaseAccountCurrent(uid)) return { ok: false, error: 'SUBSCRIPTION_ACCOUNT_CHANGED' };
     return { ok: true };
   }, [uid, caps, qc]);
 

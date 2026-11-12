@@ -4,7 +4,7 @@ import fs from 'fs';
 import { C, FT, TRACK_OVERLAY_COLORS } from '@/constants/colors';
 import {
   TRACK_OVERLAY_AUTO_KEYS, TRACK_OVERLAY_COLOR_KEYS, autoTrackOverlayColorKey, isTrackOverlayColorKey,
-  resolveTrackOverlayColorKey, trackOverlayColor,
+  resolveTrackOverlayColorKey, trackOverlayColor, normalizeTrackOverlayColor, trackColorForeground, trackOverlayColorNameKey,
 } from '@/features/tracking/utils/trackOverlayColors';
 import { type ActiveFaehrtenMap, upsertEntry } from '@/features/tracking/store/activeFaehrtenModel';
 import {
@@ -27,7 +27,7 @@ describe('Farbauflösung', () => {
     expect(resolveTrackOverlayColorKey('dog-skadi', 'violet')).toBe('violet');
   });
   it('C. kein/ungültiger colorKey → deterministischer Fallback aus dem Auto-Pool', () => {
-    for (const stored of [null, undefined, '', 'red', '#FF9838', 'mint', 42]) {
+    for (const stored of [null, undefined, '', 'red', '#FF98', 'mint', 42]) {
       const k = resolveTrackOverlayColorKey('dog-yam', stored);
       expect(k).toBe(autoTrackOverlayColorKey('dog-yam'));
       expect(TRACK_OVERLAY_AUTO_KEYS).toContain(k);
@@ -118,5 +118,22 @@ describe('Migrations-Contract', () => {
     expect(sql).toMatch(/track_overlay_color_key is null/);
     const code = sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n');   // ohne Kommentare
     expect(code).not.toMatch(/\bdefault\b|update public\.dogs|create policy|create type|drop column/i);
+  });
+});
+
+
+describe('freie opake Farben', () => {
+  it('normalisiert RGB, erhält Palette und verwirft Alpha/CSS/kurze Werte', () => {
+    expect(normalizeTrackOverlayColor(' #a1b2c3 ')).toBe('#A1B2C3');
+    expect(normalizeTrackOverlayColor('violet')).toBe('violet');
+    for (const bad of ['#ABC', '#12345678', 'rgb(1,2,3)', '#GG0000', 0, {}]) expect(normalizeTrackOverlayColor(bad)).toBeNull();
+    expect(resolveTrackOverlayColorKey('dog', '#000000')).toBe('#000000');
+    expect(trackOverlayColor('#ABCDEF')).toBe('#ABCDEF');
+    expect(trackOverlayColorNameKey('#FFFFFF')).toBe('dog.trackColor.custom');
+    expect(trackOverlayColorNameKey('orange')).toBe('dog.trackColor.orange');
+  });
+  it('wählt lesbaren Vordergrund für schwarze und weiße Vorschau', () => {
+    expect(trackColorForeground('#000000')).toBe('#FFFFFF');
+    expect(trackColorForeground('#FFFFFF')).toBe('#000000');
   });
 });

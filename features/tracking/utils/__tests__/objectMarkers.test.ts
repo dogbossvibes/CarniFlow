@@ -43,3 +43,7 @@ describe('Dübel-Voice (dog-basiert)', () => {
     expect(objectPhrase('duebel', 1, 'de')).toBe('Dübel in ca. 1 Schritt.');
   });
 });
+
+it('numbers rubber as an article and excludes both optional jokers', () => {
+  expect([...objectNumbers([g('duebel'), g('ball'), g('gummi'), w(), g('stoff')])]).toEqual([[2, 1], [4, 2]]);
+});

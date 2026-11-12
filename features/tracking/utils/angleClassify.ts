@@ -39,8 +39,11 @@ export const ANGLE_LABEL: Record<AngleKind, string> = {
   bw:           'Bodenwinkel',
 };
 
-// Kompaktes Karten-Badge je Winkeltyp (geometrisch, klar unterscheidbar):
-// 90°-Winkel → „90 L/R", Spitzwinkel → „SL/SR". Abriss hat ein eigenes Icon.
+// Kompaktes Karten-Badge je Winkeltyp (geometrisch, klar unterscheidbar).
+// Produktentscheidung Sandra, 2026-11-09 (GitHub-Issue #33, docs/agent/DECISIONS.md):
+// normale Winkel tragen die gewohnte Fährtenschreibweise «90 L» / «90 R»,
+// Spitzwinkel «SL» / «SR». Das ist ein reines Anzeige-Kürzel — die
+// Winkelerkennung und die gespeicherte Geometrie bleiben unverändert.
 export const ANGLE_SHORT: Record<AngleKind, string> = {
   links:        '90 L',
   rechts:       '90 R',

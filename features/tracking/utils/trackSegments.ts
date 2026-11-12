@@ -1,3 +1,5 @@
+import { isScoredObject } from './objectMarkers';
+import { splitContinuousPoints } from './trackContinuity';
 import { C } from '@/constants/colors';
 import { calculateDistance, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { DEFAULT_STEP_LENGTH_M } from '@/features/tracking/utils/steps';
@@ -323,7 +325,7 @@ export interface TrackPolylinePart {
 }
 
 export function buildTrackSegmentPolylines(points: TrackPointSample[], segments: TrackSegment[]): TrackPolylinePart[] {
-  const coords = points.map(p => ({ lat: p.lat, lng: p.lng }));
+  const coords = points.map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }));
   if (coords.length < 2) return [];
   // Completed-Segmente über ihre Indizes; die AKTIVE Teilstrecke live von ihrem
   // Start bis zum aktuellen letzten TrackPoint (keine Geometrie-Duplizierung —
@@ -340,7 +342,7 @@ export function buildTrackSegmentPolylines(points: TrackPointSample[], segments:
     .sort((a, b) => a.start - b.start);
 
   if (completed.length === 0) {
-    return [{ id: 'normal-0', kind: 'normal', coordinates: coords, color: C.trackPrimary }];
+    return splitContinuousPoints(coords).filter(part => part.length > 1).map((part, index) => ({ id: `normal-${index}`, kind: 'normal', coordinates: part, color: C.trackPrimary }));
   }
 
   const parts: TrackPolylinePart[] = [];
@@ -362,7 +364,8 @@ export function buildTrackSegmentPolylines(points: TrackPointSample[], segments:
   if (cursor < coords.length - 1) {
     parts.push({ id: `normal-${cursor}-${coords.length - 1}`, kind: 'normal', coordinates: coords.slice(cursor), color: C.trackPrimary });
   }
-  return parts.filter(p => p.coordinates.length >= 2);
+  return parts.flatMap(p => splitContinuousPoints(p.coordinates).filter(part => part.length > 1)
+    .map((part, index) => ({ ...p, id: `${p.id}-${index}`, coordinates: part })));
 }
 
 export function searchSegmentAnnouncements(input: {
@@ -422,7 +425,7 @@ export function analyzeTrackSegments(input: {
     // Start/Stop-Modell: keine Vorabplanung mehr → tatsächlich dokumentierte
     // Länge ausweisen (keine „geplant X Schritte"-Formulierung).
     hints.push(`Teilstrecke ${label}: ${actual} Schritte dokumentiert.`);
-    const markersInside = (input.markers ?? []).filter(m => m.type === 'gegenstand' && m.distance_from_start >= segment.startStep * DEFAULT_STEP_LENGTH_M && m.distance_from_start <= segment.endStep * DEFAULT_STEP_LENGTH_M);
+    const markersInside = (input.markers ?? []).filter(m => isScoredObject(m) && m.distance_from_start >= segment.startStep * DEFAULT_STEP_LENGTH_M && m.distance_from_start <= segment.endStep * DEFAULT_STEP_LENGTH_M);
     if (markersInside.length > 0) {
       hints.push(`${markersInside.length} Gegenstand${markersInside.length === 1 ? '' : 'e'} lagen innerhalb der Teilstrecke ${label}.`);
     }

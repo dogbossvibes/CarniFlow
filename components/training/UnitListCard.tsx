@@ -2,7 +2,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
-import { Glass, isGlass } from '@/components/ui/Glass';
 import { C } from '@/constants/colors';
 import { disciplineColor } from '@/constants/disciplines';
 import type { TrainingUnit } from '@/types/trainingUnit';
@@ -26,8 +25,7 @@ export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit
   const disciplines = Array.from(new Set(exercises.map(e => e.discipline)));
 
   return (
-    <AnimatedPressable style={[s.card, isGlass && s.cardGlass]} scale={0.98} onPress={onPress}>
-      {isGlass && <Glass style={s.glassBg} />}
+    <AnimatedPressable style={s.card} scale={0.98} onPress={onPress}>
       {clientName ? (
         <View style={s.clientRow}>
           <Ionicons name="person-circle-outline" size={16} color={C.accent} />
@@ -77,8 +75,6 @@ export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit
 
 const s = StyleSheet.create({
   card:    { backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 12, gap: 14 },
-  cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
-  glassBg:   { ...StyleSheet.absoluteFillObject, borderRadius: 24 },
   clientRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: -4 },
   clientName: { fontSize: 13, color: C.accent, fontWeight: '800', letterSpacing: 0.2 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

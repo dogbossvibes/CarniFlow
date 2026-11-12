@@ -13,8 +13,9 @@
 import {
   buildQaTrackExport, assertNoAbsoluteData, type QaTrackExport, type RawLayPoint, type RawTrackMarker,
 } from '@/features/tracking/utils/qaTrackExport';
-import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import { normalizeSearchEndDiagnostics, type QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import type { BackgroundLayDiagnostics } from '@/features/tracking/utils/backgroundLayDiagnostics';
+import { assertDiagnosticProvenance, isProvenanceUpdatePath, type DiagnosticProvenance } from './diagnosticProvenance';
 
 /**
  * Not-Aus für den Support-Capture (z. B. falls ein Performance-Problem im Feld auftaucht).
@@ -23,16 +24,24 @@ import type { BackgroundLayDiagnostics } from '@/features/tracking/utils/backgro
 export const SUPPORT_DIAGNOSTICS_CAPTURE = true;
 export const isSupportCaptureEnabled = (): boolean => SUPPORT_DIAGNOSTICS_CAPTURE;
 
-export type SupportExport = Omit<QaTrackExport, 'sessionId'> & {
+export type SupportExport = Omit<QaTrackExport, 'sessionId' | 'recordingEvidence' | 'backgroundLayDiagnosticsStatus'> & {
   exportType: 'support';
   /** v2.9: optional session-scoped lifecycle counters; no coordinates or absolute times. */
   backgroundLayDiagnostics?: BackgroundLayDiagnostics;
+  /** v2.18: observed phase history is distinct from the current exporting installation. */
+  provenance?: DiagnosticProvenance;
 };
+
+export function attachSupportProvenance<T extends SupportExport>(exported: T, provenance: DiagnosticProvenance): T {
+  const enriched = { ...exported, schemaMinor: Math.max(exported.schemaMinor ?? 0, 18) as SupportExport['schemaMinor'], provenance };
+  assertSupportPrivacy(enriched);
+  return enriched;
+}
 
 /** Additive v2.9 support field. The privacy gate also checks every diagnostic value. */
 export function attachBackgroundLayDiagnostics<T extends SupportExport>(exported: T, diagnostics: BackgroundLayDiagnostics | null): T {
   if (!diagnostics) return exported;
-  const enriched = { ...exported, schemaMinor: 9 as const, backgroundLayDiagnostics: diagnostics };
+  const enriched = { ...exported, schemaMinor: Math.max(exported.schemaMinor ?? 0, 9) as QaTrackExport['schemaMinor'], backgroundLayDiagnostics: diagnostics };
   assertSupportPrivacy(enriched);
   return enriched as T;
 }
@@ -42,6 +51,7 @@ export const SUPPORT_FORBIDDEN_KEYS = [
   'latitude', 'longitude', 'lat', 'lon', 'lng',
   'email', 'userid', 'accountid', 'ownerid', 'sessionid', 'dogid', 'dogname', 'ownername',
   'accesstoken', 'refreshtoken', 'authtoken', 'token', 'deviceid', 'pushtoken', 'ip', 'ipaddress',
+  'recordingevidence',
 ] as const;
 
 const normalizeKey = (k: string) => k.toLowerCase().replace(/[_-]/g, '');
@@ -57,22 +67,28 @@ const EPOCH_LIKE = 1e11;
  * eine E-Mail oder eine UUID auftaucht. Rekursiv über alle Werte — lieber kein Export als ein Leck.
  */
 export function assertSupportPrivacy(value: unknown, path = '$'): void {
+  if (value && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, 'provenance'))
+    assertDiagnosticProvenance((value as Record<string, unknown>).provenance);
+  visitSupportPrivacy(value, path, []);
+}
+
+function visitSupportPrivacy(value: unknown, path: string, keys: (string | number)[]): void {
   if (value == null) return;
   if (typeof value === 'number') {
-    if (Math.abs(value) >= EPOCH_LIKE) throw new Error(`Support-Export enthält einen absoluten Zeitwert bei ${path}`);
+    if (!Number.isFinite(value) || Math.abs(value) >= EPOCH_LIKE) throw new Error(`Support-Export enthält einen absoluten Zeitwert bei ${path}`);
     return;
   }
   if (typeof value === 'string') {
     if (ISO_DATE.test(value)) throw new Error(`Support-Export enthält ein Datum bei ${path}`);
     if (EMAIL_LIKE.test(value)) throw new Error(`Support-Export enthält eine E-Mail bei ${path}`);
-    if (UUID_LIKE.test(value)) throw new Error(`Support-Export enthält eine ID bei ${path}`);
+    if (UUID_LIKE.test(value) && !isProvenanceUpdatePath(keys)) throw new Error(`Support-Export enthält eine ID bei ${path}`);
     return;
   }
-  if (Array.isArray(value)) { value.forEach((v, i) => assertSupportPrivacy(v, `${path}[${i}]`)); return; }
+  if (Array.isArray(value)) { value.forEach((v, i) => visitSupportPrivacy(v, `${path}[${i}]`, [...keys, i])); return; }
   if (typeof value === 'object') {
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       if (FORBIDDEN.has(normalizeKey(k))) throw new Error(`Support-Export enthält unerlaubtes Feld ${k} bei ${path}`);
-      assertSupportPrivacy(v, `${path}.${k}`);
+      visitSupportPrivacy(v, `${path}.${k}`, [...keys, k]);
     }
   }
 }
@@ -90,6 +106,7 @@ const QA_ONLY_KEYS = [
  */
 export function toSupportCapture(d: QaSearchDiagnostics): QaSearchDiagnostics {
   const copy: Record<string, unknown> = { ...d };
+  if (d.end) copy.end = normalizeSearchEndDiagnostics(d.end);
   for (const k of QA_ONLY_KEYS) delete copy[k];
   return copy as unknown as QaSearchDiagnostics;
 }
@@ -112,7 +129,10 @@ export function buildSupportExport(
   points: readonly RawLayPoint[], markers: readonly RawTrackMarker[], search: QaSearchDiagnostics,
 ): SupportExport {
   // Der Hash dient nur als Platzhalter für den bestehenden Builder und wird sofort wieder entfernt.
-  const full = buildQaTrackExport('support', points as RawLayPoint[], markers as RawTrackMarker[], null, search);
+  // Local capture context is not a new unrestricted UUID-bearing subtree in the support JSON.
+  const { recordingContext: _context, ...supportSearch } = toSupportCapture(search);
+  void _context;
+  const full = buildQaTrackExport('support', points as RawLayPoint[], markers as RawTrackMarker[], null, supportSearch);
   assertNoAbsoluteData(full);
   const { sessionId: _dropped, ...rest } = full;
   void _dropped;

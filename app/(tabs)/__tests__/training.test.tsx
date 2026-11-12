@@ -4,6 +4,8 @@ import TrainingScreen from '@/app/(tabs)/training';
 import { deCH } from '@/i18n/de-CH';
 import { gswCH } from '@/i18n/gsw-CH';
 import { fr } from '@/i18n/locales/fr';
+import { it as itLocale } from '@/i18n/locales/it';
+import { en } from '@/i18n/locales/en';
 
 const mockPush = jest.fn();
 let mockCurrentLabels: Record<string, string> = {};
@@ -11,6 +13,8 @@ let mockCurrentLabels: Record<string, string> = {};
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
+// T-184 Etappe 2: Abschnitt „Weitermachen“ hat eigene Tests.
+jest.mock('@/components/training/ContinueTrainingSection', () => ({ ContinueTrainingSection: () => null }));
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
@@ -20,8 +24,8 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('@/components/ui/AnimatedPressable', () => {
   const { Pressable: RNPressable } = jest.requireActual('react-native');
   return {
-    AnimatedPressable: ({ children, onPress, style }: { children: React.ReactNode; onPress?: () => void; style?: unknown }) => (
-      <RNPressable testID="trainingCard" onPress={onPress} style={style}>{children}</RNPressable>
+    AnimatedPressable: ({ children, onPress, style, accessibilityRole, accessibilityLabel }: { children: React.ReactNode; onPress?: () => void; style?: unknown; accessibilityRole?: 'button'; accessibilityLabel?: string }) => (
+      <RNPressable testID="trainingCard" onPress={onPress} style={style} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel}>{children}</RNPressable>
     ),
   };
 });
@@ -29,17 +33,6 @@ jest.mock('@/components/ui/AnimatedPressable', () => {
 jest.mock('@/components/training/HeroImage', () => {
   const { View } = jest.requireActual('react-native');
   return { HeroImage: ({ children }: { children?: React.ReactNode }) => <View>{children}</View> };
-});
-
-let mockFeed: { id: string; source: string }[] = [];
-jest.mock('@/hooks/useTrainingFeed', () => ({ useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: jest.fn() }) }));
-jest.mock('@/components/training/UnitListCard', () => {
-  const { Pressable: RNPressable, Text: RNText } = jest.requireActual('react-native');
-  return {
-    UnitListCard: ({ unit, onPress }: { unit: { id: string }; onPress?: () => void }) => (
-      <RNPressable testID="recentCard" onPress={onPress}><RNText>{`recent-${unit.id}`}</RNText></RNPressable>
-    ),
-  };
 });
 
 jest.mock('@/i18n', () => ({
@@ -84,7 +77,7 @@ function cardContaining(node: ReactTestRenderer, needle: string): CardInstance |
 }
 
 describe('Training-Tab — Trainingstagebuch-Karte', () => {
-  beforeEach(() => { mockPush.mockReset(); mockFeed = []; });
+  beforeEach(() => { mockPush.mockReset(); });
 
   it('zeigt die Karte sichtbar (DE)', () => {
     const node = render(deCH as unknown as Record<string, string>);
@@ -93,20 +86,13 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     expect(s).toContain(deCH['training.journalSub']);
   });
 
-  it('Reihenfolge: Fährte (GPS) direkt unter dem Start, dann dokumentieren, dann Tagebuch', () => {
+  it('korrekte Position: zwischen "Training dokumentieren" und "Fährte (GPS)"', () => {
     const node = render(deCH as unknown as Record<string, string>);
     const texts = pressableTexts(node);
-    const faehrte = texts.findIndex((t) => t.includes(deCH['training.faehrteGps']));
     const idx = texts.findIndex((t) => t.includes(deCH['training.journal']));
-    expect(faehrte).toBe(1);
-    expect(texts[faehrte + 1]).toContain(deCH['training.document']);
-    expect(idx).toBe(faehrte + 2);
-  });
-
-  it('Fährte (GPS) öffnet /track', () => {
-    const node = render(deCH as unknown as Record<string, string>);
-    act(() => { cardContaining(node, deCH['training.faehrteGps'])?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/track');
+    expect(idx).toBeGreaterThan(-1);
+    expect(texts[idx - 1]).toContain(deCH['training.document']);
+    expect(texts[idx + 1]).toContain(deCH['training.faehrteGps']);
   });
 
   it('Navigation öffnet /training-journal', () => {
@@ -121,6 +107,8 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     ['DE', deCH as unknown as Record<string, string>],
     ['gsw-CH', gswCH as unknown as Record<string, string>],
     ['FR', fr as unknown as Record<string, string>],
+    ['IT', itLocale as unknown as Record<string, string>],
+    ['EN', en as unknown as Record<string, string>],
   ])('zeigt korrekte Übersetzung (%s) ohne rohe Keys', (_label, labels) => {
     const node = render(labels);
     const s = allStrings(node);
@@ -129,30 +117,46 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     const rawKeys = s.filter((x) => /^[a-z]+\.(?:[a-zA-Z0-9]+\.?)+$/.test(x));
     expect(rawKeys).toEqual([]);
   });
+});
 
-  it('ohne Einträge gibt es keine Verlauf-Vorschau', () => {
-    const node = render(deCH as unknown as Record<string, string>);
-    expect(allStrings(node)).not.toContain(deCH['home.recentSessions']);
+describe('Training-Tab — überarbeitete Darstellung ohne neue Geschäftslogik', () => {
+  beforeEach(() => { mockPush.mockReset(); });
+
+  it.each([
+    ['Timer', 'training.startTimer', '/unit/timer'],
+    ['Dokumentation', 'training.document', '/unit/document'],
+    ['Journal', 'training.journal', '/training-journal'],
+    ['Fährte', 'training.faehrteGps', '/track'],
+  ])('behält die Navigation für %s bei', (_name, key, route) => {
+    const labels = deCH as unknown as Record<string, string>;
+    const node = render(labels);
+    const card = cardContaining(node, labels[key]);
+    expect(card).toBeDefined();
+    act(() => { card?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith(route);
   });
 
-  it('Verlauf-Vorschau zeigt höchstens drei Einträge und öffnet den richtigen Detailbildschirm', () => {
-    mockFeed = [
-      { id: 'a', source: 'track' }, { id: 'b', source: 'unit' },
-      { id: 'c', source: 'session' }, { id: 'd', source: 'unit' },
-    ];
-    const node = render(deCH as unknown as Record<string, string>);
-    const s = allStrings(node);
-    expect(s).toContain(deCH['home.recentSessions']);
-    expect(s.filter((x) => x.startsWith('recent-'))).toEqual(['recent-a', 'recent-b', 'recent-c']);
-    const recentCard = (id: string) =>
-      (node.root as unknown as { findAll: (p: (n: { props: { testID?: string; onPress?: () => void } }) => boolean) => CardInstance[] })
-        .findAll((n) => n.props.testID === 'recentCard' && typeof n.props.onPress === 'function')
-        .find((card) => textOf(card).includes(`recent-${id}`));
-    act(() => { recentCard('a')?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenLastCalledWith('/track/a');
-    act(() => { recentCard('b')?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/detail', params: { id: 'b' } });
-    act(() => { recentCard('c')?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenLastCalledWith('/training/c');
+  it('bietet den Timer-Hinweis übersetzt und die vier Aktionskarten als Buttons an', () => {
+    const labels = deCH as unknown as Record<string, string>;
+    const node = render(labels);
+    expect(allStrings(node)).toContain(labels['training.timerHint']);
+    // React Native's Pressable may expose several renderer nodes per single button.
+    // Count distinct visible actions, not testID occurrences in the Fiber tree.
+    expect(pressableTexts(node)).toHaveLength(4);
+    for (const key of ['training.startTimer', 'training.document', 'training.journal', 'training.faehrteGps']) {
+      const accessible = cards(node).some((card) =>
+        textOf(card).includes(labels[key]) &&
+        (card as unknown as { props: { accessibilityRole?: string } }).props.accessibilityRole === 'button');
+      expect(accessible).toBe(true);
+    }
+  });
+
+  it('öffnet die Trainingsstatistik über ihren eigenen Button', () => {
+    const labels = deCH as unknown as Record<string, string>;
+    const node = render(labels);
+    const stats = node.root.findAll((n) => n.props.accessibilityLabel === labels['training.stats'])[0];
+    expect(stats).toBeDefined();
+    act(() => { stats.props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/unit/stats');
   });
 });

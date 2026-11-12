@@ -50,6 +50,8 @@ describe('sanitizeSearchRunState — legacy-sicher (17.)', () => {
   it('searchObjectKey: Marker-ID vor Index', () => {
     expect(searchObjectKey({ id: 'gegenstand-77' }, 3)).toBe('gegenstand-77');
     expect(searchObjectKey({}, 3)).toBe('idx:3');
+    expect(searchObjectKey({ recoveryIndex: 7 }, 1)).toBe('idx:7');
+    expect(searchObjectKey({ id:'stable', recoveryIndex:7 },1)).toBe('stable');
   });
 });
 
@@ -102,7 +104,7 @@ describe('Store — Search-Recovery-State im PendingTrack', () => {
     useTrackingStore.getState().restoreSearchSession(p as PendingTrack);
     const rs = useTrackingStore.getState().searchRunState;
     expect(rs).toEqual({
-      maxCursorM: 30, devSumM: 4, devCount: 3, scoreQualityVersion: 1,
+      maxCursorM: 30, devSumM: 4, devCount: 3, scoreQualityVersion: 1, unobservedProgressM: 0,
       reliableDeviationExcessSumM: 0, reliableDeviationCount: 0, reliableCursorM: 0,
       foundObjectIds: ['gegenstand-1'], autoDwellObjectIds: [], dismissedAutoDwellIds: [],
       voiceFiredIds: ['angle-10-rechts'], hapticFiredIds: ['angle-10-rechts', 'gegenstand-1'],

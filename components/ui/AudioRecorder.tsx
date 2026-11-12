@@ -1,3 +1,4 @@
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,7 +13,6 @@ import {
   useAudioRecorder,
   useAudioPlayer,
   useAudioPlayerStatus,
-  setAudioModeAsync,
   AudioModule,
   RecordingPresets,
 } from 'expo-audio';
@@ -46,6 +46,7 @@ export function AudioRecorder({ value, onChange }: Props) {
   // Detect playback completion → clean up temp file
   useEffect(() => {
     if (playerStatus.didJustFinish) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setPlayingIdx(null);
       if (localUriRef.current) {
         FileSystem.deleteAsync(localUriRef.current, { idempotent: true });
@@ -74,7 +75,7 @@ export function AudioRecorder({ value, onChange }: Props) {
       // Wiedergabe stoppen, damit die Aufnahme-Session sauber aktiviert werden kann.
       if (player.playing) player.pause();
 
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
 
@@ -96,7 +97,7 @@ export function AudioRecorder({ value, onChange }: Props) {
     try {
       await recorder.stop();
       // Session zurück auf reine Wiedergabe.
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
 
       const uri = recorder.uri;
       if (!uri) return;
@@ -138,13 +139,14 @@ export function AudioRecorder({ value, onChange }: Props) {
       setPlayingIdx(idx);
 
       // Configure audio session for playback
-      await setAudioModeAsync({
+      await setAppAudioModeAsync({
         playsInSilentMode: true,
         allowsRecording:   false,
       });
 
       // Download locally first — Supabase CDN doesn't support Range requests (AVFoundationErrorDomain -11850)
       const remoteUrl = await signMediaUrl(value[idx].url);
+      // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       const localUri  = FileSystem.cacheDirectory + `audio_${idx}_${Date.now()}.mp4`;
       const result    = await FileSystem.downloadAsync(remoteUrl, localUri);
 

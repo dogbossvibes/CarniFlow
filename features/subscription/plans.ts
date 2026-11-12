@@ -65,6 +65,7 @@ export const NEWBIE_BACKPACK_ITEM_LIMIT = 2;
 
 export type UserEntitlement =
   | 'lifetime'
+  | 'active_lifetime'
   | 'beta_tester'
   | 'ambassador'
   | 'staff';
@@ -87,6 +88,7 @@ export interface RuntimeCapabilities {
 export interface EffectiveCapabilities extends RuntimeCapabilities {
   capabilities: Capability[];
   hasLifetimeAccess: boolean;
+  hasActiveLifetimeAccess: boolean;
   activeEntitlements: UserEntitlement[];
 }
 
@@ -96,7 +98,7 @@ export interface EffectiveAccessInput {
   entitlements: UserEntitlementRecord[];
 }
 
-export const USER_ENTITLEMENTS: UserEntitlement[] = ['lifetime', 'beta_tester', 'ambassador', 'staff'];
+export const USER_ENTITLEMENTS: UserEntitlement[] = ['lifetime', 'active_lifetime', 'beta_tester', 'ambassador', 'staff'];
 export const REGULAR_PRODUCT_CAPABILITIES: Capability[] = [
   ...ACTIVE_CAPABILITIES,
   ...TRAINER_CAPABILITIES,
@@ -110,19 +112,6 @@ export const PRODUCT_IDS = {
   trainerMonthly:       'anyvo_trainer_monthly_30.00',
 } as const;
 
-// Google Play identifiers may include the base plan after a colon. Keep the
-// original identifier for SDK calls; normalize known products only for matching.
-export function canonicalStoreProductId(id: string | null | undefined): string | null {
-  if (!id) return null;
-  const [product, basePlan, ...extra] = id.split(':');
-  const known = (Object.values(PRODUCT_IDS) as string[]).includes(product);
-  return known && basePlan && extra.length === 0 ? product : id;
-}
-
-export function matchesStoreProduct(id: string | null | undefined, expected: string | null | undefined): boolean {
-  return !!id && !!expected && canonicalStoreProductId(id) === expected;
-}
-
 export interface PlanMeta {
   id:        SubscriptionPlan;
   name:      string;
@@ -133,10 +122,15 @@ export interface PlanMeta {
 }
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
-  // Paid prices come exclusively from the store; no stale numeric fallback.
+  // WICHTIG: Der Store-/RevenueCat-Preis ist die Quelle der Wahrheit und hat in der
+  // UI Vorrang. priceLabel ist nur der Fallback, wenn das Store-Paket (noch) nicht
+  // geladen ist. Für Pläne ohne aktuell gepflegten Preis bleibt priceLabel bewusst
+  // NEUTRAL ('—') statt eines veralteten hardcodierten Preises; ACTIVE spiegelt den
+  // aktuellen Produktstand (CHF 9.00/Mt.). priceChf ist NICHT autoritativ (nur interne
+  // Sortierung).
   newbie:         { id: 'newbie',         name: 'Newbie',         priceChf: 0,  priceLabel: 'Gratis', productId: null,                           trainer: false },
   founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: '—',      productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: '—', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: 'CHF 9.00/Mt.', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
   trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: '—',      productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 
@@ -232,10 +226,12 @@ export function isKnownUserEntitlement(value: string | null | undefined): value 
 }
 
 export function isActiveUserEntitlement(
-  entitlement: Pick<UserEntitlementRecord, 'expiresAt' | 'revokedAt'> | null | undefined,
+  entitlement: Pick<UserEntitlementRecord, 'expiresAt' | 'revokedAt'> & Partial<Pick<UserEntitlementRecord, 'entitlement'>> | null | undefined,
   now: Date = new Date(),
 ): boolean {
   if (!entitlement || entitlement.revokedAt != null) return false;
+  // ACTIVE lifetime is permanent by contract; malformed finite grants fail closed.
+  if (entitlement.entitlement === 'active_lifetime' && entitlement.expiresAt !== null) return false;
   if (entitlement.expiresAt && new Date(entitlement.expiresAt).getTime() <= now.getTime()) return false;
   return true;
 }
@@ -294,6 +290,12 @@ export function resolveEffectiveCapabilities(
     .filter((item) => isActiveUserEntitlement(item, now))
     .map((item) => item.entitlement);
   const hasLifetimeAccess = activeEntitlements.includes('lifetime');
+  const hasActiveLifetimeAccess = activeEntitlements.includes('active_lifetime');
+
+  if (hasActiveLifetimeAccess) {
+    pro = true;
+    for (const capability of ACTIVE_CAPABILITIES) capabilities.add(capability);
+  }
 
   if (hasLifetimeAccess) {
     pro = true;
@@ -306,6 +308,7 @@ export function resolveEffectiveCapabilities(
     trainer_module: trainer,
     capabilities: REGULAR_PRODUCT_CAPABILITIES.filter((capability) => capabilities.has(capability)),
     hasLifetimeAccess,
+    hasActiveLifetimeAccess,
     activeEntitlements,
   };
 }
@@ -342,7 +345,6 @@ export function isTrialLapsed(
 
 // Product-ID → Plan (für Restore / Provider-Bestätigung).
 export function planOfProduct(productId: string | null | undefined): SubscriptionPlan {
-  productId = canonicalStoreProductId(productId);
   if (productId === 'anyvo_newbie_monthly_0') return 'newbie';
   if (productId === PRODUCT_IDS.founderActiveMonthly) return 'founder_active';
   if (productId === PRODUCT_IDS.trainerMonthly) return 'trainer';

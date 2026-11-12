@@ -92,15 +92,16 @@ async function arriveNearEnd() {
   clock = Date.now();
   motion(WALKING);
   fix(0.3, 5); fix(0.3, 5); fix(0.3, 5);                 // Startlock
-  for (let y = 2.3; y <= 56.3; y += 2) fix(y, 3);        // Laufen, Ansatz (Abstand 7,7 → 3,7 m)
-  for (let k = 0; k < 10; k++) fix(57.4, 3);              // verlangsamt, eingeschwungen
+  for (let y = 2.3; y <= 56.3; y += 2) { motion(WALKING); fix(y, 3); }        // Laufen, Ansatz (Abstand 7,7 → 3,7 m)
+  for (let k = 0; k < 10; k++) { motion(WALKING); fix(57.4, 3); }              // verlangsamt, eingeschwungen
   expect(latestEnd).not.toBe('reached');
 }
 const reached = () => ['reached', 'completed'].includes(latestEnd);
 
 describe('useSearchRecorder + useTrackEndGuidance — Ende-Bestätigung mit Stillstands-Fixes', () => {
-  beforeEach(() => { feedSample = null; motionSampleCb = null; renderer = null; latestEnd = 'unseen'; });
-  afterEach(() => { act(() => { renderer?.unmount(); }); });
+  beforeEach(() => { feedSample = null; motionSampleCb = null; renderer = null; latestEnd = 'unseen';
+    clock = 1_000_000; jest.spyOn(Date, 'now').mockImplementation(() => clock); });
+  afterEach(() => { act(() => { renderer?.unmount(); }); jest.restoreAllMocks(); });
 
   it('A1 (reale F1-02-Form): erster Fix im Radius (Walking), zweiter unabhängiger Fix stationary → Ende bestätigt', async () => {
     await arriveNearEnd();
@@ -117,6 +118,7 @@ describe('useSearchRecorder + useTrackEndGuidance — Ende-Bestätigung mit Stil
     motion({});
     fix(59.3, 3); expect(reached()).toBe(false);          // Position noch ausserhalb des Radius
     fix(59.3, 3); expect(reached()).toBe(false);          // erster Fix im Radius
+    motion({}); // frisches Stillstandssignal auch für den dritten GPS-Fix
     fix(59.3, 3); expect(reached()).toBe(true);           // zweiter unabhängiger Fix im Radius
   });
 

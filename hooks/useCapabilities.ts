@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/useSession';
+import { useAccessRefresh } from '@/hooks/useAccessRefresh';
 import { getMyCapabilities } from '@/services/capabilityService';
 import { planLevelOf, type PlanLevel, type UserCapabilities } from '@/types/capabilities';
 import { runtimeGrantsCapability, type Capability } from '@/features/subscription/plans';
@@ -14,14 +15,17 @@ export function useCapabilities() {
   const query = useQuery({
     queryKey: ['capabilities', uid],
     enabled:  !!uid,
+    refetchOnMount: 'always',
     queryFn:  async (): Promise<UserCapabilities | null> => getMyCapabilities(uid!),
   });
+  useAccessRefresh(uid, query.refetch);
 
   const cap = query.data ?? null;
   const isTrainerModule = cap?.trainer_module === true;
   const isPro           = cap?.pro_member === true || isTrainerModule;
   const plan: PlanLevel = planLevelOf(cap);
   const hasLifetimeAccess = cap?.hasLifetimeAccess === true;
+  const hasActiveLifetimeAccess = cap?.hasActiveLifetimeAccess === true;
   const entitlements = cap?.entitlements ?? [];
 
   // Granulare Capability-Prüfung für einzelne UI-Bereiche (statt pauschaler isPro-
@@ -37,6 +41,7 @@ export function useCapabilities() {
     isPro,
     isTrainerModule,
     hasLifetimeAccess,
+    hasActiveLifetimeAccess,
     entitlements,
     plan,
     can,

@@ -1,0 +1,2 @@
+alter table public.track_markers drop constraint track_markers_material_check;
+alter table public.track_markers add constraint track_markers_material_check check(material is null or material=any(array['stoff','filz','holz','duebel','leder','plastik','metall','teppich','diverses','ball','gummi']::text[]));

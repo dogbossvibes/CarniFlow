@@ -1,3 +1,8 @@
+import { beginGpsCapture } from '@/features/tracking/storage/gpsCapture';
+import { captureDiagnosticEnvironment, recordSupportProvenance } from '@/features/tracking/utils/supportProvenanceStore';
+import { observedRecordingProvenance } from '@/features/tracking/utils/diagnosticProvenance';
+import { classifyLiveFixTime, GPS_FUTURE_TOLERANCE_MS } from '@/features/tracking/utils/liveFixOrdering';
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 /**
  * useSearchRecorder.ts — ANYVO Ausarbeiten / Suche (Expo / React Native)
  *
@@ -8,7 +13,11 @@
  * Portiert aus design_handoff_faehrten/useSearchRecorder.ts; der Helfer distM
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
-import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { isRecordingGap } from '@/features/tracking/utils/trackContinuity';
+import { isQaDiagnosticsEnabled, subscribeQaDiagnostics } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { AppState } from 'react-native';
+import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { startQaRecordingEvidence, type QaRecordingObserver } from '@/features/tracking/utils/qaRecordingEvidenceStore';
 import { isSupportCaptureEnabled } from '@/features/tracking/utils/supportDiagnostics';
 import { SEARCH_QA_LIMITS, type SearchQaTelemetry, type SearchQaRawFix } from '@/features/tracking/utils/qaSearchCapture';
 import { replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint } from '@/features/tracking/utils/searchReplayGeometry';
@@ -29,18 +38,19 @@ import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { getOffTrackThreshold, stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
-import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
-import { statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
+import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
+import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
+import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import {
-  evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand,
-  type MotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
+  evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand, motionForFix,
+  type TimedMotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
 } from '@/features/tracking/engine/trackFusionEngine';
 import { RELIABLE_CONFIDENCE_FLOOR, type AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
-import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { TRACK_ANALYSIS_THRESHOLDS } from '@/features/tracking/engine/trackAnalyticsV3';
+import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { admitsEndHandlerFix } from '@/features/tracking/utils/endFixConfirmation';
 import { formatSearchFixDiag, type SearchFixDiag, type SearchFixStatus } from '@/features/tracking/utils/searchFixDiag';
 
@@ -60,20 +70,25 @@ export interface GpsDebug {
   isNativeAvailable: boolean;
   rawGnssSupported: boolean;
   rejectedCount: number;
+  rawArchiveError?: string | null;
 }
 
-export type LatLng = { latitude: number; longitude: number };
+export type LatLng = { latitude: number; longitude: number; breakBefore?: boolean };
 // `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
-export type SearchObject = { at: LatLng; index: number; material: string; id?: string; atM?: number | null };
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null;
+  /** GPS-Genauigkeit des beim Legen gespeicherten Punkts (m); nur für die Nähe-Toleranz der Auto-Erkennung. */
+  accuracyM?: number | null };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
   recoveredAfterM?: number;
   // Punkt 1 (Re-Acquisition-Zeit): zusätzlich zur bestehenden Distanz-Metrik
   // (recoveredAfterM) jetzt auch echte Zeitstempel. startedAtSec ist bewusst
-  // NICHT identisch mit `t`: es markiert den Beginn der bestätigten
-  // Warning-Phase aus der accuracy-aware State-Machine. Der exakte erste
-  // Grenzübertritt ist aus diskreten GPS-Fixes nicht verlässlich bestimmbar.
+  // NICHT identisch mit `t` — es ist der Moment, in dem der Hund/die virtuelle
+  // Position den äusseren Korridor (BREAK_THRESHOLD_M) tatsächlich verlassen
+  // hat, `t` dagegen erst der spätere, um BREAK_HOLD_MS verzögerte
+  // Bestätigungs-Zeitpunkt. Für die Re-Acquisition-DAUER zählt der echte
+  // Verlassenszeitpunkt, nicht die Bestätigungsverzögerung.
   startedAtSec: number;
   // undefined/null = noch offen (Session endete im Abriss) — geht NICHT in
   // meanSec/maxSec ein (siehe trackAnalytics.computeReacquisitionStats).
@@ -111,7 +126,7 @@ const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
 const LOOKAHEAD_M = 20;          // m — so weit voraus wird auf die Soll-Fährte projiziert
 const BACK_M = 4;                // m — kleine Toleranz nach hinten (Jitter)
 const ADVANCE_DEV_M = 12;        // m — nur bei Abweichung darunter rückt der Fortschritt vor
-// Score-Skala für den zuverlässigen Restabstand jenseits des GPS-adaptiven Warnkorridors.
+// Strenge Abweichungs-Skala für die Wertung: volle Punkte bis FULL_DEV_M, 0 ab ZERO_DEV_M.
 const FULL_DEV_M = 1.5;
 const ZERO_DEV_M = 10;
 
@@ -135,6 +150,7 @@ export interface SearchRecorder {
   ready: boolean;
   recording: boolean;
   paused: boolean;
+  continuityEpoch: number;
   points: LatLng[];
   position: LatLng | null;
   /** Last GPS-accepted, fusion-safe handler fix for end eligibility. */
@@ -173,8 +189,9 @@ export interface SearchRecorder {
   // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
   // `runState` (Search-Recovery-State) seedet Fortschritt/Funde/Abrisse/Abweichung/
   // Off-Track desselben Runs; fehlt er (Legacy-Puffer) → wie bisher ab 0.
-  start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState }, opts?: { forceLocked?: boolean }) => void;
+  start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean; diagnosticAttemptKey?: string }) => void;
   stop: () => SearchResult;
+  flushRawCapture: () => Promise<import('../storage/gpsCapture').GpsCaptureSnapshot | null>;
   setPaused: (p: boolean) => void;
   markObject: () => void;
   dismissAutoObject: (id: string) => void;
@@ -194,6 +211,7 @@ export type SearchResult = {
   foundObjectIndices: number[];
   autoDwellObjectIds: string[];
   objectStatuses: ReferenceObjectStatus[];
+  objectScoreBasis?: TrackObjectScoreBasis;
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
   // gleiche Länge/Reihenfolge wie `points` — additiv, KEINE zweite Geometrie.
   // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
@@ -209,6 +227,7 @@ export type SearchResult = {
   // QA-Telemetrie (nur im QA-Diagnosemodus; rein beobachtend — siehe qaSearchCapture.ts).
   // Keine Metrik, kein Cursor, kein Score liest dieses Feld.
   qa?: SearchQaTelemetry;
+  rawCapture?: ReturnType<ReturnType<typeof beginGpsCapture>['snapshot']> | null;
 };
 
 export type { Level };
@@ -219,20 +238,28 @@ export function useSearchRecorder(opts: {
   /** QA-Diagnose: pro eingehendem Fix genau ein Endstatus (siehe searchFixDiag.ts). Rein beobachtend. */
   onFixDiag?: (d: SearchFixDiag) => void;
 }): SearchRecorder {
-  const { laidPoints, laidObjects, level } = opts;
+  const { laidPoints, level } = opts;
+  const laidObjects = useMemo(() => opts.laidObjects.map((o, i) => ({ ...o, recoveryIndex: o.recoveryIndex ?? i }))
+    .filter(o => !isTrainingJoker(o.material)), [opts.laidObjects]);
   const onFixDiagRef = useRef(opts.onFixDiag);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
-  const totalObjects = laidObjects.length || model.objects;
 
   // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
   const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sessionIdRef.current = opts.sessionId ?? null;
+  const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
+  const streamSourceModeRef = useRef<unknown>(null);
 
   // Bogenlängen der Soll-Fährte (stabil, da laidPoints aus dem Snapshot stammt).
   const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);
   const hasTrack = arc.total > 1;
+  // A known reference may deliberately contain zero objects. Only free searches
+  // without a reference use the rulebook target; zero must not become three.
+  const totalObjects = hasTrack ? laidObjects.length : (laidObjects.length || model.objects);
 
   // ── State (UI) ──
   const [ready, setReady] = useState(false);
@@ -259,6 +286,11 @@ export function useSearchRecorder(opts: {
   const recordingRef = useRef(false);
   const pausedRef = useRef(false);
   const pointsRef = useRef<LatLng[]>([]);
+  const [continuityEpoch, setContinuityEpoch] = useState(0);
+  const continuityPendingRef = useRef(false);
+  const unobservedProgressMRef = useRef(0);
+  const replayBoundaryRef = useRef(false);
+  const lastContinuityFixMsRef = useRef<number | null>(null);
   // Punkt 17 (Track-Replay-Auftrag): EINE Sekunden-seit-Start-Zeit pro
   // pointsRef-Eintrag, im selben Moment (`pts.push(sm)`) fortgeschrieben —
   // keine zweite, parallele Geometrie-Quelle, nur ein additiver Zeitstempel
@@ -276,6 +308,21 @@ export function useSearchRecorder(opts: {
   const replayEmaRef = useRef<LatLng | null>(null);
   // QA-Telemetrie (null = QA aus). Reiner Beobachter: wird nur geschrieben, nie von Cursor/Distanz/Score gelesen.
   const qaTelRef = useRef<SearchQaTelemetry | null>(null);
+  const enforceQaCaptureAccess = useCallback(() => {
+    const enabled = isQaDiagnosticsEnabled();
+    if (!enabled) {
+      recordingEvidenceRef.current?.close();
+      recordingEvidenceRef.current = null;
+    }
+    if (!enabled && qaTelRef.current?.captureLevel === 'qa') {
+      // Keep the existing customer support capture, discard internal-only fields.
+      if (isSupportCaptureEnabled()) {
+        qaTelRef.current.captureLevel = 'support';
+        delete qaTelRef.current.objectDwellCandidates;
+      } else qaTelRef.current = null;
+    }
+  }, []);
+  useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
   const qaLastCursorSampleSecRef = useRef(-Infinity);
   const replayDisabledRef = useRef(false);   // Resume: Vor-Resume-Punkte haben keine dichte Spur
   // Lotfusspunkt des zuletzt akzeptierten Punkts auf der Soll-Fährte — Kontinuität
@@ -290,6 +337,9 @@ export function useSearchRecorder(opts: {
   // zweiter Geometrie-Zustand) — leert sich bei jedem Accept oder bei einem
   // Accuracy-Reject (der sagt nichts über einen falschen Anker aus).
   const recentRejectedRef = useRef<SearchFixRejectedRecord[]>([]);
+  const liveMeasurementRef = useRef<number | null>(null);
+  const resumeNotBeforeRef = useRef<number | null>(null);
+  const rawCaptureRef = useRef<ReturnType<typeof beginGpsCapture> | null>(null);
   const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreisser-Filter)
   const rejectedRef = useRef(0);      // verworfene Fixes (Ausreisser/Genauigkeit) — Debug
   const distRef = useRef(0);
@@ -320,11 +370,12 @@ export function useSearchRecorder(opts: {
   const maxCursorMRef = useRef(0);   // weitester erreichter Fortschritt (für Coverage)
 
   // ── Core-Motion-Sensor-Fusion (rein additiv, siehe GpsQuality-Kommentar oben) ──
-  const motionLatestRef = useRef<MotionInput | null>(null);
+  const motionLatestRef = useRef<TimedMotionInput | null>(null);
   // Rein diagnostisch (Punkt 9 des Audits) — bewusst NICHT Teil von MotionInput/
   // evaluateFusion (keine Funktions-/Signaturänderung an der reinen Fusion-
   // Engine), nur für das sparsame [fusion]-DEV-Log unten.
   const motionActivityAgeMsRef = useRef<number | null>(null);
+  const motionNotBeforeRef = useRef(0);
   const motionUnsubRef = useRef<{ remove: () => void } | null>(null);
   const fusionHistoryRef = useRef<FusionHistory>({ prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null });
   const analyticsSamplesRef = useRef<AnalyticsSample[]>([]);
@@ -339,7 +390,7 @@ export function useSearchRecorder(opts: {
   // Kurs-Evidenz. Stabil pro laidPoints/arc, kein Recompute je Fix.
   const firstLegHeading = useMemo(() => computeFirstLegHeadingDeg(laidPoints, arc.cum), [laidPoints, arc.cum]);
 
-  const computeScore = useCallback(() => {
+  const computeScoreBreakdown = useCallback(() => {
     // Ohne Soll-Fährte (Freilauf-Training) gibt es nichts zu bewerten → neutral.
     const qualityVersion = scoreQualityVersionRef.current;
     const scoreCount = qualityVersion === 1 ? reliableDeviationCountRef.current : devCountRef.current;
@@ -352,13 +403,20 @@ export function useSearchRecorder(opts: {
       ? 1
       : (scoreCount ? Math.max(0, Math.min(1, (ZERO_DEV_M - avgDev) / (ZERO_DEV_M - FULL_DEV_M))) : 0);
     // Coverage: wie viel der Fährte in richtiger Reihenfolge abgelaufen wurde.
-    const scoreCursorM = qualityVersion === 1 ? reliableCursorMRef.current : maxCursorMRef.current;
-    const coverage = !hasTrack ? 1 : Math.max(0, Math.min(1, scoreCursorM / arc.total));
+    const scoreCursorM = qualityVersion === 1 ? reliableCursorMRef.current : Math.max(0, maxCursorMRef.current - unobservedProgressMRef.current);
+    const observedReferenceM = Math.max(0, arc.total - unobservedProgressMRef.current);
+    const coverage = !hasTrack ? 1 : observedReferenceM > 0 ? Math.max(0, Math.min(1, scoreCursorM / observedReferenceM)) : 0;
     const breakPenalty = breaksRef.current.length * 4;
     const trackScore = Math.max(0, model.trackPts * onTrackRatio * coverage - breakPenalty);
-    const objScore = totalObjects ? (foundRef.current.size / totalObjects) * model.objectPts : model.objectPts;
-    return Math.round(Math.max(0, Math.min(100, trackScore + objScore)));
+    const observedObjects = totalObjects - objectStatusesRef.current.filter(status => status === 'unobserved').length;
+    const objectScoreBasis: TrackObjectScoreBasis = { version: 1, trackPoints: trackScore,
+      maxTrackPoints: model.trackPts, maxObjectPoints: model.objectPts, totalObjects };
+    if (totalObjects > 0 && observedObjects === 0) return {
+      score: Math.round(Math.max(0, Math.min(100, trackScore / model.trackPts * 100))), objectScoreBasis };
+    const objScore = observedObjects ? (foundRef.current.size / observedObjects) * model.objectPts : model.objectPts;
+    return { score: Math.round(Math.max(0, Math.min(100, trackScore + objScore))), objectScoreBasis };
   }, [model, totalObjects, hasTrack, arc.total]);
+  const computeScore = useCallback(() => computeScoreBreakdown().score, [computeScoreBreakdown]);
 
   const pushSnapshot = useCallback(() => {
     setSnap({
@@ -377,15 +435,63 @@ export function useSearchRecorder(opts: {
     });
   }, [computeScore, hasTrack]);
 
+  const interruptContinuity = useCallback(() => {
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
+    motionNotBeforeRef.current = Date.now();
+    if (continuityPendingRef.current) return;
+    continuityPendingRef.current = true;
+    replayBoundaryRef.current = true;
+    lastContinuityFixMsRef.current = null;
+    smoothRef.current = null; replayEmaRef.current = null; endSmoothRef.current = null;
+    prevFixRef.current = null; prevFootRef.current = null; recentRejectedRef.current = [];
+    fusionHistoryRef.current = { prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null };
+    autoDwellRef.current.clear(); autoDwellStartRef.current.clear();
+    lastReliableCursorMRef.current = null; lastReliableAtSecRef.current = null;
+    offTrackWarningSinceRef.current = null;
+    offTrackRef.current = { ...initialOffTrack(), state: offTrackRef.current.state };
+    setActiveObjectWait(false); setEndHandlerFix(null);
+    setContinuityEpoch(epoch => epoch + 1);
+  }, []);
+
   // ── Kernlogik ──
   const onFix = useCallback((loc: Location.LocationObject) => {
+    enforceQaCaptureAccess();
+    const measurementMs = loc.timestamp;
+    const receivedMs = Date.now();
+    let timing = classifyLiveFixTime({ measurementMs, receivedMs,
+      lastLiveMeasurementMs: liveMeasurementRef.current, allowedFutureSkewMs: GPS_FUTURE_TOLERANCE_MS });
+    if (timing.disposition === 'live' && resumeNotBeforeRef.current != null && measurementMs < resumeNotBeforeRef.current)
+      timing = { disposition: 'late', nextLiveMeasurementMs: liveMeasurementRef.current };
+    if (recordingRef.current) void rawCaptureRef.current?.capture({
+      measuredAtMs: measurementMs, receivedAtMs: receivedMs,
+      latitude: loc.coords.latitude, longitude: loc.coords.longitude,
+      accuracy: loc.coords.accuracy ?? null, altitude: loc.coords.altitude ?? null,
+      speed: loc.coords.speed ?? null, heading: loc.coords.heading ?? null,
+      source: gpsSourceRef.current ?? 'unknown', delivery: 'foreground', timing: timing.disposition,
+    });
+    if (timing.disposition !== 'live') {
+      // Rohablage erfolgt unabhängig vom Diagnosemodus vor diesem Live-Gate.
+      const tel = qaTelRef.current;
+      if (recordingRef.current && !pausedRef.current && tel && Number.isFinite(measurementMs)) {
+        if (tel.raw.length < SEARCH_QA_LIMITS.maxRaw) tel.raw.push({
+          lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? null,
+          t: measurementMs, receivedAtMs: receivedMs, accepted: false, reason: `time_${timing.disposition}`,
+        });
+        else tel.truncated.raw = true;
+      }
+      return;
+    }
+    liveMeasurementRef.current = timing.nextLiveMeasurementMs;
     setLiveFix({ lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? null, t: loc.timestamp });
     const accRaw = loc.coords.accuracy ?? null;
     setAccuracy(accRaw != null ? Math.round(accRaw) : null);
 
     const raw: LatLng = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-    const tNow = loc.timestamp || Date.now();
+    const tNow = measurementMs;
     const speed = loc.coords.speed ?? null;
+    if (recordingRef.current && !pausedRef.current && isRecordingGap(lastContinuityFixMsRef.current, tNow)) interruptContinuity();
+    const motion = motionForFix(motionLatestRef.current, tNow, Date.now());
     const prev = smoothRef.current;
 
     // Fix-Annahme wie beim Legen (Genauigkeit ≤ 45 m, Speed ≤ 12 m/s), gegen den
@@ -414,7 +520,7 @@ export function useSearchRecorder(opts: {
 
     // QA-Search-Telemetrie: JEDER eingehende Fix, vor allen Filtern (rein beobachtend).
     const qaRawRec: SearchQaRawFix | null = qaTelRef.current && qaTelRef.current.raw.length < SEARCH_QA_LIMITS.maxRaw
-      ? { lat: raw.latitude, lng: raw.longitude, accuracy: accRaw, t: tNow, accepted: decision.accepted, reason: decision.accepted ? null : decision.reason }
+      ? { lat: raw.latitude, lng: raw.longitude, accuracy: accRaw, t: tNow, receivedAtMs: receivedMs, accepted: decision.accepted, reason: decision.accepted ? null : decision.reason }
       : null;
     if (qaTelRef.current) {
       if (qaRawRec) qaTelRef.current.raw.push(qaRawRec); else qaTelRef.current.truncated.raw = true;
@@ -435,7 +541,7 @@ export function useSearchRecorder(opts: {
         dtMs,
         jumpM: decision.jumpM,
         speedMps: decision.jumpM != null && dtMs != null && dtMs > 0 ? decision.jumpM / (dtMs / 1000) : null,
-        movementState: motionLatestRef.current?.movementState ?? null,
+        movementState: motion?.movementState ?? null,
         fusion: fusionClass,
         pointsBefore,
         pointsAfter: pointsRef.current.length,
@@ -489,7 +595,7 @@ export function useSearchRecorder(opts: {
     const gpsHeading = loc.coords.heading ?? null;
     const fusion = evaluateFusion(
       { latitude: raw.latitude, longitude: raw.longitude, timestamp: tNow, horizontalAccuracy: accRaw, speed, course: gpsHeading },
-      motionLatestRef.current,
+      motion,
       fusionHistoryRef.current,
       DEFAULT_FUSION_CONFIG,
     );
@@ -519,6 +625,7 @@ export function useSearchRecorder(opts: {
     // Der historische Stand (82bd17c) kannte trackFusionEngine.ts gar nicht.
     const fusionBlocksGeometry = getTrackingEngineMode() !== 'build40'
       && (fusion.classification === 'gps_outlier' || fusion.classification === 'stationary');
+    if (fusion.classification !== 'gps_outlier') lastContinuityFixMsRef.current = tNow;
     // Ende-Bestätigung: nur belastbare Fixes zählen (siehe admitsEndHandlerFix) — auch Stillstands-Fixes.
     // Bei Stillstand wird `sm` unten auf den Puck-Stand zurückgesetzt; ein einzelnes Teil-Update davon
     // konvergiert nie zur echten Position. Die Ende-Position führt deshalb einen eigenen EMA
@@ -567,8 +674,8 @@ export function useSearchRecorder(opts: {
       // Core-Motion (Punkt 7): rein optionale Zusatzevidenz, siehe
       // searchStartAcquisition.ts — niemals ein Gate, nur eine leichte
       // Aufweitung der erlaubten Abweichung bei erkannter Fussbewegung.
-      const startMotion = motionLatestRef.current
-        ? { movementState: motionLatestRef.current.movementState ?? 'unknown', motionConfidence: motionLatestRef.current.motionConfidence ?? 0 }
+      const startMotion = motion
+        ? { movementState: motion.movementState ?? 'unknown', motionConfidence: motion.motionConfidence ?? 0 }
         : null;
       searchStartRef.current = stepSearchStart(
         searchStartRef.current, startEvalu, { position: sm, accuracy: accRaw, headingDeg: heading, motion: startMotion },
@@ -614,11 +721,12 @@ export function useSearchRecorder(opts: {
           tMs: tNow, speedMps: dwellSpeed, accuracyM: accRaw,
           progressM: maxCursorMRef.current, trackLengthM: arc.total,
           distanceToReferenceM: distM(sm, object.at), driftFromStartM: distM(sm, origin),
+          referenceToleranceM: objectReferenceToleranceM(accRaw, object.accuracyM),
           nearAngle: (opts.angleArcM ?? []).some(a => Math.abs(a - maxCursorMRef.current) <= 3),
           searchActive: recordingRef.current, gpsOutlier: fusion.classification === 'gps_outlier',
         });
         autoDwellRef.current.set(i, next.state);
-        if (next.state.startedMs != null) { waitingAtObject = true; autoDwellStartRef.current.set(i, origin); }
+        if (next.state.startedMs != null && !next.state.accepted) { waitingAtObject = true; autoDwellStartRef.current.set(i, origin); }
         else autoDwellStartRef.current.delete(i);
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
@@ -659,20 +767,21 @@ export function useSearchRecorder(opts: {
         analyticsSamplesRef.current.push({
           atM: maxCursorMRef.current,
           searchDistanceM: distRef.current,
-          tSec: (Date.now() - startMsRef.current) / 1000,
+          tSec: (tNow - startMsRef.current) / 1000,
           devM: Math.round(devEmaRef.current * 10) / 10,
           confidence: fusion.confidence,
           speedMps: null,
           accuracyM: accRaw,
           geometryAccepted: false,
+          ...(continuityPendingRef.current ? { breakBefore: true } : {}),
           fusionClassification: fusion.classification,
-          motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
+          motionConfidence: motion?.motionConfidence ?? null,
         });
       }
       if (__DEV__) console.log('[fusion]', fusion.classification, {
         confidence: Math.round(fusion.confidence * 100) / 100, reasonFlags: fusion.reasonFlags,
-        source: gpsDebug.source, movementState: motionLatestRef.current?.movementState ?? null,
-        activityAgeMs: motionActivityAgeMsRef.current, geometryBlocked: true,
+        source: gpsDebug.source, movementState: motion?.movementState ?? null,
+        activityAgeMs: motion ? motionActivityAgeMsRef.current : null, geometryBlocked: true,
       });
       emitDiag(fusion.classification === 'stationary' ? 'BLOCK_FUSION_STATIONARY' : 'BLOCK_FUSION_OUTLIER', fusion.classification);
       return;
@@ -698,11 +807,13 @@ export function useSearchRecorder(opts: {
         : { latitude: raw.latitude, longitude: raw.longitude };
       replayEmaRef.current = re;
       if (!replayDisabledRef.current && replayDenseRef.current.length < REPLAY_GEOMETRY.maxDensePoints) {
-        replayDenseRef.current.push({ lat: re.latitude, lng: re.longitude, t: Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10 });
+        replayDenseRef.current.push({ lat: re.latitude, lng: re.longitude, ...(replayBoundaryRef.current ? { breakBefore: true } : {}), t: Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10 });
       }
     }
+    replayBoundaryRef.current = false;
     const pts = pointsRef.current;
-    if (pts.length > 0) {
+    const beginsSection = continuityPendingRef.current && pts.length > 0;
+    if (pts.length > 0 && !beginsSection) {
       const d = distM(pts[pts.length - 1], sm);
       if (d < MIN_SEGMENT) {   // Liniendichte-Gate: noch kein neuer Linienpunkt
         emitDiag('SKIP_MIN_SEGMENT', fusion.classification);
@@ -710,6 +821,8 @@ export function useSearchRecorder(opts: {
       }
       distRef.current += d;
     }
+    if (beginsSection) sm = { ...sm, breakBefore: true };
+    continuityPendingRef.current = false;
     pts.push(sm);
     pointsTimeRef.current.push(Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10);
     logSearchFix(decision);
@@ -721,12 +834,14 @@ export function useSearchRecorder(opts: {
     const searchSample: TrackPointSample = {
       lat: sm.latitude, lng: sm.longitude, accuracy: accRaw,
       altitude: loc.coords.altitude ?? null, speed, heading: null, t: tNow,
+      ...(beginsSection ? { breakBefore: true } : {}),
     };
     useTrackingStore.getState().addSearchPoint(searchSample);
     enqueueSearchPoint({
       latitude: sm.latitude, longitude: sm.longitude, accuracy: accRaw,
       altitude: loc.coords.altitude ?? null, speed, heading: null,
       timestamp: new Date(tNow).toISOString(),
+      ...(beginsSection ? { breakBefore: true } : {}),
     });
 
     // ── Abweichung von der Soll-Fährte (reihenfolge-bewusst) ──
@@ -736,6 +851,7 @@ export function useSearchRecorder(opts: {
     // akzeptierten Fix, siehe Kommentar dort) — hier nur noch: Anzeige-
     // Abweichung ableiten (Fenster-Kandidat vor dem Lock, sonst normale
     // Cursor-Projektion) und ggf. den Cursor vorrücken.
+    const previousProgressM = maxCursorMRef.current;
     let dev: number;
     const nowLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
     if (hasTrack && !nowLocked) {
@@ -747,7 +863,7 @@ export function useSearchRecorder(opts: {
       // dem vorherigen akzeptierten Punkt" passt (Gleichstand → kleinerer
       // Abstand). Fenster/Monotonie/ADVANCE_DEV_M unverändert; ohne Vorgänger
       // (erster Punkt nach Lock/Reset) identisch zu projectForward.
-      const prevAccepted = pts.length >= 2 ? pts[pts.length - 2] : null;
+      const prevAccepted = !beginsSection && pts.length >= 2 ? pts[pts.length - 2] : null;
       // Vorgänger-Lotfuss: aus dem letzten Schritt; sonst (nach Resume mit
       // Seed-Cursor oder nach anchor_reset bei bestehendem Cursor) der
       // Linienpunkt am aktuellen Cursor — dann ohne Vorgängerpunkt, d. h. die
@@ -755,14 +871,20 @@ export function useSearchRecorder(opts: {
       // Vorgänger (frischer Start) bleibt es beim nächsten Kandidaten.
       const prevFoot = prevFootRef.current
         ?? (prevAccepted || cursorMRef.current > 0 ? pointAtDistance(laidPoints, arc.cum, cursorMRef.current) : null);
-      const cands = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+      // Keep the established branch near self-crossings. Only widen reacquisition
+      // after an interruption when no nearby candidate remains in that window.
+      const localCandidates = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+      const widen = beginsSection && !localCandidates.some(candidate => candidate.offLineM <= ADVANCE_DEV_M);
+      const lookaheadM = widen ? arc.total : LOOKAHEAD_M;
+      const cands = widen ? projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M) : localCandidates;
       const predicted = prevFoot ? predictContinuityFoot(prevFoot, prevAccepted, sm, laidPoints, arc.cum, cursorMRef.current) : null;
       const chosen = pickContinuousProjection(cands, predicted);
       const proj = chosen
         ? { devM: chosen.offLineM, atM: chosen.arcM }
-        : projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+        : projectForward(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M);
       dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
       if (dev <= ADVANCE_DEV_M && proj.atM > cursorMRef.current) {
+        if (beginsSection) unobservedProgressMRef.current += Math.max(0, proj.atM - maxCursorMRef.current);
         cursorMRef.current = proj.atM;
         if (proj.atM > maxCursorMRef.current) maxCursorMRef.current = proj.atM;
       }
@@ -771,7 +893,9 @@ export function useSearchRecorder(opts: {
       dev = 0;
     }
     laidObjects.forEach((object, i) => {
-      objectStatusesRef.current[i] = statusAfterProgress({ status: objectStatusesRef.current[i] ?? 'pending',
+      const status = objectStatusesRef.current[i] ?? 'pending';
+      objectStatusesRef.current[i] = statusAfterProgress({ status: beginsSection
+        ? statusAcrossGap(status, object.atM ?? null, previousProgressM, maxCursorMRef.current) : status,
         referenceArcM: object.atM ?? null, handlerProgressM: maxCursorMRef.current,
         accuracyM: accRaw, isFinalObject: i === laidObjects.length - 1 });
     });
@@ -853,14 +977,15 @@ export function useSearchRecorder(opts: {
       analyticsSamplesRef.current.push({
         atM: maxCursorMRef.current,
         searchDistanceM: distRef.current,
-        tSec: (now - startMsRef.current) / 1000,
+        tSec: (tNow - startMsRef.current) / 1000,
         devM: dev,
         confidence: fusion.confidence,
         speedMps: speed,
         accuracyM: accRaw,
         geometryAccepted: true,
+        ...(beginsSection ? { breakBefore: true } : {}),
         fusionClassification: fusion.classification,
-        motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
+        motionConfidence: motion?.motionConfidence ?? null,
       });
     }
 
@@ -909,6 +1034,8 @@ export function useSearchRecorder(opts: {
         reliableDeviationExcessSumM: reliableDeviationExcessSumRef.current,
         reliableDeviationCount: reliableDeviationCountRef.current,
         reliableCursorM: reliableCursorMRef.current,
+        unobservedProgressM: unobservedProgressMRef.current,
+        unobservedObjectIds: laidObjects.flatMap((o, i) => objectStatusesRef.current[i] === 'unobserved' ? [searchObjectKey(o, i)] : []),
         breaks: breaksRef.current.slice(),
       });
       if (st.searchRunState.offTrackState !== offTrackRef.current.state) st.noteSearchOffTrackState(offTrackRef.current.state);
@@ -921,7 +1048,7 @@ export function useSearchRecorder(opts: {
   // onFix neu erzeugen und damit den Location-Watch-Effect (Deps: [onFix])
   // unnötig neu starten. Ein evtl. kurz veralteter Wert im Log ist unkritisch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
+  }, [enforceQaCaptureAccess, interruptContinuity, laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
 
   // ── Watch ab Mount ──
   //
@@ -945,16 +1072,34 @@ export function useSearchRecorder(opts: {
   // Prop-Identitäten immun — unabhängig davon, dass run.tsx die Identitäten
   // zusätzlich stabilisiert.
   const onFixRef = useRef(onFix);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixRef.current = onFix;
+  // Observation only: no start/stop/restore or React updates on lifecycle events.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      recordingEvidenceRef.current?.appState(state);
+      if (state !== 'active') void rawCaptureRef.current?.flush();
+    });
+    return () => {
+      sub.remove();
+      void rawCaptureRef.current?.close(false);
+      rawCaptureRef.current = null;
+      recordingEvidenceRef.current?.close('recorderUnmounted');
+      recordingEvidenceRef.current = null;
+    };
+  }, []);
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted' || !mounted) return;
       setReady(true);
+      streamSourceModeRef.current = getLocationSourceMode();
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource(
         (s) => {
+          if (!mounted) return;
+          recordingEvidenceRef.current?.source(s.source, s.provider);
           gpsSourceRef.current = s.source;
           setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
           onFixRef.current(sampleToLocationObject(s));
@@ -964,7 +1109,7 @@ export function useSearchRecorder(opts: {
       if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
       watchRef.current = { remove: handle.stop };
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
-    })();
+    })().catch(() => { if (mounted) setReady(false); });
     return () => { mounted = false; watchRef.current?.remove(); };
   }, []);
 
@@ -975,8 +1120,13 @@ export function useSearchRecorder(opts: {
   // aktuellsten Wert. Wird recordingRef nicht gesetzt (nicht aufgenommen),
   // ist motionClient ohnehin gestoppt → keine Samples zu erwarten. ──
   useEffect(() => {
+    let listening = true;
     const sub = motionClient.onSample((sMotion) => {
+      if (!listening || !recordingRef.current || pausedRef.current
+        || !motionForFix(sMotion, sMotion.timestamp, Date.now()) || sMotion.timestamp < motionNotBeforeRef.current
+        || (motionLatestRef.current != null && sMotion.timestamp <= motionLatestRef.current.timestamp)) return;
       motionLatestRef.current = {
+        timestamp: sMotion.timestamp,
         movementState: sMotion.movementState,
         stepDelta: sMotion.stepDelta,
         accelerationMagnitude: sMotion.accelerationMagnitude,
@@ -988,6 +1138,9 @@ export function useSearchRecorder(opts: {
     });
     motionUnsubRef.current = sub;
     return () => {
+      listening = false;
+      motionLatestRef.current = null;
+      motionActivityAgeMsRef.current = null;
       sub.remove();
       // Defensiv: falls die Absuche noch lief, sauber stoppen (kein Leak über
       // den Unmount hinaus, Punkt 16).
@@ -1000,32 +1153,48 @@ export function useSearchRecorder(opts: {
     if (!recording || paused) return;
     const id = setInterval(() => {
       setElapsedS(Math.floor((Date.now() - startMsRef.current) / 1000));
-      setGpsDebug(d => d.rejectedCount === rejectedRef.current ? d : { ...d, rejectedCount: rejectedRef.current });
+      setGpsDebug(d => { const rawArchiveError = rawCaptureRef.current?.snapshot().error ?? null;
+        return d.rejectedCount === rejectedRef.current && d.rawArchiveError === rawArchiveError ? d : { ...d, rejectedCount: rejectedRef.current, rawArchiveError }; });
     }, 1000);
     return () => clearInterval(id);
   }, [recording, paused]);
 
   // ── Steuerung ──
-  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState }, opts?: { forceLocked?: boolean }) => {
+  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean; diagnosticAttemptKey?: string }) => {
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
+    motionNotBeforeRef.current = Date.now();
+    resumeNotBeforeRef.current = resume ? Date.now() : null;
     const resumePts = resume?.points ?? [];
     // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
     // weiter); frisch: leer.
     pointsRef.current = resumePts.slice();
-    // Bewusst NICHT mit Platzhalter-Zeiten für resumePts vorbefüllt — echte
-    // Zeitstempel für die vor-Resume-Punkte sind nicht bekannt. Die
-    // resultierende Längen-Differenz zu pointsRef ist das Signal für "Replay
-    // für diese Session nicht verfügbar" (siehe SearchResult.pointsTimeSec).
-    pointsTimeRef.current = [];
+    continuityPendingRef.current = resumePts.length > 0;
+    replayBoundaryRef.current = resumePts.length > 0;
+    lastContinuityFixMsRef.current = null;
+    setContinuityEpoch(epoch => epoch + 1);
+    // Only original timestamps can restore replay; old snapshots without them
+    // remain unavailable instead of receiving invented timing.
+    pointsTimeRef.current = resume?.pointsTimeSec?.length === resumePts.length
+      && resume.pointsTimeSec.every(Number.isFinite) ? resume.pointsTimeSec.slice() : [];
     replayDenseRef.current = [];
     replayEmaRef.current = null;
     replayDisabledRef.current = resumePts.length > 0;
     qaLastCursorSampleSecRef.current = -Infinity;
-    smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
+    smoothRef.current = null; // a recovered position is not a smoothing anchor across the unknown interval
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
     recentRejectedRef.current = [];
+    // Nach Recovery bekannte Messzeiten erhalten, statt alte Zustellungen erneut
+    // als Live-Fixes zu zählen. Legacy-Snapshots erhalten keine erfundenen Zeiten.
+    liveMeasurementRef.current = null;
+    if (resume) {
+      const restored = pointsTimeRef.current.map(t => resume.startedAtMs + t * 1000)
+        .filter(t => Number.isFinite(t) && t <= Date.now());
+      liveMeasurementRef.current = restored.reduce<number | null>((last, t) => last == null ? t : Math.max(last, t), liveMeasurementRef.current);
+    }
     lastFixTRef.current = 0; rejectedRef.current = 0;
     let d = 0;
-    for (let i = 1; i < resumePts.length; i++) d += distM(resumePts[i - 1], resumePts[i]);
+    for (let i = 1; i < resumePts.length; i++) if (!resumePts[i].breakBefore) d += distM(resumePts[i - 1], resumePts[i]);
     distRef.current = d;
     // ── Search-Recovery-State (P0): derselbe Run läuft weiter, nicht „ungefähr
     // am selben Ort neu". Seed aus dem persistierten Run-State:
@@ -1042,6 +1211,7 @@ export function useSearchRecorder(opts: {
     reliableDeviationExcessSumRef.current = rs?.reliableDeviationExcessSumM ?? 0;
     reliableDeviationCountRef.current = rs?.reliableDeviationCount ?? 0;
     reliableCursorMRef.current = rs?.reliableCursorM ?? 0;
+    unobservedProgressMRef.current = rs?.unobservedProgressM ?? 0;
     lastReliableCursorMRef.current = null;
     lastReliableAtSecRef.current = null;
     breaksRef.current = rs ? rs.breaks.map(b => ({ ...b, at: { ...b.at } })) : [];
@@ -1094,16 +1264,32 @@ export function useSearchRecorder(opts: {
         foundRef.current.add(i);
         objectStatusesRef.current[i] = rs.autoDwellObjectIds.includes(key) ? 'auto_dwell_found' : 'manual_found';
       } else if (rs.dismissedAutoDwellIds.includes(key)) objectStatusesRef.current[i] = 'user_removed';
+      else if (rs.unobservedObjectIds?.includes(key)) objectStatusesRef.current[i] = 'unobserved';
     });
+    if (rs?.endFired) objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
+    setActiveObjectWait(false);
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
+    const diagnosticEnvironment = captureDiagnosticEnvironment();
+    if (sessionIdRef.current) void recordSupportProvenance(sessionIdRef.current, 'search', !!resume, opts?.diagnosticAttemptKey, diagnosticEnvironment);
+    void rawCaptureRef.current?.close(false);
+    rawCaptureRef.current = sessionIdRef.current
+      ? beginGpsCapture(sessionIdRef.current, 'search', String(startMsRef.current)) : null;
     // Search-Telemetrie — rein BEOBACHTEND (nur Schreiben, nie von Cursor/Distanz/Score/Ende gelesen):
     //   • interner QA-Modus: Vollumfang inkl. Dwell-Mitschnitt,
     //   • sonst Support-Minimal-Capture für normale Kunden (ohne Dwell-Mitschnitt; kein neuer
     //     GPS-/Sensor-Zugriff, nur dieselben Fixes, die ohnehin verarbeitet werden),
     //   • beides aus → null → kein Overhead.
     const qaOn = isQaDiagnosticsEnabled();
+    recordingEvidenceRef.current?.close();
+    recordingEvidenceRef.current = qaOn && sessionIdRef.current
+      ? startQaRecordingEvidence(sessionIdRef.current, 'search', !!resume, {
+          engine: getTrackingEngineMode(), source: streamSourceModeRef.current ?? 'unknown',
+        })
+      : null;
+    recordingEvidenceRef.current?.appState(AppState.currentState as string);
     qaTelRef.current = (qaOn || isSupportCaptureEnabled())
       ? { captureLevel: qaOn ? 'qa' : 'support',
+          recordingContext: observedRecordingProvenance(diagnosticEnvironment, !!resume),
           startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
           ...(qaOn ? { objectDwellCandidates: [] } : {}),
           minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false } }
@@ -1123,22 +1309,36 @@ export function useSearchRecorder(opts: {
     pushSnapshot();
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
 
+  const flushRawCapture = useCallback(async () => {
+    const capture = rawCaptureRef.current;
+    if (!capture) return null;
+    if (capture.snapshot().closed) await capture.close(true);
+    else await capture.flush();
+    return capture.snapshot();
+  }, []);
+
   const stop = useCallback((): SearchResult => {
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
+    recordingEvidenceRef.current?.close();
+    recordingEvidenceRef.current = null;
     recordingRef.current = false; setRecording(false);
     // Letzten lokalen Persistenz-Puffer schreiben (best-effort, blockiert nicht).
     void flushSearchPoints();
+    void rawCaptureRef.current?.close(true);
     // Core-Motion-Fusion sauber stoppen (Punkt 16 — kein CPU/Akku-Verbrauch
     // ausserhalb einer aktiven Absuche).
     void motionClient.stop();
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);
     const qaTel = qaTelRef.current
-      ? { ...qaTelRef.current, display: replayDisabledRef.current ? [] : replayDenseRef.current.map(p => ({ lat: p.lat, lng: p.lng, tSec: p.t })),
+      ? { ...qaTelRef.current, rawArchive: rawCaptureRef.current?.snapshot() ?? null, display: replayDisabledRef.current ? [] : replayDenseRef.current.map(p => ({ lat: p.lat, lng: p.lng, tSec: p.t })),
           replayInsertedForGap: replay?.insertedForGap ?? [],
           replayUnfillableGaps: replay?.unfillableGaps ?? [] }
       : undefined;
     return {
       ...(qaTel ? { qa: qaTel } : {}),
+      rawCapture: rawCaptureRef.current?.snapshot() ?? null,
       ...(replay ? { replayPoints: replay.points, replayPointsTimeSec: replay.timeSec } : {}),
       points: pointsRef.current.slice(),
       breaks: breaksRef.current.slice(),
@@ -1152,11 +1352,17 @@ export function useSearchRecorder(opts: {
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
       durationS,
-      score: computeScore(),
+      ...computeScoreBreakdown(),
     };
-  }, [computeScore, totalObjects]);
+  }, [computeScoreBreakdown, totalObjects]);
 
-  const setPaused = useCallback((p: boolean) => { pausedRef.current = p; setPausedState(p); }, []);
+  const setPaused = useCallback((p: boolean) => {
+    if (p === pausedRef.current) return;
+    recordingEvidenceRef.current?.note(p ? 'userPaused' : 'userResumed');
+    interruptContinuity();
+    pausedRef.current = p; setPausedState(p);
+    if (!p) { resumeNotBeforeRef.current = Date.now(); smoothRef.current = null; endSmoothRef.current = null; setEndHandlerFix(null); }
+  }, [interruptContinuity]);
 
   const markObject = useCallback(() => {
     const cur = smoothRef.current; if (!cur) return;
@@ -1169,6 +1375,12 @@ export function useSearchRecorder(opts: {
     if (bestI >= 0) {
       foundRef.current.add(bestI);
       objectStatusesRef.current[bestI] = 'manual_found';
+      autoDwellRef.current.delete(bestI);
+      autoDwellStartRef.current.delete(bestI);
+      // Resolving this object must release its blocker even without another fix.
+      // Any other unfinished dwell still blocks the end.
+      setActiveObjectWait(Array.from(autoDwellRef.current).some(([i, dwell]) =>
+        dwell.startedMs != null && !dwell.accepted && !foundRef.current.has(i)));
       useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(laidObjects[bestI], bestI));
       pushSnapshot();
     }
@@ -1188,7 +1400,8 @@ export function useSearchRecorder(opts: {
 
   const confirmEnd = useCallback(() => {
     objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
-  }, []);
+    pushSnapshot();
+  }, [pushSnapshot]);
 
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
   // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
@@ -1198,18 +1411,21 @@ export function useSearchRecorder(opts: {
   const dogProgressM = startLockedForDisplay ? estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total) : snap.progressM;
   const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   return {
     ready, recording, paused,
     objectStatuses: snap.objectStatuses,
-    points: snap.points, position, endHandlerFix, liveFix, deviationM: snap.deviationM,
+    points: snap.points, position, endHandlerFix, liveFix, continuityEpoch, deviationM: snap.deviationM,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     onTrack: !hasTrack || (offTrackReliableRef.current && offTrackRef.current.state === 'on_track'),
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, setPaused, markObject, dismissAutoObject, confirmEnd,
+    start, stop, flushRawCapture, setPaused, markObject, dismissAutoObject, confirmEnd,
   };
 }

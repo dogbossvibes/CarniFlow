@@ -1,5 +1,5 @@
 import type { TesterLevel } from '@/features/subscription/internalTester';
-import type { TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import type { TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 export type Plan = 'free' | 'premium';
 
@@ -77,7 +77,7 @@ export type Dog = {
   // Darstellung: Fährtenfarbe für Referenz-Fährten auf der Karte (semantischer Key,
   // null = Automatisch). Optional, weil die Spalte erst mit der Migration
   // 20261005120000_dogs_track_overlay_color_key existiert.
-  track_overlay_color_key?: TrackOverlayColorKey | null;
+  track_overlay_color_key?: TrackOverlayColorValue | null;
   created_at: string;
 };
 

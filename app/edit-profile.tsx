@@ -1,5 +1,6 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -52,6 +53,7 @@ export default function EditProfileScreen() {
   // Hydrieren aus dem Profil-Cache (einmalig).
   useEffect(() => {
     if (username === null && profile !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setUsername(profile?.username ?? '');
     }
     if (phoneNumber === null && profile !== undefined) {
@@ -64,6 +66,7 @@ export default function EditProfileScreen() {
     if (username === null) return;
     const res = validateUsername(username);
     if (!res.ok) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setUsernameStatus({ state: 'error', errorKey: USERNAME_ERROR_KEY[res.error] });
       return;
     }
@@ -141,7 +144,7 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={s.avatarKreis}>
           <Text style={s.avatarText}>{initialen || '?'}</Text>
         </View>

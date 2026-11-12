@@ -24,6 +24,14 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 
 const CYCLE: HeatCycle = { id: 'cyc-1', dogId: 'dog-1', startDate: '2026-08-12', endDate: '2026-09-01', status: 'completed', notes: null, phase: null, createdAt: '2026-08-12T00:00:00Z' };
 
+// Jeden gerenderten Baum nach dem Test abbauen. Sonst läuft eine Animation
+// (AnimatedPressable) nach dem Ende der Testumgebung weiter und Jest endet mit
+// Fehlercode 1, obwohl alle Tests bestehen.
+const mounted: ReactTestRenderer[] = [];
+afterEach(() => {
+  act(() => { for (const node of mounted.splice(0)) node.unmount(); });
+});
+
 function render(props: Partial<Parameters<typeof DogHeatCard>[0]> = {}): ReactTestRenderer {
   let node!: ReactTestRenderer;
   act(() => {
@@ -31,6 +39,7 @@ function render(props: Partial<Parameters<typeof DogHeatCard>[0]> = {}): ReactTe
       <DogHeatCard cycles={[CYCLE]} prediction={null} onAdd={() => {}} onOpen={() => {}} {...props} />,
     );
   });
+  mounted.push(node);
   return node;
 }
 

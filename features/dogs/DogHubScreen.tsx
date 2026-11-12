@@ -28,6 +28,7 @@ import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } fr
 
 // Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogHeatProps {
+  onOpenOverview?: () => void;
   cycles: HeatCycle[];
   prediction: HeatPrediction | null;
   onAdd: () => void;
@@ -43,7 +44,7 @@ export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; o
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; items?: DogBackpackItem[]; onOpen: () => void; onAdd?: () => void }
 // Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
-export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void }
+export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void; onOpenAppointment?: (appointment: DogAppointment) => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -73,7 +74,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel }: { trackingPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
   const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
@@ -135,6 +136,8 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 {badges.map(b => <View key={b} style={s.badge}><Text style={s.badgeTxt}>{b}</Text></View>)}
               </View>
             ) : null}
+
+            {trackingPanel}
 
             {actions.onOpenHealthRecord ? (
               <View style={s.miniHub}>
@@ -299,7 +302,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
 
             {/* Oberste Karte: offene Fährte dieses Hundes (falls vorhanden). Bindet
                 die Fährte an den Hund — überlebt Navigation/Hundewechsel/Neustart. */}
-            {activeFaehrte && onOpenFaehrte ? (
+            {!trackingPanel && (activeFaehrte && onOpenFaehrte ? (
               <View style={{ marginBottom: 12 }}>
                 <ActiveFaehrteCard entry={activeFaehrte} dogName={id.name} onOpen={onOpenFaehrte} />
               </View>
@@ -313,7 +316,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
               </TouchableOpacity>
-            ) : null}
+            ) : null)}
 
             {/* Tab-Leiste */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabbar}>
@@ -342,6 +345,18 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                     backpackPacked={backpack?.packed ?? 0}
                     lastTrainingLabel={vm.lastTrainingLabel}
                     localeTag={intlLocale}
+                    getHintAction={hint => {
+                      switch (hint.kind) {
+                        case 'appointment_today':
+                        case 'appointment_overdue': return hint.appointment && appointments?.onOpenAppointment
+                          ? () => appointments.onOpenAppointment!(hint.appointment!) : appointments?.onOpenCalendar;
+                        case 'heat': return heat?.onOpenCalendar;
+                        case 'goal': return actions.onOpenGoals ?? actions.onEditGoal;
+                        case 'backpack': return backpack?.onOpen;
+                        case 'last_activity': return vm.recentTrainings[0] && actions.onOpenTraining
+                          ? () => actions.onOpenTraining!(vm.recentTrainings[0]) : actions.onOpenJournal;
+                      }
+                    }}
                   />
 
                   {/* 2) Nächste Termine */}
@@ -350,6 +365,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                       appointments={appointments.items}
                       localeTag={intlLocale}
                       onOpenCalendar={appointments.onOpenCalendar}
+                      onOpenAppointment={appointments.onOpenAppointment}
                     />
                   )}
 
@@ -360,7 +376,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   {isFemale && heat && (
                     <>
                       <Text style={s.sectionLabel}>{t('dash.heat')}</Text>
-                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} currentPhases={heat.currentPhases} />
+                      <DogHeatCard onOpenOverview={heat.onOpenOverview} cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} currentPhases={heat.currentPhases} />
                     </>
                   )}
 
@@ -397,7 +413,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 </>
               )}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
-              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
+              {tab === 'heat'     && isFemale && heat && <DogHeatCard onOpenOverview={heat.onOpenOverview} cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>
           </View>

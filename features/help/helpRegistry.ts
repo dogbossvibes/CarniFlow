@@ -21,6 +21,7 @@ export type HelpTopicId =
   | 'track_objects'
   | 'track_angles'
   | 'track_gps'
+  | 'track_shelly'
   | 'track_search'
   | 'track_handler_distance'
   | 'track_step_calibration'
@@ -33,6 +34,7 @@ export interface HelpTopic {
   shortDescription: string;   // Coachmark-Kurztext (2–4 Sätze / kompakte Zeilen)
   body?: string[];            // Optionale Detailabsätze (Help-Center / „Mehr erfahren")
   category: HelpCategory;
+  externalLink?: { url: string; labelKey: TranslationKey; errorKey: TranslationKey };
 }
 
 // Reihenfolge/Beschriftung der Kategorien im Help-Center.
@@ -63,6 +65,7 @@ export const HELP_TOPIC_TITLE_KEY: Record<HelpTopicId, TranslationKey> = {
   track_objects: 'help.trackObjectsTitle',
   track_angles: 'help.trackAnglesTitle',
   track_gps: 'help.trackGpsTitle',
+  track_shelly: 'help.shellyTitle',
   track_search: 'track.search',
   track_handler_distance: 'help.trackHandlerDistanceTitle',
   track_step_calibration: 'help.trackStepCalibrationTitle',
@@ -82,6 +85,7 @@ export const HELP_TOPIC_SHORT_KEY: Record<HelpTopicId, TranslationKey> = {
   track_objects: 'help.trackObjectsShort',
   track_angles: 'help.trackAnglesShort',
   track_gps: 'help.trackGpsShort',
+  track_shelly: 'help.shellyShort',
   track_search: 'help.trackSearchShort',
   track_handler_distance: 'help.trackHandlerDistanceShort',
   track_step_calibration: 'help.trackStepCalibrationShort',
@@ -90,6 +94,7 @@ export const HELP_TOPIC_SHORT_KEY: Record<HelpTopicId, TranslationKey> = {
 };
 
 export const HELP_TOPIC_BODY_KEYS: Partial<Record<HelpTopicId, TranslationKey[]>> = {
+  track_shelly: ['help.shellyBody1', 'help.shellyBody2', 'help.shellyBody3'],
   home: ['help.homeBody1', 'help.homeBody2'],
   account_security: ['help.accountSecurityBody1', 'help.accountSecurityBody2'],
   track_laying: ['help.trackLayingBody1', 'help.trackLayingBody2'],
@@ -138,7 +143,7 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     id: 'document_training',
     title: 'Training dokumentieren',
     shortDescription:
-      'Erfasse eine Einheit nachträglich: Hund, Kategorie, Übungen mit Bewertung, Dauer und Notizen. Fotos, Videos und Sprachnotizen kannst du anhängen.',
+      'In drei Schritten: bisherigen Hinweis ansehen, heutige Übungen und Beobachtungen dokumentieren, einen Hinweis fürs nächste Mal speichern. Dauer, Bewertungen und Medien sind optional.',
     category: 'training',
   },
   start_training: {
@@ -181,6 +186,17 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     body: ['Tippe während des Legens auf den Winkel-Button und wähle die passende Art.'],
     category: 'tracking',
   },
+  track_shelly: {
+    id: 'track_shelly',
+    title: 'Fährten-Zubehör / Shelly-Button',
+    shortDescription: 'Bluetooth-Taster für geplante Fernsteuerung; aktuell nur interne Vordergrund-Empfangsdiagnose.',
+    category: 'tracking',
+    externalLink: {
+      url: 'https://www.shelly.com/de/products/shelly-blu-button-tough-1-zb-black',
+      labelKey: 'help.shellyProductLink',
+      errorKey: 'help.shellyLinkError',
+    },
+  },
   track_gps: {
     id: 'track_gps',
     title: 'GPS & Startpunkt',
@@ -207,7 +223,7 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     title: 'Persönliche Schrittlänge',
     shortDescription:
       'Kalibriere deine normale Schrittlänge, damit Schrittangaben besser zu dir passen.',
-    body: ['Gehe eine bekannte Strecke und ANYVO berechnet deine Schrittlänge aus der GPS-Distanz.'],
+    body: ["Bleibe am Start stehen, bis GPS bereit ist. Starte dann und zähle 50 eigene normale Fährtenschritte auf gerader Strecke. Tippe am Ende auf Fertig und bleibe stehen, bis die Endposition geprüft ist. GPS liefert nur eine Schätzung. Erst «Schrittlänge übernehmen» speichert den Wert; Abbruch oder eine ungeeignete Messung ändern nichts."],
     category: 'tracking',
   },
   smart_analysis: {

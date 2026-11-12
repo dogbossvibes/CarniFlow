@@ -1,3 +1,6 @@
+import { syncOwnTransfer } from '@/features/tracking-transfer/runtime';
+import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/syncGuard';
+import { syncObjectReviews, objectReviewQueueCounts } from '@/features/tracking/services/objectReview/service';
 import { fetchIsOnline } from '@/features/sync/services/netinfo';
 import { supabase } from '@/lib/supabase';
 import { useSyncStore } from '@/features/sync/store/syncStore';
@@ -27,8 +30,9 @@ async function isOnline(): Promise<boolean> {
 
 async function refreshCounts() {
   const c = await syncQueueCounts();
+  const reviews = await objectReviewQueueCounts();
   const st = useSyncStore.getState();
-  st.setPendingCount(c.pending); st.setFailedCount(c.failed); st.setConflictCount(c.conflict);
+  st.setPendingCount(c.pending + reviews.pending); st.setFailedCount(c.failed + reviews.failed); st.setConflictCount(c.conflict + reviews.conflict);
 }
 
 // Grund, warum ein Queue-Item NICHT rekonstruierbar ist: die lokale Session
@@ -38,13 +42,17 @@ async function refreshCounts() {
 // (Production-Befund 84b3c0ea: 0 Marker, 0 Runs, nie nachgezogen).
 export const LOCAL_SESSION_MISSING = 'Lokale Session nicht gefunden – nicht rekonstruierbar';
 
-export interface SyncSessionResult { ok: boolean; error?: string; reason?: 'local_missing' }
+export interface SyncSessionResult { ok: boolean; error?: string; reason?: 'local_missing' | 'transfer_conflict' }
 
 // Eine Trainings-Session + ihre Kinder (Punkte, Marker) hochladen. Exportiert für
 // gezielte Idempotenz-/Replace-Tests (kein Verhaltenswechsel gegenüber intern).
 export async function syncTrainingSession(localId: string): Promise<SyncSessionResult> {
   const local = await getLocalTrainingSessionById(localId);
   if (!local) return { ok: false, error: LOCAL_SESSION_MISSING, reason: 'local_missing' };
+  const transferResult = await syncOwnTransfer(local);
+  if (transferResult) return transferResult;
+  try { assertOrdinaryTrainingSyncAllowed(local); }
+  catch (error) { return { ok: false, error: (error as Error).message }; }
 
   // Idempotenter Session-Upsert: die remote_id IST die lokale UUID (local_id).
   // Auch wenn eine ACK zuvor verloren ging (remote_id lokal noch null), erzeugt der
@@ -112,16 +120,30 @@ async function processQueueItem(item: Awaited<ReturnType<typeof getPendingSyncOp
     if (item.entity_type === 'training_session') {
       if (item.operation === 'delete') {
         const local = await getLocalTrainingSessionById(item.entity_local_id);
+        const transfer = local ? await syncOwnTransfer(local, true) : null;
+        if (transfer) {
+          if (transfer.reason === 'transfer_conflict') { await markSyncConflict(item.id, transfer.error); return; }
+          if (!transfer.ok) throw new Error(transfer.error);
+          await markSyncCompleted(item.id); return;
+        }
+        assertOrdinaryTrainingSyncAllowed(local);
         if (local?.remote_id) { const r = await deleteRemoteTrainingSession(local.remote_id); if (r.error) throw new Error(r.error); }
         await markSyncCompleted(item.id);
       } else if (item.operation === 'update') {
         const local = await getLocalTrainingSessionById(item.entity_local_id);
+        const transfer = local ? await syncOwnTransfer(local, false) : null;
+        if (transfer) {
+          if (transfer.reason === 'transfer_conflict') { await markSyncConflict(item.id, transfer.error); return; }
+          if (!transfer.ok) throw new Error(transfer.error);
+          await markSyncCompleted(item.id); return;
+        }
+        assertOrdinaryTrainingSyncAllowed(local);
         // rating nur gültig (1–5) übernehmen; der Fährten-Score (0–100) bleibt in
         // track_data.score (autoritativ über den create/upsert-Pfad synchronisiert).
         if (local?.remote_id) { const r = await updateRemoteTrainingSession(local.remote_id, { notes: local.notes, rating: validSessionRating(local.score), status: local.status, ended_at: local.ended_at, duration_seconds: local.duration_seconds }); if (r.error) throw new Error(r.error); }
         else {
           const res = await syncTrainingSession(item.entity_local_id);
-          if (res.reason === 'local_missing') { await markSyncConflict(item.id, res.error); return; }
+          if (res.reason === 'local_missing' || res.reason === 'transfer_conflict') { await markSyncConflict(item.id, res.error); return; }
           if (!res.ok) throw new Error(res.error);
         }
         await markSyncCompleted(item.id);
@@ -130,7 +152,7 @@ async function processQueueItem(item: Awaited<ReturnType<typeof getPendingSyncOp
         // Lokale Session weg → terminal 'conflict' (sichtbar, nicht endlos
         // retried; retryFailedOperations fasst nur 'failed' an). Kein
         // updateTrainingSyncStatus: die Zeile existiert nicht mehr.
-        if (res.reason === 'local_missing') { await markSyncConflict(item.id, res.error); return; }
+        if (res.reason === 'local_missing' || res.reason === 'transfer_conflict') { await markSyncConflict(item.id, res.error); return; }
         if (!res.ok) throw new Error(res.error);
         await markSyncCompleted(item.id);
       }
@@ -160,27 +182,40 @@ async function syncMediaItem(queueId: string, mediaLocalId: string) {
 export async function syncNow(): Promise<void> {
   if (running) return;
   const st = useSyncStore.getState();
-  if (!(await isOnline())) { st.setOnlineStatus(false); return; }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;   // ohne Login kein Sync
-
+  // Claim the worker before network/auth awaits, which can otherwise admit
+  // a second caller processing the same queue items concurrently.
   running = true;
-  st.setSyncing(true);
-  st.setLastError(null);
+  let syncStarted = false;
   try {
+    if (!(await isOnline())) { st.setOnlineStatus(false); return; }
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!session) return;   // ohne Login kein Sync
+
+    syncStarted = true;
+    st.setSyncing(true);
+    st.setLastError(null);
     const ops = await getPendingSyncOperations(200);
     for (let i = 0; i < ops.length; i++) {
       await processQueueItem(ops[i]);
       st.setSyncProgress((i + 1) / ops.length);
     }
     await clearCompleted();
+    // Separate append-only review outbox; never rewrite parent sessions/markers.
+    await syncObjectReviews();
     st.setLastSyncAt(Date.now());
   } catch (e: any) {
     st.setLastError(e?.message ?? 'Sync-Fehler');
   } finally {
-    await refreshCounts().catch(() => {});
-    st.setSyncing(false);
-    running = false;
+    try {
+      if (syncStarted) {
+        await refreshCounts().catch(() => {});
+        st.setSyncing(false);
+      }
+    } finally {
+      // Cleanup/store failures must never strand the admission reservation.
+      running = false;
+    }
   }
 }
 

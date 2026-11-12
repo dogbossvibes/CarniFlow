@@ -1,3 +1,4 @@
+import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/syncGuard';
 import { supabase } from '@/lib/supabase';
 import { uploadImage, uploadVideo, uploadAudio } from '@/services/mediaService';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
@@ -22,6 +23,7 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
     const summary = ((): Record<string, any> => {
       try { return local.payload_json ? JSON.parse(local.payload_json) : {}; } catch { return {}; }
     })();
+    assertOrdinaryTrainingSyncAllowed(local);
     const { data, error } = await supabase.from('training_sessions').upsert({
       id: local.local_id,   // clientseitige UUID = training_sessions.id
       owner_id: local.user_id, dog_id: local.dog_id, type: local.type ?? 'track',
@@ -48,8 +50,10 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
         average_deviation_meters: summary.run.average_deviation_meters ?? null,
         articles_found:           summary.run.articles_found ?? null,
       } : {}),
-      ...((summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at) ? { track_data: {
+      ...((summary.manualAngleGeometry || summary.layContinuity || summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at) ? { track_data: {
+        ...(summary.manualAngleGeometry ? { manualAngleGeometry: summary.manualAngleGeometry } : {}),
         ...(summary.segments ? { segments: summary.segments } : {}),
+        ...(summary.layContinuity ? { layContinuity: summary.layContinuity } : {}),
         ...(summary.run ? { run: runSummaryForTrackData(summary.run) } : {}),
         ...(summary.legs ? { legs: summary.legs } : {}),
         ...(summary.score != null ? { score: summary.score } : {}),

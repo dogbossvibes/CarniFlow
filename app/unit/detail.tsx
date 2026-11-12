@@ -1,5 +1,7 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -9,7 +11,7 @@ import { ZoomableImage } from '@/components/ui/ZoomableImage';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
@@ -25,13 +27,17 @@ import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
+import { ratingDisplay } from '@/features/training/documentation/learningLevel';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
   const player = useVideoPlayer(signed, p => { p.loop = false; p.muted = true; });
   useEffect(() => { if (signed) player.replace(signed); }, [signed, player]);
-  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls allowsFullscreen />;
+  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls />;
 }
+
+// Eindeutiger Cache-Pfad pro Abspielvorgang (Zeitstempel ausserhalb der Komponente).
+const memoCachePath = (idx: number) => FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
 
 // Read-only Audio-Wiedergabe. Datei wird lokal geladen (Supabase-CDN ohne
 // Range-Support), dann via expo-audio abgespielt — gleiches Muster wie AudioRecorder.
@@ -42,10 +48,16 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const localRef = useRef<string | null>(null);
 
+  // Wiedergabe-Ende: Anzeige direkt beim Rendern zurücksetzen (React-Muster
+  // „State bei geänderter Eingabe anpassen“), die Datei-Aufräumarbeit bleibt im Effekt.
+  const [seenFinish, setSeenFinish] = useState(status.didJustFinish);
+  if (seenFinish !== status.didJustFinish) {
+    setSeenFinish(status.didJustFinish);
+    if (status.didJustFinish) setPlayingIdx(null);
+  }
   useEffect(() => {
-    if (status.didJustFinish) {
-      setPlayingIdx(null);
-      if (localRef.current) { FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null; }
+    if (status.didJustFinish && localRef.current) {
+      FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null;
     }
   }, [status.didJustFinish]);
 
@@ -55,8 +67,8 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
       if (localRef.current) { FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null; }
       if (playingIdx === idx) { setPlayingIdx(null); return; }
       setPlayingIdx(idx);
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
-      const localUri = FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      const localUri = memoCachePath(idx);
       const result   = await FileSystem.downloadAsync(await signMediaUrl(files[idx].url), localUri);
       if (result.status !== 200) throw new Error('Download fehlgeschlagen');
       localRef.current = result.uri;
@@ -127,6 +139,7 @@ export default function UnitDetailScreen() {
           const { error } = await deleteTrainingUnit(id);
           if (error) { Alert.alert(t('common.error'), error.message); return; }
           queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+          queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
           router.back();
         },
       },
@@ -149,7 +162,7 @@ export default function UnitDetailScreen() {
 
   return (
     <View style={s.root}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <HeroImage height={260} overlay={0.96} contentPosition="top">
           <SafeAreaView edges={['top']} style={s.heroSafe}>
             <View style={s.heroText}>
@@ -199,13 +212,20 @@ export default function UnitDetailScreen() {
               <View style={s.flex}>
                 <Text style={s.exName}>{ex.exercise_name}</Text>
                 <Text style={s.exDisc}>{ex.discipline}</Text>
+                {ex.notes?.trim() ? <Text style={s.notesTxt}>{ex.notes}</Text> : null}
               </View>
-              {ex.rating != null && (
-                <View style={s.exStars}>
-                  <Ionicons name="star" size={12} color={C.star} />
-                  <Text style={s.exRating}>{ex.rating}</Text>
-                </View>
-              )}
+              {(() => {
+                // T-184: Lernstufe nur mit rating_scale; alte Bewertungen bleiben Sterne.
+                const shown = ratingDisplay(ex);
+                if (shown?.kind === 'level') return <Text style={s.exRating}>{t(`trainingLevel.${shown.level}`)}</Text>;
+                if (shown?.kind === 'legacy') return (
+                  <View style={s.exStars}>
+                    <Ionicons name="star" size={12} color={C.star} />
+                    <Text style={s.exRating}>{shown.stars}</Text>
+                  </View>
+                );
+                return null;
+              })()}
             </View>
           ))}
 
@@ -350,7 +370,7 @@ const s = StyleSheet.create({
   statsRow:  { flexDirection: 'row', gap: 10, marginTop: 8 },
   statCard:  { flex: 1, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingVertical: 18, alignItems: 'center', gap: 6 },
   cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
+  glassBg:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   statVal:   { fontSize: 20, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   statLabel: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1 },
 

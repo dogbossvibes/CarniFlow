@@ -1,3 +1,6 @@
+import { EXCHANGE_SCHEMA } from '@/features/tracking-exchange/schema';
+import { PLANNER_SCHEMA } from '@/features/tracking-planner/schema';
+import { DISTRACTION_SCHEMA } from '@/features/tracking-distractions/schema';
 // Lokale SQLite-Migrationen (idempotent). Jede Migration hat eine Version;
 // angewandte Versionen stehen in local_schema_migrations.
 export interface LocalMigration { version: number; name: string; sql: string }
@@ -132,4 +135,46 @@ export const MIGRATIONS: LocalMigration[] = [
     name: 'add_angle_kind_to_local_track_markers',
     sql: `alter table local_track_markers add column angle_kind text;`,
   },
+  {
+    version: 7,
+    name: 'create_local_track_transfer_sync',
+    sql: `create table if not exists local_track_transfer_sync (
+      session_id text primary key references local_training_sessions(local_id) on delete cascade,
+      receipt_id text not null unique,
+      user_id text not null,
+      receipt_json text not null,
+      revision integer not null,
+      base_patch_json text not null,
+      pending_json text,
+      deleted integer not null default 0
+    );`,
+  },
+  { version: 8, name: 'independent_distraction_tracks', sql: DISTRACTION_SCHEMA },
+  {
+    version: 9,
+    name: 'create_track_object_review_store',
+    // Separate from sync_queue: older clients discard unknown queue entity types.
+    // No foreign-key cascade: pending human observations survive parent resync.
+    sql: `create table if not exists track_object_review_cache (
+      owner_id text not null, run_id text not null, session_id text not null,
+      dog_id text not null, revision integer not null, response_json text not null,
+      updated_at text not null, primary key (owner_id, run_id)
+    );
+    create table if not exists track_object_review_outbox (
+      operation_id text primary key, owner_id text not null, run_id text not null,
+      session_id text not null, dog_id text not null, request_json text not null,
+      state text not null check (state in ('pending','failed','conflict','sent','cancelled')),
+      created_at text not null, last_error text
+    );
+    create unique index if not exists idx_review_one_open
+      on track_object_review_outbox (owner_id, run_id)
+      where state in ('pending','failed','conflict');
+    create index if not exists idx_review_owner_state
+      on track_object_review_outbox (owner_id, state);`,
+  },
+  { version: 10, name: 'local_track_planner', sql: PLANNER_SCHEMA },
+  { version: 11, name: 'distraction_parent_reference', sql: `create table if not exists local_distraction_parents (
+    owner_id text not null, session_id text not null, payload_json text not null, primary key(owner_id,session_id)
+  );` },
+  { version: 12, name: 'track_file_exchange', sql: EXCHANGE_SCHEMA },
 ];

@@ -1,3 +1,5 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+import { loadQaPreferences, setQaPreference } from '@/features/tracking/utils/qaPreferences';
 import React from 'react';
 import { AppState, DeviceEventEmitter } from 'react-native';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -129,10 +131,13 @@ function expectSourceAlive(mode: LocationSourceMode) {
   expect(mode === 'precision' ? mockNativeRunning : mockExpoListeners.size === 1).toBe(true);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.useFakeTimers();
   clockMs = 1700000000000;
   jest.setSystemTime(clockMs);
+  setDiagnosticsSession('owner');
+  resolveDiagnosticsAccess('owner', getDiagnosticsAccessSnapshot().generation, true);
+  await loadQaPreferences();
   jest.clearAllMocks();
   mockNativeListeners.clear(); mockExpoListeners.clear(); mockNativeRunning = false;
   renderer = null;
@@ -143,11 +148,30 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { renderer?.unmount(); });
   useTrackingStore.getState().reset();
+  revokeDiagnosticsAccess();
   jest.useRealTimers();
 });
 
 describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search location owner — %s', mode => {
   beforeEach(() => { setLocationSourceMode(mode); });
+
+  it('revocation removes internal capture while the running GPS source keeps delivering', async () => {
+    setQaPreference('diagnostics', true);
+    await mount();
+    feed(0); feed(0); feed(0); startSearch();
+    for (let i = 0; i < 5; i++) feed(0);
+    for (let y = 2; y <= 10; y += 2) feed(y);
+    const before = recorder.points.length;
+    act(revokeDiagnosticsAccess);
+    expectSourceAlive(mode);
+    for (let y = 12; y <= 24; y += 2) feed(y);
+    expectSourceAlive(mode);
+    expect(recorder.points.length).toBeGreaterThan(before);
+    let result!: SearchResult;
+    act(() => { result = recorder.stop(); });
+    expect(result.qa?.captureLevel).toBe('support');
+    expect(result.qa?.objectDwellCandidates).toBeUndefined();
+  });
 
   it('reports near, stable reached, and departure transitions without absolute coordinates', async () => {
     await mount();
@@ -212,6 +236,31 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     expect(mode === 'precision' ? mockNativeStop : mockExpoRemove).toHaveBeenCalledTimes(1);
   });
 
+  it('expires start readiness without new callbacks and requires fresh confirmation after resume', async () => {
+    await mount();
+    feed(2); feed(2);
+    expect(approach.armed).toBe(true);
+    const oldArmedAt = approach.armedAtMs;
+    const events = approachEvents.length;
+    const pos = approach.position;
+    act(() => { jest.advanceTimersByTime(5001); });
+    clockMs = Date.now();
+    expect(approach.armed).toBe(false);
+    expect(approach.phase).toBe('approaching');
+    expect(approach.armedAtMs).toBeNull();
+    expect(approach.startReachedAtMs).toBeNull();
+    expect(approach.firstStableFixAtMs).toBeNull();
+    expect(approach.position).toEqual(pos);
+    expect(approachEvents).toHaveLength(events); // no invented GPS or departure event
+    feed(5); feed(5);
+    expect(approach.phase).not.toBe('departed_start');
+    feed(2);
+    expect(approach.armed).toBe(false);
+    feed(2);
+    expect(approach.armed).toBe(true);
+    expect(approach.armedAtMs!).toBeGreaterThan(oldArmedAt!);
+  });
+
   it('keeps raw coordinates, unrounded accuracy, freshness and consecutive-fix arming', async () => {
     await mount();
     feed(2, 4.4);
@@ -226,8 +275,16 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     expect(approach.position!.lat).not.toBe(recorder.position!.latitude); // not EMA
     feed(3, 4.4);
     expect(approach.armed).toBe(true);
+    const eventsBeforeLate = approachEvents.length;
+    const lastLive = recorder.liveFix;
     feed(3, 4.4, 6000);
-    expect(approach.armed).toBe(false);
+    expect(recorder.liveFix).toBe(lastLive);
+    expect(approachEvents).toHaveLength(eventsBeforeLate);
+    expect(approach.armed).toBe(true); // last accepted fix is still fresh
+    act(() => { jest.advanceTimersByTime(5001); });
+    clockMs = Date.now();
+    expect(approach.armed).toBe(false); // expires without replaying the stale delivery
+    expect(approachEvents).toHaveLength(eventsBeforeLate);
     feed(3, 13); // accuracy cap unchanged
     expect(approach.fixesRemaining).toBe(2);
     feed(100); // implausible jump / outside radius

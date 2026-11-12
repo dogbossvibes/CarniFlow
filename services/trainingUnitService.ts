@@ -3,16 +3,9 @@ import { supabase } from '@/lib/supabase';
 import type { TrainingUnit, TrainingExercise, AudioFile } from '@/types/trainingUnit';
 import type { TrainingMetrics } from '@/types/analytics';
 import { createEmbeddingForTrainingSession, createEmbeddingForExerciseNote } from '@/features/ai/services/trainingEmbeddingService';
-import { claimNewbieQuota, quotaBlock, type QuotaBlock } from '@/services/quotaService';
-
-// Zentraler NEWBIE-Quota-Gate für NEUE Trainingsdokumentationen (2/Kalendermonat).
-// Serverautoritativ + idempotent auf der stabilen Unit-ID → Retry/Resume derselben
-// ID verbraucht KEIN zweites Kontingent. Premium wird serverseitig durchgelassen.
-// Production ist fail-closed (siehe quotaService). Läuft auf ALLEN Save-Pfaden,
-// damit alternative Navigationswege das Limit nicht umgehen.
-async function guardNewTrainingQuota(unitId: string): Promise<QuotaBlock | null> {
-  return quotaBlock((await claimNewbieQuota('training', unitId)).status);
-}
+import { getAtomicTrainingDocument, type DocumentPatch, type DocumentSave } from './trainingDocumentService';
+import { commitTrainingSave, saveFingerprint } from '@/features/training/documentation/saveIntent';
+import { trainingUnitFingerprint } from '@/features/training/documentation/retry';
 
 // Embeddings für die semantische Suche erzeugen — NON-BLOCKING (fire-and-forget,
 // schluckt Fehler intern). Darf das Speichern der Einheit nie aufhalten.
@@ -83,19 +76,32 @@ export function getTrainingUnits(ownerId: string, dogId?: string) {
   return q;
 }
 
+// Apply the discipline before the bound, so many unrelated sessions do not
+// hide the last matching training. Keep the existing all-unit feed unchanged.
+export function getTrainingPreparationUnits(ownerId: string, dogId: string, discipline: string) {
+  return supabase.from('training_units')
+    .select('*, dog:dogs(name), exercises:training_exercises!inner(*)')
+    .eq('owner_id', ownerId).eq('dog_id', dogId).eq('status', 'completed')
+    .eq('exercises.discipline', discipline)
+    .order('session_date', { ascending: false }).order('created_at', { ascending: false });
+}
+
 // Rein lesend, KEIN neues Schema: leitet „zuletzt selbst benutzte eigene Übungen"
 // für eine feste Sparte aus der bestehenden Trainingshistorie ab (training_exercises
 // über die bereits vorhandene FK-Relation zu training_units gefiltert nach
 // owner_id). Ersetzt für System-Sparten (die keine editierbare Übungsliste haben,
 // im Gegensatz zu custom_categories) eine eigene Persistenz-Tabelle.
-export async function getRecentExerciseNames(ownerId: string, discipline: string, limit = 20) {
-  const { data, error } = await supabase
+export async function getRecentExerciseNames(ownerId: string, discipline: string, limit = 20, dogId?: string) {
+  let query = supabase
     .from('training_exercises')
-    .select('exercise_name, created_at, training_units!inner(owner_id)')
+    .select('exercise_name, created_at, training_units!inner(owner_id,dog_id,status)')
     .eq('discipline', discipline)
     .eq('training_units.owner_id', ownerId)
+    .eq('training_units.status', 'completed')
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (dogId) query = query.eq('training_units.dog_id', dogId);
+  const { data, error } = await query;
   if (error) return { data: [] as string[], error };
   const names: string[] = [];
   for (const row of (data ?? []) as { exercise_name: string }[]) {
@@ -130,88 +136,79 @@ export async function createTrainingUnit(
     .single();
 }
 
-// Schliesst die Einheit ab und persistiert alle Übungen.
-export async function finishTrainingUnit(
-  unitId:  string,
+type ExerciseInput = Omit<TrainingExercise, 'unit_id' | 'created_at'>;
+interface AtomicSaveOptions {
+  operationId?: string;
+  current?: () => boolean;
+  expectedFingerprint?: string;
+  focusChanges?: DocumentSave['focusChanges'];
+  identityChanges?: DocumentSave['identityChanges'];
+}
+
+// Every completion/documentation route uses this single transactional RPC.
+// The server owns quota, authorization, CAS, child replacement and receipts.
+export async function saveDocumentedUnitAtomic(
+  ownerId: string, unitId: string, unit: DocumentPatch, exercises: ExerciseInput[],
+  mode: 'create' | 'edit' | 'finish', options: AtomicSaveOptions = {},
+) {
+  const current = options.current ?? (() => true);
+  if (mode === 'edit' && !options.expectedFingerprint) return { data: null, error: { code: 'CONFLICT', message: 'An edit requires its original training snapshot' } };
+  const fingerprint = saveFingerprint({ unit, exercises, mode, operationId: options.operationId, focusChanges: options.focusChanges, identityChanges: options.identityChanges });
+  const result = await commitTrainingSave(ownerId, unitId, fingerprint, async () => {
+    let expectedToken: string | null = null;
+    if (mode !== 'create') {
+      const latest = await getAtomicTrainingDocument(ownerId, unitId, current);
+      if (latest.error) return latest;
+      if (mode === 'finish') {
+        const remote = latest.data.unit;
+        const resultFields = ['duration_sec', 'rating', 'score', 'notes', 'motivation', 'konzentration', 'praezision', 'ausdauer', 'trieblage', 'impulskontrolle'] as const;
+        // Old active drafts have no captured baseline. Only an untouched empty
+        // active result can be adopted; existing results are never overwritten.
+        if (remote.status !== 'active' || (!options.expectedFingerprint && (
+          remote.exercises?.length || remote.ended_at != null || resultFields.some(field => remote[field] != null)
+        ))) return { data: null, error: { code: 'CONFLICT', message: 'Remote training already changed or completed' } };
+      }
+      if (options.expectedFingerprint && trainingUnitFingerprint(latest.data.unit) !== options.expectedFingerprint) {
+        return { data: null, error: { code: 'CONFLICT', message: 'Training changed before saving' } };
+      }
+      expectedToken = latest.data.token;
+    }
+    return { error: null, data: {
+      unitId, requestId: options.operationId ?? Crypto.randomUUID(), expectedToken,
+      unit: { ...unit, ...(mode === 'finish' ? { ended_at: new Date().toISOString() } : {}), status: 'completed' as const },
+      exercises: exercises.map(e => ({ ...e, id: e.id ?? Crypto.randomUUID() })),
+      ...(options.focusChanges ? { focusChanges: options.focusChanges } : {}),
+      ...(options.identityChanges ? { identityChanges: options.identityChanges } : {}),
+    } };
+  }, current);
+  if (result.error) return { data: null, error: result.error };
+  if (current() && !result.data.duplicate && mode !== 'edit') {
+    void notifyTrainersOfActivity(ownerId, '🐾 Neue Aktivität');
+    embedUnitContent(unitId, unit.dog_id ?? null, unit.notes ?? null, exercises, unit.session_date);
+  }
+  return { data: { id: unitId, ...result.data }, error: null };
+}
+
+export function finishTrainingUnit(
+  unitId: string,
   updates: { duration_sec: number; rating: number | null; notes: string | null; shared_with_trainer?: boolean } & Partial<TrainingMetrics>,
-  exercises: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[],
+  exercises: ExerciseInput[], ownerId: string, current?: () => boolean, expectedFingerprint?: string, operationId?: string,
 ) {
-  // NEWBIE-Quota beim Abschluss (nicht beim Start): idempotent auf der stabilen
-  // unitId → Resume/Retry desselben Trainings verbraucht kein zweites Kontingent.
-  const block = await guardNewTrainingQuota(unitId);
-  if (block) return { error: block };
-
-  const { error: unitErr } = await supabase
-    .from('training_units')
-    .update({ ...updates, ended_at: new Date().toISOString(), status: 'completed' })
-    .eq('id', unitId);
-  if (unitErr) return { error: unitErr };
-
-  if (exercises.length > 0) {
-    const { error } = await supabase
-      .from('training_exercises')
-      .insert(exercises.map(e => ({ ...e, unit_id: unitId })));
-    if (error) return { error };
-  }
-
-  // Verbundene Trainer:innen (mit view_trainings) über die neue Einheit informieren.
-  const { data: u } = await supabase.from('training_units').select('owner_id, dog_id, session_date').eq('id', unitId).single();
-  if (u?.owner_id) notifyTrainersOfActivity(u.owner_id, '🐾 Neues Training').catch(() => {});
-  embedUnitContent(unitId, u?.dog_id ?? null, updates.notes, exercises, u?.session_date);
-  return { error: null };
+  return saveDocumentedUnitAtomic(ownerId, unitId, updates, exercises, 'finish', { current, expectedFingerprint, operationId });
 }
 
-// Nachträgliche Dokumentation: legt direkt eine ABGESCHLOSSENE Einheit an
-// (mit Medien + Score + Zeiten) und persistiert die Übungen.
-export async function createDocumentedUnit(
-  ownerId:   string,
-  unit:      DocumentedUnitInput,
-  exercises: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[],
-  unitId?:   string,
+export function createDocumentedUnit(
+  ownerId: string, unit: DocumentedUnitInput, exercises: ExerciseInput[],
+  unitId = Crypto.randomUUID(), current?: () => boolean,
 ) {
-  // Stabile ID: vom Aufrufer (idempotent über Retries) ODER hier erzeugt.
-  const id = unitId ?? Crypto.randomUUID();
-  const block = await guardNewTrainingQuota(id);
-  if (block) return { error: block, data: null };
-
-  const { data, error } = await supabase
-    .from('training_units')
-    .upsert({ ...unit, id, owner_id: ownerId, status: 'completed' }, { onConflict: 'id' })
-    .select('*')
-    .single();
-  if (error || !data) return { error, data: null };
-
-  if (exercises.length > 0) {
-    const { error: exErr } = await supabase
-      .from('training_exercises')
-      .insert(exercises.map(e => ({ ...e, unit_id: data.id })));
-    if (exErr) return { error: exErr, data: null };
-  }
-  notifyTrainersOfActivity(ownerId, '🐾 Neue Aktivität').catch(() => {});
-  embedUnitContent(data.id, data.dog_id ?? null, data.notes ?? null, exercises, data.session_date ?? null);
-  return { error: null, data };
+  return saveDocumentedUnitAtomic(ownerId, unitId, unit, exercises, 'create', { current });
 }
 
-// Bearbeiten einer dokumentierten Einheit: Felder aktualisieren + Übungen
-// komplett ersetzen (alte löschen, neue einfügen).
-export async function updateDocumentedUnit(
-  unitId:    string,
-  unit:      DocumentedUnitInput,
-  exercises: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[],
+export function updateDocumentedUnit(
+  unitId: string, unit: DocumentedUnitInput, exercises: ExerciseInput[],
+  current: () => boolean, ownerId: string, expectedFingerprint: string,
 ) {
-  const { error } = await supabase.from('training_units').update(unit).eq('id', unitId);
-  if (error) return { error };
-
-  const { error: delErr } = await supabase.from('training_exercises').delete().eq('unit_id', unitId);
-  if (delErr) return { error: delErr };
-
-  if (exercises.length > 0) {
-    const { error: exErr } = await supabase
-      .from('training_exercises')
-      .insert(exercises.map(e => ({ ...e, unit_id: unitId })));
-    if (exErr) return { error: exErr };
-  }
-  return { error: null };
+  return saveDocumentedUnitAtomic(ownerId, unitId, unit, exercises, 'edit', { current, expectedFingerprint });
 }
 
 export async function deleteTrainingUnit(id: string) {

@@ -23,6 +23,9 @@ export interface CanonicalDistance {
   /** Nächste (mit dem bisherigen EMA 0,4 geglättete) Position. Liefert die Gesamtdistanz. */
   push(ema: LatLng): number;
   readonly total: number;
+  /** Start a new observed section while retaining measured distance. */
+  interrupt(): void;
+  restore(measuredMeters: number): void;
   reset(): void;
 }
 
@@ -38,6 +41,8 @@ export function createCanonicalDistance(gateM: number = CANONICAL_GATE_M): Canon
       return total;
     },
     get total() { return total; },
+    interrupt() { last = null; },
+    restore(measuredMeters) { last = null; total = Number.isFinite(measuredMeters) ? Math.max(0, measuredMeters) : 0; },
     reset() { last = null; total = 0; },
   };
 }

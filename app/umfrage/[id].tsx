@@ -43,6 +43,7 @@ export default function UmfrageAntwortenScreen() {
     setAntworten(mine);
     setLoading(false);
   };
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { load(); }, [id]);
 
   const counts = (terminId: string) => {

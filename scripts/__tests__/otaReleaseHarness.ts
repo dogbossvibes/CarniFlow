@@ -47,6 +47,10 @@ export interface FakeState {
   publishExtraPlatform?: string;       // simulierte fremde Plattform in der neuen Group
   listCalls?: number;
   ignoreListFilters?: boolean;         // update:list ignoriert --platform/--runtime-version (Fail-safe-Test)
+  fingerprintHash?: string;
+  fingerprintFail?: boolean;
+  fingerprintRace?: boolean;
+  fingerprintCalls?: number;
   builds?: Record<string, unknown>;    // build:view <id> --json → Eintrag; fehlt → Fehler (Build unbekannt)
 }
 
@@ -84,6 +88,11 @@ else if (a[0] === 'channel:view') {
   const b = (load().builds || {})[a[1]];
   if (!b) { process.stderr.write('Build not found'); process.exit(1); }
   out(b);
+} else if (a[0] === 'fingerprint:generate') {
+  const s = load();
+  s.fingerprintCalls = (s.fingerprintCalls || 0) + 1; save(s);
+  if (s.fingerprintFail) process.exit(1);
+  out({hash: s.fingerprintRace && s.fingerprintCalls > 1 ? 'f'.repeat(40) : s.fingerprintHash});
 } else if (a[0] === 'update:view') {
   const s = load();
   const g = s.groups.find(x => x.group === a[1]);
@@ -157,7 +166,9 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
     // Plattform-Overrides nur über explizites appJson in den Test aufnehmen.
     if (opts.appVersion) app.expo.version = opts.appVersion;
     delete app.expo.ios?.runtimeVersion;
+    delete app.expo.ios?.version;
     delete app.expo.android?.runtimeVersion;
+    delete app.expo.android?.version;
     writeFileSync(join(repo, 'app.json'), JSON.stringify(app, null, 2));
   }
   const releaseRuntime = opts.appVersion ?? RELEASE_RUNTIME;

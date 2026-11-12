@@ -1,10 +1,15 @@
 // Kunden-Diagnose teilen (I/O): Capture bevorzugt, sonst aus SQLite, sonst aus dem
 // geladenen Detail; nichts → verständlich „none"/„missing"; Share-Abbruch/-Fehler sauber.
 import {
-  customerDiagnosticsAvailability, shareCustomerDiagnostics,
+  customerDiagnosticsAvailability, customerDiagnosticsOverview, shareCustomerDiagnostics,
 } from '@/features/tracking/services/supportDiagnosticsService';
 import { buildSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import { setDiagnosticsSession } from '@/lib/diagnosticsAccessState';
+import { observedRecordingProvenance } from '@/features/tracking/utils/diagnosticProvenance';
+import { captureDiagnosticEnvironment, recordSupportProvenance } from '@/features/tracking/utils/supportProvenanceStore';
 import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
+
+jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ getFirstAsync: async (_sql: string, id: string, _remote: string, owner: string) => ({ local_id: id, user_id: owner, deleted_at: null }) }) }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -54,6 +59,7 @@ const capture = toSupportCapture(buildSearchDiagnostics({
 const sharedPayload = () => JSON.parse(mockShareFile.mock.calls[0][0]);
 
 beforeEach(() => {
+  setDiagnosticsSession('fixture-owner');
   [mockHas, mockLoad, mockLay, mockMarkers, mockSession, mockShareFile].forEach(m => m.mockReset());
   mockHas.mockResolvedValue(false);
   mockLoad.mockResolvedValue(null);
@@ -66,6 +72,24 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('Kunden-Diagnose teilen', () => {
+  it('sperrt parallele Teilen-Aufrufe vor dem ersten await und gibt die Sperre danach frei', async () => {
+    let done!: () => void;
+    mockShareFile.mockImplementationOnce(() => new Promise<void>(resolve => { done = resolve; }));
+    const first = shareCustomerDiagnostics('sess-1', { points: sqlLay(3) });
+    expect(await shareCustomerDiagnostics('sess-1', { points: sqlLay(3) })).toEqual({ ok: false, reason: 'busy' });
+    for (let i = 0; i < 50 && !done; i++) await Promise.resolve();
+    expect(mockShareFile).toHaveBeenCalledTimes(1);
+    done();
+    expect(await first).toMatchObject({ ok: true });
+    expect(await shareCustomerDiagnostics('sess-1', { points: sqlLay(3) })).toMatchObject({ ok: true });
+  });
+
+  it('meldet Teilaufnahme und ausgedünnte Suchdaten ohne Werte zu erfinden', async () => {
+    mockLoad.mockResolvedValue({ ...capture, partial: true, truncated: { raw: true, cursor: false } });
+    mockLay.mockResolvedValue(sqlLay(4));
+    expect(await customerDiagnosticsOverview('sess-1')).toMatchObject({ availability: 'capture', partial: true, reduced: true,
+      recording: { lay: { availability: 'unknown' }, search: { availability: 'unknown' } } });
+  });
   it('Capture vorhanden → Capture wird geteilt (bestehender Pfad)', async () => {
     mockHas.mockResolvedValue(true);
     mockLoad.mockResolvedValue(capture);
@@ -129,4 +153,52 @@ describe('Kunden-Diagnose teilen', () => {
     expect(await customerDiagnosticsAvailability('sess-1', null)).toBe('none');
     expect(await shareCustomerDiagnostics('sess-1', null)).toEqual({ ok: false, reason: 'missing' });
   });
+});
+
+
+it('never attributes an older capture to a newer search attempt or the exporting installation', async () => {
+  await recordSupportProvenance('sess-1', 'search', false, 'newer-attempt');
+  mockLoad.mockResolvedValue(capture); // legacy capture has no recording-time context
+  mockLay.mockResolvedValue(sqlLay(4));
+  expect(await shareCustomerDiagnostics('sess-1', null)).toMatchObject({ ok: true });
+  expect(sharedPayload().provenance.recording.search.availability).toBe('unknown');
+});
+
+it('projects capture-time context into the narrow support block without a second UUID-bearing subtree', async () => {
+  const context = observedRecordingProvenance(captureDiagnosticEnvironment(), false);
+  mockLoad.mockResolvedValue({ ...capture, recordingContext: context });
+  mockLay.mockResolvedValue(sqlLay(4));
+  expect(await shareCustomerDiagnostics('sess-1', null)).toMatchObject({ ok: true });
+  expect(sharedPayload().provenance.recording.search).toEqual(context);
+  expect(sharedPayload().searchDiagnostics.recordingContext).toBeUndefined();
+});
+
+it('uses the persisted run identity only for local metadata lookup and never exports it', async () => {
+  await recordSupportProvenance('sess-1', 'search', false, 'exact-synthetic-run');
+  mockSession.mockResolvedValue(localRow({ run: { run_id: 'exact-synthetic-run', run_points: [] } }));
+  mockLay.mockResolvedValue(sqlLay(4));
+  expect(await shareCustomerDiagnostics('sess-1', null)).toMatchObject({ ok: true, source: 'persisted' });
+  expect(sharedPayload().provenance.recording.search.availability).toBe('available');
+  expect(mockShareFile.mock.calls[0][0]).not.toContain('exact-synthetic-run');
+});
+
+it('does not open a share sheet if the account changed while preparing an export', async () => {
+  mockLoad.mockImplementationOnce(async () => {
+    setDiagnosticsSession('another-owner');
+    return capture;
+  });
+  mockLay.mockResolvedValue(sqlLay(4));
+  expect(await shareCustomerDiagnostics('sess-1', { points: sqlLay(3) })).toEqual({ ok: false, reason: 'failed' });
+  expect(mockShareFile).not.toHaveBeenCalled();
+});
+
+it('passes an account fence through the existing file-write and native-share boundary', async () => {
+  let opened = false;
+  mockShareFile.mockImplementationOnce(async (_json: string, _file: string, _title: string, validate: () => void) => {
+    setDiagnosticsSession('another-owner');
+    validate();
+    opened = true;
+  });
+  expect(await shareCustomerDiagnostics('sess-1', { points: sqlLay(3) })).toEqual({ ok: false, reason: 'failed' });
+  expect(opened).toBe(false);
 });

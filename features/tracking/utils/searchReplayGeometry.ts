@@ -1,3 +1,4 @@
+import { splitContinuousPoints } from './trackContinuity';
 // ──────────────────────────────────────────────────────────────────────────
 // Search-Replay-/Display-Geometrie (turn-aware) — getrennt von den Metriken.
 //
@@ -19,7 +20,7 @@
 // Reine Funktionen, kein React/Native.
 // ──────────────────────────────────────────────────────────────────────────
 
-export interface ReplayGeoPoint { lat: number; lng: number; t: number }
+export interface ReplayGeoPoint { lat: number; lng: number; t: number; breakBefore?: boolean }
 
 export const REPLAY_GEOMETRY = {
   /** Glättung (EMA) des Display-Stroms: leicht, damit Ecken nicht abgerundet werden (Metrik-Glättung ist 0,4). */
@@ -109,6 +110,23 @@ function angleDiffDeg(a: number, b: number): number {
 export function buildReplayGeometryDetailed(dense: readonly ReplayGeoPoint[]): ReplayGeometryDetail | null {
   const n = dense.length;
   if (n < 2 || n > REPLAY_GEOMETRY.maxDensePoints) return null;
+  if (dense.some(p => p.breakBefore)) {
+    const points: ReplayGeoPoint[] = [];
+    const insertedForGap: ReplayGapInsertion[] = [];
+    const unfillableGaps: ReplayUnfillableGap[] = [];
+    let offset = 0;
+    for (const part of splitContinuousPoints(dense)) {
+      const clean = part.map(({ breakBefore: _boundary, ...p }) => p);
+      const detail = buildReplayGeometryDetailed(clean);
+      const result = detail?.points ?? clean;
+      result.forEach((p, index) => points.push({ ...p, ...(points.length > 0 && index === 0 ? { breakBefore: true } : {}) }));
+      insertedForGap.push(...(detail?.insertedForGap ?? []).map(g => ({ ...g, sourceIndex: g.sourceIndex + offset })));
+      unfillableGaps.push(...(detail?.unfillableGaps ?? []).map(g => ({ ...g,
+        startSourceIndex: g.startSourceIndex + offset, endSourceIndex: g.endSourceIndex + offset })));
+      offset += part.length;
+    }
+    return { points, insertedForGap, unfillableGaps };
+  }
   const { x, y, cum } = toXY(dense);
 
   const keep = douglasPeucker(x, y, REPLAY_GEOMETRY.epsilonM);
@@ -186,11 +204,11 @@ export function buildReplayGeometry(dense: readonly ReplayGeoPoint[]): ReplayGeo
 
 /** Bequem für den Recorder: getrennte Arrays wie `run_points` + `pointsTimeSec`. */
 export function replayGeometryArrays(dense: readonly ReplayGeoPoint[]):
-  { points: { latitude: number; longitude: number }[]; timeSec: number[];
+  { points: { latitude: number; longitude: number; breakBefore?: boolean }[]; timeSec: number[];
     insertedForGap: ReplayGapInsertion[]; unfillableGaps: ReplayUnfillableGap[] } | null {
   const detail = buildReplayGeometryDetailed(dense);
   if (!detail) return null;
-  return { points: detail.points.map(p => ({ latitude: p.lat, longitude: p.lng })),
+  return { points: detail.points.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
     timeSec: detail.points.map(p => p.t), insertedForGap: detail.insertedForGap,
     unfillableGaps: detail.unfillableGaps };
 }
