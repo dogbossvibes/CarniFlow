@@ -18,6 +18,7 @@ export default function Index() {
   // Timer (manuell — keine automatische Reload-Schleife).
   useEffect(() => {
     if (!loading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     setTimedOut(false);
     const t = setTimeout(() => setTimedOut(true), 10000);
     return () => clearTimeout(t);

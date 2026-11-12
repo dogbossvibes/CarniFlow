@@ -107,9 +107,11 @@ function DogHeatDetailContent({ resolvedDog }: { resolvedDog: import('@/types').
     if (current === loadGeneration.current) setLoading(false);
   }, [heatCycleId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { void load(); return () => { loadGeneration.current++; }; }, [load]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!cycle?.dogId) { setIsOwner(false); return; }
     let cancelled = false;
     getDogById(cycle.dogId).then(({ data }) => { if (!cancelled) setIsOwner(!!data && data.owner_id === user?.id); });

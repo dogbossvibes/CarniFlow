@@ -51,6 +51,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
   const localRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability, react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (status.didJustFinish) { setPlayingId(null); cleanupLocal(); }
   }, [status.didJustFinish]);
 

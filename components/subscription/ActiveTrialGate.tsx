@@ -19,6 +19,7 @@ export function ActiveTrialGate() {
     if (trial.loading || shownOnceRef.current) return;
     if (trial.shouldShowProactively) {
       shownOnceRef.current = true;   // pro Mount nur einmal öffnen
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setVisible(true);
       void trial.markShown();        // serverseitig „gezeigt" + Funnel-Event + Cooldown
     }

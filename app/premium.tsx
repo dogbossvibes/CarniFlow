@@ -103,6 +103,7 @@ export default function PremiumScreen() {
 
   const invalidateLoad = useCallback(() => { loadGeneration.current++; }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     void loadIap().catch(() => {});
     return invalidateLoad;
   }, [loadIap, invalidateLoad]);
@@ -118,7 +119,9 @@ export default function PremiumScreen() {
   // Trial — auch nicht für Alt-Konten mit einem noch gespeicherten status='trialing'
   // aus der Zeit, als NEWBIE fälschlich als 7-Tage-Trial aktiviert wurde.
   const trialEnd = trialEndsAt ? new Date(trialEndsAt) : null;
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const trialing = subStatus === 'trialing' && currentPlan !== 'newbie' && (!trialEnd || trialEnd.getTime() > Date.now());
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : null;
   const trialEndLabel = trialEnd
     ? `${String(trialEnd.getDate()).padStart(2, '0')}.${String(trialEnd.getMonth() + 1).padStart(2, '0')}.${trialEnd.getFullYear()}`

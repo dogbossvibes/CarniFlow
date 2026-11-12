@@ -76,6 +76,7 @@ export default function TrackLiegenScreen() {
   const [identity, setIdentity] = useState<RestingIdentity | null>(() =>
     id ? null : resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: undefined }));
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!id) { setIdentity(resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: undefined })); return; }
     let alive = true;
     setIdentity(null);

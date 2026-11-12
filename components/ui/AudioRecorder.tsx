@@ -46,6 +46,7 @@ export function AudioRecorder({ value, onChange }: Props) {
   // Detect playback completion → clean up temp file
   useEffect(() => {
     if (playerStatus.didJustFinish) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setPlayingIdx(null);
       if (localUriRef.current) {
         FileSystem.deleteAsync(localUriRef.current, { idempotent: true });
@@ -145,6 +146,7 @@ export function AudioRecorder({ value, onChange }: Props) {
 
       // Download locally first — Supabase CDN doesn't support Range requests (AVFoundationErrorDomain -11850)
       const remoteUrl = await signMediaUrl(value[idx].url);
+      // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       const localUri  = FileSystem.cacheDirectory + `audio_${idx}_${Date.now()}.mp4`;
       const result    = await FileSystem.downloadAsync(remoteUrl, localUri);
 

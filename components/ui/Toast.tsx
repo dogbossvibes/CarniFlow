@@ -7,6 +7,7 @@ import { useFabBottom } from '@/hooks/useFabBottom';
 // Host nötig: `useToast()` liefert ein Element zum Einhängen + eine show-Funktion.
 export function useToast() {
   const [message, setMessage] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const opacity = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Schwebt über Tab-Leiste bzw. System-Navigation (kein fester Wert mehr).

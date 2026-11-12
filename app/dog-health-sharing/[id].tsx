@@ -99,6 +99,7 @@ export default function DogHealthSharingRoute() {
   useEffect(() => {
     if (!personSearchOpen) return;
     const q = personQuery.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!q) { setPersonResults([]); setPersonSearching(false); return; }
     setPersonSearching(true);
     let cancelled = false;

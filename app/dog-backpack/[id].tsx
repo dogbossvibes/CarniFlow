@@ -64,6 +64,7 @@ export default function DogBackpackScreen() {
   const openEdit = (it: DogBackpackItem) => { setEditId(it.id); setDraftLabel(it.label); setDraftCat(it.category); setLabelError(false); setEditorOpen(true); };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (openAddParam === '1' && userId && dogId) openAdd();
   }, [dogId, openAddParam, userId]);
 

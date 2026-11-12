@@ -111,6 +111,7 @@ export default function ProfilScreen() {
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
 
   const [aktiveSparten, setAktiveSparten] = useState<string[]>(DEFAULT_SPARTEN);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setAktiveSparten(profile?.aktive_sparten ?? DEFAULT_SPARTEN); }, [profile?.aktive_sparten]);
 
   const toggleSparte = async (id: string) => {
@@ -178,6 +179,7 @@ export default function ProfilScreen() {
   }, [user?.id]);
 
   const trialEnd = trialSub?.trialEndsAt ? new Date(trialSub.trialEndsAt) : null;
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const isActiveTrial = trialSub?.status === 'trialing' && (!trialEnd || trialEnd.getTime() > Date.now());
   const trialEndLabel = trialEnd ? trialEnd.toLocaleDateString('de-CH') : null;
   const trialCancelled = trialSub?.cancelAtPeriodEnd === true;

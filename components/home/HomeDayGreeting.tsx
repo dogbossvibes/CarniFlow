@@ -108,6 +108,7 @@ export function HomeDayGreeting({ ownerId, name, username, ready }: {
     </View>
     {handle ? <Text style={s.username}>@{handle}</Text> : null}
     <View style={s.dots} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
       {dots.map((dot, index) => <Animated.View testID={`greeting-dot-${index}`} key={index} style={[s.dot, { transform: [{ translateY: dot }] }]} />)}
     </View>
   </View>;

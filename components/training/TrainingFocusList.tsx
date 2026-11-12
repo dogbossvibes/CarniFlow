@@ -13,10 +13,12 @@ export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, on
   const { t } = useT();
   const alive = useRef(true);
   const identity = useRef({ owner: ownerId, generation: 0 });
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   if (identity.current.owner !== ownerId) identity.current = { owner: ownerId, generation: identity.current.generation + 1 };
   const generation = identity.current.generation;
   const isCurrent = () => alive.current && identity.current.owner === ownerId && identity.current.generation === generation;
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     alive.current = true; setBusy(false); setError(false); setExpanded(false);
     return () => { alive.current = false; };
   }, [ownerId]);

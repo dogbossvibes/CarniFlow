@@ -97,6 +97,7 @@ function DogHeatCalendarScreenContent({ resolvedDog }: { resolvedDog: import('@/
   }, [dogId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!dogId) { setIsOwner(false); return; }
     let cancelled = false;
     getDogById(dogId).then(({ data }) => { if (!cancelled) setIsOwner(!!data && data.owner_id === user?.id); });

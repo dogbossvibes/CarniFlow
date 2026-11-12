@@ -37,6 +37,7 @@ function SharedDogDetail({ id }: { id: string }) {
   const [activity, setActivity] = useState<{ key: string; area: Area; reading: boolean; error: boolean } | null>(null);
   const run = useRef(0);
   const alive = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const currentKey = useRef(accessKey); currentKey.current = accessKey;
   useLayoutEffect(() => {
     alive.current = true;
@@ -44,6 +45,7 @@ function SharedDogDetail({ id }: { id: string }) {
   }, []);
   const dogSignature = dog ? sharedDogSignature(dog) : '';
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     ++run.current; setHealth(null); setActivity(null);
   }, [accessKey, dogSignature]);
   const actionCurrent = (request: number, key: string) => alive.current && request === run.current && currentKey.current === key && isCurrent(key);
@@ -95,6 +97,7 @@ function SharedDogDetail({ id }: { id: string }) {
   };
   // A narrowed grant hides the old snapshot in this render, before any passive cleanup.
   const visible = dog && health?.key === accessKey && health.signature === dogSignature && isCurrent(accessKey) ? health : null;
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const visibleData = useMemo(() => visible && dog ? scopeSharedHealth(visible.data, dog.permissions) : null, [visible, dog]);
   const timeline = useMemo(() => visibleData ? buildHealthTimeline(visibleData, [], (key, _fallback, params) => t(key, params), sharedRecordDate) : [], [visibleData, t]);
   const rows = timeline.filter(item => visible?.area === 'documents' ? item.kind === 'document' : item.kind !== 'document');

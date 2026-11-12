@@ -21,11 +21,13 @@ export function HealthRouteGate({ dogId, children }: { dogId: string; children: 
 
 function ScopedHealthRouteGate({ dogId, account, children }: { dogId: string; account: string; children: ReactNode }) {
   const router = useRouter();
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const routerRef = useRef(router); routerRef.current = router;
   const { t } = useT();
   const [mode, setMode] = useState<Mode>('checking');
   const [everOwner, setEverOwner] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const attemptRef = useRef(attempt); attemptRef.current = attempt;
   const generation = useRef(0);
   const live = useRef({ mounted: false, focused: false, online: false, active: AppState.currentState === 'active', account });
@@ -76,12 +78,15 @@ function ScopedHealthRouteGate({ dogId, account, children }: { dogId: string; ac
     });
     return () => { lifecycle.focused = false; invalidate('checking'); app.remove(); network(); subscription.unsubscribe(); };
   }, [account, dogId, attempt]));
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const showOwner = mode === 'owner' && live.current.account === account && live.current.focused && live.current.online && live.current.active;
   return <View style={{ flex: 1, backgroundColor: C.bg }}>
     {/* Hide but preserve same-account/same-dog drafts during transient checks. */}
+    {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
     <View style={[{ flex: 1 }, !showOwner && { display: 'none' }]} pointerEvents={showOwner ? 'auto' : 'none'} accessibilityElementsHidden={!showOwner} importantForAccessibility={showOwner ? 'auto' : 'no-hide-descendants'}>
       {everOwner ? children : null}
     </View>
+    {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
     {!showOwner ? <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 16 }}>
       {mode === 'checking' ? <ActivityIndicator color={C.accent} /> : <>
         <Text accessibilityRole="alert" style={{ color: C.white }}>{t(mode === 'denied' ? 'sharing.accessUnavailable' : 'sharing.loadFailed')}</Text>

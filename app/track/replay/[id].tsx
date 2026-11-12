@@ -54,6 +54,7 @@ export default function TrackReplayScreen() {
   useEffect(() => {
     if (!id) return;
     let alive = true; const token = generation.current, userId = session?.user.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     setData(null); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
@@ -80,6 +81,7 @@ export default function TrackReplayScreen() {
 
   const replayData = useMemo(() => extractTrackReplayData(data), [data]);
   const [paceHistory,setPaceHistory]=useState<unknown[]>([]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(()=>{let active=true;setPaceHistory([]);
     if(data?.dog_id)void (async()=>{
       try {const {data:{session}}=await supabase.auth.getSession();
@@ -268,6 +270,7 @@ export default function TrackReplayScreen() {
         <View
           style={s.progressBar}
           onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width; }}
+          // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
           {...panResponder.panHandlers}
         >
           <View style={s.progressTrack}>

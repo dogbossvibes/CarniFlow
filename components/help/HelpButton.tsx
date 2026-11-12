@@ -41,6 +41,7 @@ export function HelpButton({
     if (!autoShow || !hydrated || autoDoneRef.current) return;
     if (!seen.includes(topicId)) {
       autoDoneRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setDetails(false);
       setOpen(true);
     }

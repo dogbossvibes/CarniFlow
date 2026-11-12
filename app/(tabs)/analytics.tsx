@@ -93,6 +93,7 @@ export default function AnalyticsScreen() {
   // LLM-Analyse (lokal) überschreibt die live berechnete Coach-Auswertung.
   const coach = aiOverride ?? latestAnalysis;
   // Override zurücksetzen, wenn der Hund gewechselt wird.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setAiOverride(null); }, [selectedDog?.id]);
 
   const activeTrend = period === 7 ? trend7 : trend30;
