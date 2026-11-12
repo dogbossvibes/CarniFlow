@@ -1,5 +1,27 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach drei OTAs – 2026-11-12
+
+Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus
+EAS nachkontrolliert. Ersetzt für iOS 60 die Angaben in den Abschnitten darunter.
+- **Aktiv:** Source `96e7f661`, Group `4c1e1629-e0b3-45ce-9856-285316f27b22`. Release-Karte
+  Issue #81: T-207 richtiger Schenkel und Fährtenende (PR #78). Gerätetest offen.
+- Darunter, am selben Tag: Karte #79 (Source `e253a552`, Group `d4f86f24-29d4-4d40-a996-064f9c29ae52`):
+  T-203, T-204, T-205 (Testcode), T-206 (PR #69, #71, #73, #75), Gerätetest bestanden.
+  Karte #77 (Source `a67cef9b`, Group `8e0044b6-49a4-4b8e-99c3-1c41b2998a3b`): T-184
+  Speicher-Hinweis und «Allgemeines Training», Gerätetest bestanden.
+- **Release-Quellen auf GitHub:** `release/ios60-production-a67cef9b-20261112`,
+  `release/ios60-production-e253a552-20261112`, `release/ios60-production-96e7f661-20261112`
+  (enthalten auch `2f7a1e7f`, `51d7d706`, `b6ef690f`, `b676b403`).
+- **Jede weitere iOS-60-OTA muss `96e7f661` enthalten.** `release/ios60-greeting-sound-20261109`
+  und `feat/training-doku-neu-etappe1` (auf GitHub zusätzlich mit PR #63 Kontaktanfragen, nicht
+  live) enthalten den Live-Stand nicht.
+- **iOS 57** unverändert (Karte #58, Source `91a17f97`). PR #68 (Lernstufen-Anzeige) ist in
+  `release/ios57-greeting-sound-20261109` gemergt, aber nicht veröffentlicht.
+- Android unverändert. Keine DB-, Native- oder Store-Änderung.
+Publish jeweils nach Einzelfreigabe der Nutzerin durch den MASTER über den Production-Wrapper.
+Karten #44, #49, #51, #58, #59, #61, #77, #79 auf „Veröffentlicht“.
+
 ## Abendstand: iOS 60 Fährten-Paket, iOS 57 Trainingskarten – 2026-11-11
 
 Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt für iOS 57 und iOS 60
