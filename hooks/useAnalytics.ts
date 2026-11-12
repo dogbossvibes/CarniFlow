@@ -17,6 +17,7 @@ const EMPTY_STATE: AnalyticsState = {
   latestAnalysis:  null,
   trend7:          EMPTY_TREND,
   trend30:         EMPTY_TREND,
+  trend90:         EMPTY_TREND,
   trendPoints:     [],
   recommendations: [],
   loading:         true,
@@ -90,6 +91,7 @@ export function useAnalytics(dogId: string | null) {
 
     const trend7  = computeTrend(trendPoints, 7);
     const trend30 = computeTrend(trendPoints, 30);
+    const trend90 = computeTrend(trendPoints, 90);
 
     // Regelbasierte Coach-Auswertung live aus der jüngsten Einheit
     let latestAnalysis: TrainingAnalysis | null = null;
@@ -125,6 +127,7 @@ export function useAnalytics(dogId: string | null) {
       latestAnalysis,
       trend7,
       trend30,
+      trend90,
       trendPoints: trendPoints.slice(-30),
       recommendations,
       loading: false,
