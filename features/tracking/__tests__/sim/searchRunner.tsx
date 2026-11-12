@@ -54,6 +54,8 @@ export interface SearchRunInput {
    * in dieser Zeit aus (Annahme).
    */
   backgroundWindows?: readonly { fromMs: number; toMs: number }[];
+  /** Android ignoriert die Hintergrund-Option der Absuche (kein Vordergrund-Dienst) → im Hintergrund keine Positionen. */
+  platform?: 'ios' | 'android';
 }
 
 /** Zustand nach jeder GPS-Messung (für Pfote, Fortschritt und «falscher Schenkel»). */
@@ -103,6 +105,7 @@ interface HarnessCallbacks {
 interface HarnessProps {
   laidPoints: { latitude: number; longitude: number }[]; laidObjects: SearchObject[]; angleArcM: number[];
   handlerDistanceM: SearchHandlerDistanceM;
+  endPointAccuracyM: number | null;
   guidanceAngles: GuidanceAngle[]; guidanceObjects: GuidanceObject[];
   seed: SearchRunState | null;
   cb: { current: HarnessCallbacks };
@@ -153,7 +156,7 @@ function Harness(p: HarnessProps) {
   useTrackEndGuidance({
     recording: searchGuidanceActive, paused: s.paused, continuityEpoch: s.continuityEpoch, sessionId: null, runId: 'sim-run',
     dogProgressM: s.dogProgressM, handlerProgressM: s.progressM, handlerPosition: s.position, endHandlerFix: s.endHandlerFix,
-    lastSegmentReached, trackLengthM: s.trackLengthM, estimatedDogPosition: s.estimatedDogPosition, endPoint,
+    lastSegmentReached, trackLengthM: s.trackLengthM, estimatedDogPosition: s.estimatedDogPosition, endPoint, endPointAccuracyM: p.endPointAccuracyM,
     openMandatoryObjects: Math.max(0, s.totalObjects - s.foundObjects), activeObjectWait: s.activeObjectWait,
     finalObjectPendingNearEnd, voiceOn: true, initialFired: seed?.endFired ?? false, onFired: onEndFired,
   });
@@ -227,7 +230,7 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
   const mount = (seed: SearchRunState | null) => {
     act(() => {
       renderer = TestRenderer.create(<Harness laidPoints={laidPoints} laidObjects={laidObjects} angleArcM={angleArcM}
-        handlerDistanceM={input.handlerDistanceM} guidanceAngles={guidanceAngles} guidanceObjects={guidanceObjects} seed={seed} cb={cb} />);
+        handlerDistanceM={input.handlerDistanceM} endPointAccuracyM={laidAccuracies[laidAccuracies.length - 1] ?? null} guidanceAngles={guidanceAngles} guidanceObjects={guidanceObjects} seed={seed} cb={cb} />);
     });
   };
 
@@ -321,7 +324,8 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
       }
       if (killed) continue;
       const inBackground = (input.backgroundWindows ?? []).some(w => ev.at >= w.fromMs && ev.at < w.toMs);
-      if (inBackground && (ev.motion || !searchBridge.backgroundAllowed)) continue;
+      const backgroundGps = searchBridge.backgroundAllowed && input.platform !== 'android';
+      if (inBackground && (ev.motion || !backgroundGps)) continue;
       if (ev.motion) {
         const m = ev.motion;
         const sample: BridgeMotion = { timestamp: m.t, movementState: m.movementState, stepDelta: m.stepDelta,

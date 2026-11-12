@@ -46,6 +46,8 @@ export function useTrackEndGuidance(input: {
   trackLengthM: number;
   estimatedDogPosition: LL | null;
   endPoint: LL | null;
+  /** T-207: GPS-Genauigkeit des gelegten Endpunkts (m) — weitet den Ende-Radius um die Lege-Unsicherheit. */
+  endPointAccuracyM?: number | null;
   openMandatoryObjects: number;
   voiceOn: boolean;
   // Recovery (Search-Recovery-State): Ende in DIESEM Run bereits angesagt →
@@ -113,6 +115,7 @@ export function useTrackEndGuidance(input: {
         tMs: handlerFix.tMs, distanceToEndM: handlerDistanceToEndM, accuracyM: handlerFix.accuracyM,
         lastSegmentReached: input.lastSegmentReached ?? false,
         handlerProgressRatio: input.trackLengthM > 0 ? (input.handlerProgressM ?? 0) / input.trackLengthM : 0,
+        endPointAccuracyM: input.endPointAccuracyM,
       });
     }
     const history = endFixHistoryRef.current;
@@ -122,6 +125,7 @@ export function useTrackEndGuidance(input: {
         handlerProgressM: input.handlerProgressM,
         handlerDistanceToEndM,
         accuracyM: handlerFix?.accuracyM ?? null,
+        endPointAccuracyM: input.endPointAccuracyM,
         lastSegmentReached: input.lastSegmentReached,
         approachSeen: history.approachSeen, stableEndFixCount: history.insideCount,
         stableEndFixSpanMs: history.firstInsideMs == null || handlerFix == null ? 0 : handlerFix.tMs - history.firstInsideMs,
@@ -167,7 +171,7 @@ export function useTrackEndGuidance(input: {
             && now.recording && !now.paused && now.voiceOn && now.dogProgressM != null && trackEndBlocker({
             dogProgressM: now.dogProgressM, handlerProgressM: now.handlerProgressM,
             handlerDistanceToEndM: handlerDistance, geomDistanceM: dogDistance,
-            accuracyM: now.endHandlerFix?.accuracyM ?? null, lastSegmentReached: now.lastSegmentReached,
+            accuracyM: now.endHandlerFix?.accuracyM ?? null, endPointAccuracyM: now.endPointAccuracyM, lastSegmentReached: now.lastSegmentReached,
             approachSeen: currentHistory.approachSeen, stableEndFixCount: currentHistory.insideCount,
             stableEndFixSpanMs: currentHistory.firstInsideMs == null || now.endHandlerFix == null ? 0
               : now.endHandlerFix.tMs - currentHistory.firstInsideMs,
@@ -195,7 +199,7 @@ export function useTrackEndGuidance(input: {
     input.recording, input.paused, input.continuityEpoch, input.sessionId, input.runId, input.dogProgressM, input.trackLengthM,
     input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition, input.endHandlerFix,
     input.lastSegmentReached,
-    input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.openMandatoryObjects, input.voiceOn, graceClock,
+    input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.endPointAccuracyM, input.openMandatoryObjects, input.voiceOn, graceClock,
   ]);
 
   return endState;

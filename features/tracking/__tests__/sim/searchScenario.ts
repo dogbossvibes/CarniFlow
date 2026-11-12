@@ -148,7 +148,7 @@ export async function runSearchScenario(s: SearchScenario): Promise<SearchOutcom
     if (i.kind === 'kill') actions.push({ atMs: from, kind: 'kill' }, { atMs: to, kind: 'restart' });   // Runner verwirft alles dazwischen
   }
   if (s.manualTap) for (const a of truth.articles) if (a.pickupStartTS != null) actions.push({ atMs: t0 + Math.round((a.pickupStartTS + s.manualTap.tapAfterS) * 1000), kind: 'markObject' });
-  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0, backgroundWindows });
+  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0, backgroundWindows, platform: s.platform });
   return { scenario: s, lay, truth, search, score: scoreSearch(lay, truth, search, !!s.manualTap) };
 }
 
