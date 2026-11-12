@@ -18,9 +18,19 @@ export interface StreamSample extends GpsSample, LocationFixQuality {
 //   2) sonst die native Precision-Engine (anyvo-precision-location), die intern
 //      auf expo-location zurückfällt, falls das native Modul nicht im Build ist.
 // Gibt eine Aufräum-Funktion zurück. Die Hooks müssen die Quelle nicht kennen.
+export interface PositionStreamExtras {
+  /**
+   * iOS: Positionen auch bei gesperrtem Bildschirm / App im Hintergrund weiter liefern
+   * (allowsBackgroundLocationUpdates + blaue Statusanzeige). Nur das native Modul; der
+   * expo-location-Fallback bleibt Vordergrund. Android ignoriert die Option.
+   */
+  allowBackground?: boolean;
+}
+
 export async function startPositionStream(
   onSample: (s: StreamSample) => void,
   opts: Location.LocationOptions,
+  extras: PositionStreamExtras = {},
 ): Promise<() => void> {
   if (isExternalMode()) {
     resetRecorder();
@@ -59,7 +69,7 @@ export async function startPositionStream(
       intervalMs: opts.timeInterval ?? 1000,
       mode: 'tracking_dog_sport',   // BestForNavigation, kein Auto-Pause
       enableHeading: false,         // Heading läuft separat über watchHeadingAsync
-      allowBackground: false,
+      allowBackground: extras.allowBackground === true,
       enableGnssStatusAndroid: true, // diagnostics only; never enables raw measurements
     });
   } catch (error) {

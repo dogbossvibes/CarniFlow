@@ -21,10 +21,12 @@ export function advanceEndFixHistory(previous: EndFixHistory, fix: {
   accuracyM: number | null;
   lastSegmentReached: boolean;
   handlerProgressRatio: number;
+  /** T-207: Genauigkeit des gelegten Endpunkts, siehe endRadiusM. */
+  endPointAccuracyM?: number | null;
 }): EndFixHistory {
   // Delayed re-delivery must not rebuild a streak that a newer outside fix reset.
   if (previous.lastFixMs != null && fix.tMs <= previous.lastFixMs) return previous;
-  const radius = endRadiusM(fix.accuracyM);
+  const radius = endRadiusM(fix.accuracyM, fix.endPointAccuracyM);
   // Keep the approach observation independently of the final last-segment
   // gate. Real accepted fixes can pass 4–5 m before progress crosses 90%;
   // requiring both on that earlier sample loses a valid monotone approach.
