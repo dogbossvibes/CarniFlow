@@ -2,12 +2,15 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 import { readFileSync } from 'fs';
+import React from 'react';
+import { act, create } from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   __resetActiveDogForTests,
   activeDogKeyForUser,
   resolveActiveDogId,
   setActiveDogId,
+  useStoredActiveDogId,
 } from '@/stores/activeDog';
 
 const dogs = [{ id: 'malu' }, { id: 'yam' }];
@@ -41,10 +44,25 @@ describe('Aktiver Hund — Speicher', () => {
     expect(activeDogKeyForUser(null)).toBe('active_dog:anon');
   });
 
-  it('speichert nur die Hunde-ID', async () => {
-    setActiveDogId('yam');
-    await Promise.resolve();
-    expect(await AsyncStorage.getItem(activeDogKeyForUser(null))).toBe('yam');
+  it('eine Auswahl vor dem Laden des Speichers wird nicht überschrieben', async () => {
+    await AsyncStorage.setItem(activeDogKeyForUser('u1'), 'malu');
+    let seen: string | null = null;
+    const Probe = () => { seen = useStoredActiveDogId('u1'); return null; };
+    await act(async () => {
+      create(React.createElement(Probe));
+      setActiveDogId('yam');            // Tipp, bevor der Speicher geladen ist
+    });
+    await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+    expect(seen).toBe('yam');
+    expect(await AsyncStorage.getItem(activeDogKeyForUser('u1'))).toBe('yam');
+  });
+
+  it('speichert nur die Hunde-ID, pro Nutzer', async () => {
+    const Probe = () => { useStoredActiveDogId('u2'); return null; };
+    await act(async () => { create(React.createElement(Probe)); });
+    await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+    await act(async () => { setActiveDogId('yam'); });
+    expect(await AsyncStorage.getItem(activeDogKeyForUser('u2'))).toBe('yam');
   });
 });
 
