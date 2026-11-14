@@ -3,8 +3,11 @@ import type { CalendarEvent } from '@/types/calendar';
 
 // expo-calendar ist nativ → defensiv laden (Geräte-Kalender-Export braucht
 // einen neuen Build; ohne ihn DEVICE_CALENDAR_AVAILABLE = false).
-let Cal: typeof import('expo-calendar') | null = null;
-try { Cal = require('expo-calendar'); } catch { Cal = null; }
+// Ab expo-calendar 56 (SDK 58, Build 60) sind die …Async-Funktionen im
+// Hauptimport nur noch Platzhalter, die beim Aufruf werfen. Die bisherige API
+// liegt unter `expo-calendar/legacy` (nativ weiterhin als ExpoCalendar im Build).
+let Cal: typeof import('expo-calendar/legacy') | null = null;
+try { Cal = require('expo-calendar/legacy'); } catch { Cal = null; }
 export const DEVICE_CALENDAR_AVAILABLE = Cal != null;
 
 async function writableCalendarId(C: NonNullable<typeof Cal>): Promise<string> {
