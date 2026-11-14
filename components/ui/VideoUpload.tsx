@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { uploadFileToStorage } from '@/services/storageUpload';
 import { C } from '@/constants/colors';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useT } from '@/i18n';
@@ -92,14 +93,7 @@ export function VideoUpload({ value, onChange }: Props) {
       const ext      = uri.split('.').pop()?.toLowerCase() ?? 'mp4';
       const fileName = `${user!.id}/${Date.now()}.${ext}`;
 
-      const formData = new FormData();
-      formData.append('file', { uri, name: fileName, type: `video/${ext}` } as any);
-
-      const { error } = await supabase.storage
-        .from('training-videos')
-        .upload(fileName, formData, { contentType: `video/${ext}`, upsert: true });
-
-      if (error) throw error;
+      await uploadFileToStorage('training-videos', fileName, uri, `video/${ext}`, { upsert: true });
 
       const { data: urlData } = supabase.storage
         .from('training-videos')
