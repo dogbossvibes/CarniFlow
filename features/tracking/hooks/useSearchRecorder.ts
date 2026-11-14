@@ -45,6 +45,7 @@ import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type Refere
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
+import { startSearchKeepalive, stopSearchKeepalive } from '@/features/tracking/native/searchKeepalive';
 import {
   evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand, motionForFix,
   type TimedMotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
@@ -1198,7 +1199,7 @@ export function useSearchRecorder(opts: {
       watchRef.current = { remove: handle.stop };
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
     })().catch(() => { if (mounted) setReady(false); });
-    return () => { mounted = false; watchRef.current?.remove(); };
+    return () => { mounted = false; watchRef.current?.remove(); void stopSearchKeepalive(); };
   }, []);
 
   // ── Core-Motion-Listener (Punkt 3/16: Listener-Registrierung ist billig;
@@ -1394,6 +1395,8 @@ export function useSearchRecorder(opts: {
     setEndHandlerFix(null);
     endSmoothRef.current = null;
     if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
+    // T-209: Android hält die Ortung bei ausgeschaltetem Bildschirm nur mit Vordergrund-Dienst wach (iOS: No-op).
+    void startSearchKeepalive();
     pushSnapshot();
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
 
@@ -1417,6 +1420,7 @@ export function useSearchRecorder(opts: {
     // Core-Motion-Fusion sauber stoppen (Punkt 16 — kein CPU/Akku-Verbrauch
     // ausserhalb einer aktiven Absuche).
     void motionClient.stop();
+    void stopSearchKeepalive();   // T-209
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);
     const qaTel = qaTelRef.current

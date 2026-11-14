@@ -4,6 +4,7 @@ import 'react-native-get-random-values';       // patches crypto.getRandomValues
 import 'react-native-url-polyfill/auto';        // patches URL constructor
 import '@/lib/crypto-polyfill';                 // patches crypto.subtle.digest via expo-crypto
 import '@/features/tracking/native/backgroundLocationTask';  // registriert den Fährten-Hintergrund-Task
+import '@/features/tracking/native/searchKeepalive';         // T-209: Android-Absuche-Wachhalter (iOS: nichts)
 import '../global.css';                         // NativeWind (Tailwind) — Theme/Tokens
 
 import { useEffect } from 'react';
