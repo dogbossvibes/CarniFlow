@@ -362,7 +362,7 @@ export const deCH = {
   'auth.showPassword':             'Passwort anzeigen',
   'auth.hidePassword':             'Passwort verbergen',
   'auth.errorMissingCredentials':  'Bitte E-Mail und Passwort eingeben',
-  'auth.errorPasswordMin6':        'Passwort: mindestens 6 Zeichen',
+  'auth.errorPasswordMin8':        'Passwort: mindestens 8 Zeichen',
   'auth.errorInvalidCredentials':  'E-Mail oder Passwort nicht korrekt — nochmal versuchen?',
   'auth.errorEmailUnconfirmed':    'Fast da! Bitte bestätige zuerst deine E-Mail.',
   'auth.errorAlreadyRegistered':   'Diese E-Mail ist bereits dabei — einfach anmelden!',

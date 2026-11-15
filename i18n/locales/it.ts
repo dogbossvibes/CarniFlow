@@ -344,7 +344,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "auth.showPassword": "Mostra password",
   "auth.hidePassword": "Nascondi password",
   "auth.errorMissingCredentials": "Inserisci e-mail e password.",
-  "auth.errorPasswordMin6": "Password: almeno 6 caratteri",
+  "auth.errorPasswordMin8": "Password: almeno 8 caratteri",
   "auth.errorInvalidCredentials": "E-mail o password non corretti. Riprovare?",
   "auth.errorEmailUnconfirmed": "Ci sei quasi! Conferma prima la tua e-mail.",
   "auth.errorAlreadyRegistered": "Questa e-mail è già registrata; accedi semplicemente.",

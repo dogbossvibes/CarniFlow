@@ -340,7 +340,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'auth.showPassword':             'Passwort aazeige',
   'auth.hidePassword':             'Passwort verstecke',
   'auth.errorMissingCredentials':  'Bitte E-Mail und Passwort iigee',
-  'auth.errorPasswordMin6':        'Passwort: mindestens 6 Zeiche',
+  'auth.errorPasswordMin8':        'Passwort: mindestens 8 Zeiche',
   'auth.errorInvalidCredentials':  'E-Mail oder Passwort stimmt nöd — nomal versueche?',
   'auth.errorEmailUnconfirmed':    'Fascht da! Bitte bestätig zerscht dini E-Mail.',
   'auth.errorAlreadyRegistered':   'Die E-Mail isch scho debii — eifach amälde!',
