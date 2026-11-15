@@ -2,13 +2,13 @@ import { deleteDogWithDependents } from '@/services/dogs';
 import { subscribeDailyWidgetDataChanged } from '../dailyWidgetRefresh';
 
 type DeleteResult = { error: { message: string } | null };
-type DeleteBuilder = { delete: jest.Mock; eq: jest.Mock; then: Promise<DeleteResult>['then'] };
+type DeleteBuilder = { delete: jest.Mock; eq: jest.Mock; select: jest.Mock; then: Promise<DeleteResult>['then'] };
 const mockFailures = new Map<string, { message: string }>();
 const mockRejections = new Map<string, Error>();
 const mockBuilders: DeleteBuilder[] = [];
 const mockFrom = jest.fn((table: string) => {
   const builder: DeleteBuilder = {
-    delete: jest.fn(), eq: jest.fn(),
+    delete: jest.fn(), eq: jest.fn(), select: jest.fn(),
     then: (resolve, reject) => {
       const result: Promise<DeleteResult> = mockRejections.has(table)
         ? Promise.reject(mockRejections.get(table))
@@ -16,10 +16,14 @@ const mockFrom = jest.fn((table: string) => {
       return result.then(resolve, reject);
     },
   };
-  builder.delete.mockReturnValue(builder); builder.eq.mockReturnValue(builder);
+  builder.delete.mockReturnValue(builder); builder.eq.mockReturnValue(builder); builder.select.mockReturnValue(builder);
   mockBuilders.push(builder); return builder;
 });
-jest.mock('@/lib/supabase', () => ({ supabase: { from: (table: string) => mockFrom(table) } }));
+// Ohne angemeldeten Nutzer ermittelt #76 keine Speicherdateien → Tabellenreihenfolge unverändert.
+jest.mock('@/lib/supabase', () => ({ supabase: {
+  from: (table: string) => mockFrom(table),
+  auth: { getUser: async () => ({ data: { user: null } }) },
+} }));
 
 const dogId = 'synthetic-own-widget-test-dog';
 let listener: jest.Mock;
