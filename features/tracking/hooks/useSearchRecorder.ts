@@ -130,6 +130,11 @@ const ADVANCE_DEV_M = 12;        // m — nur bei Abweichung darunter rückt der
 const REACQUIRE_WALK_FACTOR = 1.5; // T-207: Abkürzen am Winkel — Fortschritt entlang der Fährte bis 1,5× der gegangenen Strecke
 const REACQUIRE_SLACK_M = 10;      // m — T-207: Spielraum für GPS-Versatz beim Wiedereinstieg
 const REACQUIRE_CLEAR_M = 4;       // m — T-207: so viel näher muss der vordere Schenkel liegen, um zu wechseln
+const REACQUIRE_CONFIRM_FIXES = 2;  // T-208: so viele aufeinanderfolgende Messungen müssen den Wechsel stützen
+const REACQUIRE_CONFIRM_ARC_M = 8;  // m — T-208: so nah müssen die Wechselziele dieser Messungen beieinander liegen
+const REACQUIRE_JUMP_M = 10;        // m — T-208: weiter darf der Fortschritt je Messung nicht unbestätigt springen
+const REACQUIRE_BACKSLIDE_M = 1;    // m — T-208: so weit darf das Wechselziel zurückwandern (Rauschen); mehr = Drift quer zur Fährte
+const REACQUIRE_MAX_WALK_M = 80;    // m — T-208: Obergrenze der gegangenen Strecke im Sprungbudget
 // Strenge Abweichungs-Skala für die Wertung: volle Punkte bis FULL_DEV_M, 0 ab ZERO_DEV_M.
 const FULL_DEV_M = 1.5;
 const ZERO_DEV_M = 10;
@@ -334,7 +339,12 @@ export function useSearchRecorder(opts: {
   // projectForwardCandidates/pickContinuousProjection). null = kein Vorgänger.
   const prevFootRef = useRef<GeoLL | null>(null);
   // T-207: seit dem letzten Fortschritt gegangene Strecke (m) — begrenzt den Wiedereinstieg auf einen anderen Schenkel.
+  // T-208: Luftlinie statt aufsummierter Wegstücke — GPS-Schwanken im Stand vergrössert das Budget nicht.
   const walkedSinceAdvanceRef = useRef(0);
+  // T-208: Bezugspunkt der Luftlinie (Position beim letzten Fortschritt).
+  const reacquireAnchorRef = useRef<LatLng | null>(null);
+  // T-208: Wechsel-Kandidat, der noch durch eine weitere Messung bestätigt werden muss.
+  const reacquirePendingRef = useRef<{ firstArcM: number; arcM: number; count: number } | null>(null);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
@@ -453,7 +463,7 @@ export function useSearchRecorder(opts: {
     replayBoundaryRef.current = true;
     lastContinuityFixMsRef.current = null;
     smoothRef.current = null; replayEmaRef.current = null; endSmoothRef.current = null;
-    prevFixRef.current = null; prevFootRef.current = null; walkedSinceAdvanceRef.current = 0; recentRejectedRef.current = [];
+    prevFixRef.current = null; prevFootRef.current = null; walkedSinceAdvanceRef.current = 0; reacquireAnchorRef.current = null; reacquirePendingRef.current = null; recentRejectedRef.current = [];
     fusionHistoryRef.current = { prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null };
     autoDwellRef.current.clear(); autoDwellStartRef.current.clear();
     lastReliableCursorMRef.current = null; lastReliableAtSecRef.current = null;
@@ -587,7 +597,7 @@ export function useSearchRecorder(opts: {
       pointsTimeRef.current = [];
       replayDenseRef.current = [];
       replayEmaRef.current = null;
-      prevFootRef.current = null; walkedSinceAdvanceRef.current = 0;
+      prevFootRef.current = null; walkedSinceAdvanceRef.current = 0; reacquireAnchorRef.current = null; reacquirePendingRef.current = null;
       distRef.current = 0;
     }
 
@@ -900,16 +910,60 @@ export function useSearchRecorder(opts: {
       //  • der alte Schenkel zu weit weg ist (> ADVANCE_DEV_M) oder klar ferner (≥ REACQUIRE_CLEAR_M), und
       //  • der Sprung zur Bewegung passt: ≤ 1,5 × gegangene Strecke + 2 × Hundeabstand + Spielraum.
       // GPS-Rauschen zwischen zwei 4 m entfernten Schenkeln erreicht den Abstandsvorsprung selten.
-      if (prevAccepted) walkedSinceAdvanceRef.current += distM(prevAccepted, sm);
+      // T-208 (Review-Restrisiken):
+      //  • Gegangene Strecke = grösste Luftlinie seit dem letzten Fortschritt (höchstens
+      //    REACQUIRE_MAX_WALK_M) — Schwanken im Stand, z. B. am Gegenstand, vergrössert sie kaum.
+      //  • Unter mehreren passenden Kandidaten zählt der entlang der Fährte nächste, nicht der seitlich nächste.
+      //  • Gewechselt wird erst, wenn REACQUIRE_CONFIRM_FIXES Messungen hintereinander dasselbe Ziel stützen
+      //    UND das Ziel dabei nicht zurückwandert. Wer wirklich auf dem neuen Schenkel ist, geht ihn entlang;
+      //    driftet das GPS vom Hinweg zum parallelen Rückweg, wandert das Ziel dort rückwärts — kein Wechsel.
+      if (prevAccepted) {
+        if (!reacquireAnchorRef.current) reacquireAnchorRef.current = { latitude: prevAccepted.latitude, longitude: prevAccepted.longitude };
+        walkedSinceAdvanceRef.current = Math.min(REACQUIRE_MAX_WALK_M,
+          Math.max(walkedSinceAdvanceRef.current, distM(reacquireAnchorRef.current, sm)));
+      }
+      let reacquireTarget: typeof chosen | null = null;
       if (chosen && !widen && prevAccepted) {
+        const current = chosen;
         const reachM = REACQUIRE_WALK_FACTOR * walkedSinceAdvanceRef.current + 2 * handlerDistanceM + REACQUIRE_SLACK_M;
         const pool = reachM > LOOKAHEAD_M ? projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, reachM, BACK_M) : cands;
-        const nearest = pool.reduce<typeof chosen | null>((best, c) => (
-          c.arcM > cursorMRef.current && c.arcM - cursorMRef.current <= reachM && (!best || c.offLineM < best.offLineM) ? c : best), null);
-        if (nearest && nearest.offLineM <= ADVANCE_DEV_M
-          && (chosen.offLineM > ADVANCE_DEV_M || chosen.offLineM - nearest.offLineM >= REACQUIRE_CLEAR_M)) chosen = nearest;
+        reacquireTarget = pool.reduce<typeof chosen | null>((best, c) => (
+          c.arcM > cursorMRef.current && c.arcM - cursorMRef.current <= reachM
+          && c.offLineM <= ADVANCE_DEV_M
+          && (current.offLineM > ADVANCE_DEV_M || current.offLineM - c.offLineM >= REACQUIRE_CLEAR_M)
+          && (!best || c.arcM < best.arcM) ? c : best), null);
       }
-      const proj = chosen
+      // T-208: Auch die normale Kontinuitätswahl kann bei parallelen Schenkeln (≤ 20 m voraus) auf den
+      // Rückweg springen, wenn das GPS einige Sekunden dorthin driftet. Jeder Sprung > REACQUIRE_JUMP_M
+      // braucht deshalb dieselbe Bestätigung; bis dahin bleibt der Fortschritt stehen.
+      const baseJump = !reacquireTarget && chosen && !widen && prevAccepted
+        && chosen.arcM - cursorMRef.current > REACQUIRE_JUMP_M ? chosen : null;
+      if (baseJump) reacquireTarget = baseJump;
+      let holdProgress = false;
+      if (reacquireTarget) {
+        const pending = reacquirePendingRef.current;
+        const same = pending && Math.abs(reacquireTarget.arcM - pending.arcM) <= REACQUIRE_CONFIRM_ARC_M;
+        const next = same && pending
+          ? { firstArcM: pending.firstArcM, arcM: reacquireTarget.arcM, count: pending.count + 1 }
+          : { firstArcM: reacquireTarget.arcM, arcM: reacquireTarget.arcM, count: 1 };
+        if (next.count >= REACQUIRE_CONFIRM_FIXES && reacquireTarget.arcM >= next.firstArcM - REACQUIRE_BACKSLIDE_M) {
+          chosen = reacquireTarget;
+          reacquirePendingRef.current = null;
+        } else {
+          reacquirePendingRef.current = next;
+          if (baseJump) {
+            const local = cands.filter(c => c.arcM - cursorMRef.current <= REACQUIRE_JUMP_M)
+              .reduce<typeof chosen | null>((best, c) => (!best || c.offLineM < best.offLineM ? c : best), null);
+            chosen = local;
+            holdProgress = !local;
+          }
+        }
+      } else {
+        reacquirePendingRef.current = null;
+      }
+      const proj = holdProgress && baseJump
+        ? { devM: baseJump.offLineM, atM: cursorMRef.current }
+        : chosen
         ? { devM: chosen.offLineM, atM: chosen.arcM }
         : projectForward(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M);
       dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
@@ -917,7 +971,7 @@ export function useSearchRecorder(opts: {
         if (beginsSection) unobservedProgressMRef.current += Math.max(0, proj.atM - maxCursorMRef.current);
         cursorMRef.current = proj.atM;
         if (proj.atM > maxCursorMRef.current) maxCursorMRef.current = proj.atM;
-        walkedSinceAdvanceRef.current = 0;
+        walkedSinceAdvanceRef.current = 0; reacquireAnchorRef.current = { latitude: sm.latitude, longitude: sm.longitude };
       }
       prevFootRef.current = chosen ? chosen.point : pointAtDistance(laidPoints, arc.cum, proj.atM);
     } else {
@@ -1257,7 +1311,7 @@ export function useSearchRecorder(opts: {
     // Kontinuität: Lotfusspunkt des Vorgängers wird im Fix-Handler gesetzt; beim
     // Fortsetzen wird er dort lazy am geseedeten Cursor abgeleitet (der letzte
     // wiederhergestellte Punkt ist der Vorgänger).
-    prevFootRef.current = null; walkedSinceAdvanceRef.current = 0;
+    prevFootRef.current = null; walkedSinceAdvanceRef.current = 0; reacquireAnchorRef.current = null; reacquirePendingRef.current = null;
     // Core-Motion-Fusion (Punkt 3/16): NUR während einer aktiven Absuche aktiv.
     // Fire-and-forget — ein Start-Fehler (Permission verweigert, kein Modul im
     // Build, Android) fällt lautlos auf fusionMode='gps_only' zurück, blockiert

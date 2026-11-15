@@ -51,6 +51,23 @@ describe('Bottom-Navigation (Analyse fest, Hub additiv)', () => {
   });
 });
 
+describe('Aus dem Hub erreichbare Seiten ohne Tab-Knopf (expo-router 58)', () => {
+  // `href: null` setzt in expo-router 58 `hidden: true`; ein fokussierter versteckter
+  // Tab wird dann auf den Start-Tab umgeleitet (useVisibleTabsWithRedirect). Kunden,
+  // Verbindungen und Statistik (clients/activity) wären so nicht mehr erreichbar.
+  for (const name of ['clients', 'activity']) {
+    it(`${name}: nur Tab-Knopf ausgeblendet, nicht per href:null versteckt`, () => {
+      const line = layoutSrc.split('\n').find(l => l.includes(`name="${name}"`)) ?? '';
+      expect(line).toContain('HIDDEN_TAB_OPTIONS');
+      expect(line).not.toMatch(/href:\s*null/);
+    });
+  }
+  it('HIDDEN_TAB_OPTIONS blendet nur den Knopf aus', () => {
+    expect(layoutSrc).toMatch(/const HIDDEN_TAB_OPTIONS = \{ tabBarButton: \(\) => null, tabBarItemStyle: \{ display: 'none' as const \} \};/);
+    expect(layoutSrc).not.toMatch(/HIDDEN_TAB_OPTIONS = \{[^}]*href/);
+  });
+});
+
 describe('Trainer-Hub-Einstieg im Profil (additiv, echte Capability)', () => {
   it('zeigt den Trainer-Hub-Eintrag nur bei isTrainerModule und öffnet die Modal-Route', () => {
     expect(profileSrc).toContain('isTrainerModule');
