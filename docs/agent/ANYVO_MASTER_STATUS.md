@@ -1,5 +1,48 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53 nach drei OTAs – 2026-11-16 (Nacht)
+
+Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt die Angaben «Aktiv» im
+Abschnitt darunter.
+
+**iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `c3fd9879` (aktive Production `e92533a0` plus main `723b8c31`, dazu drei
+  ESLint-Kommentarzeilen), Group `98054619-13ee-4544-9b2c-e4a96c45aa6d`. Release-Karte Issue #132:
+  Gruppentraining Stufe 3 (PR #130), Sync #128. Testweg Vorher, Gerätetest laut Nutzerin erfolgt;
+  Migrationen Stufe 2a/2b/3 laut Nutzerin in Production ausgeführt.
+- Davor am selben Abend: Karte #131, Source `e92533a0`, Group `f25de2a2-a003-48de-a3c2-edbcc320e457`:
+  Training mit Fährte verknüpfen (#114, PR #125, Korrektur #129), «Neu in ANYVO» (#126, #127).
+  Gerätetest laut Nutzerin am 16.11. bestanden (iOS und Android), Karte auf Veröffentlicht.
+  Karte #123 (Heimzone) ist auf Veröffentlicht.
+- **Release-Quelle:** `release/ios60-main-723b8c31-20261116`.
+- **Jede weitere iOS-60-OTA muss `c3fd9879` enthalten.** `main` enthält seit #128 den Stand
+  `072b3b07`, aber nicht die Release-Merges `dbb9179e`, `e92533a0`, `c3fd9879` (inhaltlich
+  gleich bis auf die Kommentarzeilen). Vor der nächsten OTA aus main wieder eine Release-Quelle
+  aus dem Live-Commit plus main bauen.
+- **iOS 57** (App Store 1.0.6, Runtime `1.0.6-map49-v1`) unverändert.
+
+**Android**
+- **Build 53** (1.0.8, versionCode 53, Runtime `1.0.8-sdk58-android-v1`, interner Test-Track):
+  erste OTA dieser Runtime live, Source `47b82b3a` (Build-53-Stand `4aac8786` plus main
+  `422d5219`), Group `c0de00de-7786-45a3-a4f8-353a0eccf6ee`, Karte #131. Enthält erstmals
+  Gruppentraining 2a/2b, Passwort min. 8, Heimzone, Trainer-Kopie, Training-Fährte-Verknüpfung.
+  Gruppentraining Stufe 3 ist auf Android **nicht** ausgeliefert. Gerätetest bestanden.
+  Release-Quelle `release/android53-main-422d5219-20261116`. Jede weitere OTA auf dieser
+  Runtime muss `47b82b3a` enthalten.
+- **Store/Production-OTA unverändert:** 1.0.5 (49), Runtime `1.0.5-gnss-v1`, Group `6b52516b`.
+  Keine Play-Produktion für Build 53.
+
+**In main, aber noch nicht ausgeliefert:** PR #135 (Live-Positionen im Gruppentraining nur bei
+sichtbarem Bildschirm; Mitteilungskarte ohne setState im Effekt). Braucht eine eigene OTA-Freigabe
+für iOS 60 und Android Build 53; damit entfällt die Kommentarzeile in `GroupNotifyCard.tsx`.
+
+**Board:** keine Karte mehr auf «Live – Nachkontrolle offen» (#18, #19, #20, #108, #131 nach
+Gerätetest der Nutzerin auf Veröffentlicht). Release-Ziel kennt neu «iOS 60 + Android 53».
+
+**Abdeckungsprüfung iOS über alle Runtimes:** acht Oktober-OTAs alter Runtimes untersucht und
+ausgenommen (PR #133). Abo-Wiederherstellung und Tagesbegrüssung sind auf Build 60 vorhanden;
+Kartenebenen-Auswahl und Startlogo-Korrektur lagen nie in Build 57 und fehlen bewusst.
+
 ## Stand iOS 60 nach Heimzonen-OTA und Android Build 53 – 2026-11-16 (Abend)
 
 Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus EAS
