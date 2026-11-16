@@ -1,5 +1,25 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #118 und Android Build 52 – 2026-11-16
+
+**Erledigt:** iOS-60-OTAs #90, #102, #103, #106, #108, #118 live (Stand `072b3b07`). Karten #44–#106
+und #118 auf Veröffentlicht. Android Build 51 und 52 gebaut und im internen Test-Track
+(Build 52 eingereicht). Repo ist privat; Quality Gate mit Kurzpfad für reine `.md`-Änderungen (#97).
+Ideen aus Markt-Radar KW 47 als Issues #109, #110, #111 im Backlog.
+
+**Offen:**
+- **Gerätetest #108** auf Build 60: Legen unterbrechen, wieder öffnen, fortsetzen; danach Karte auf
+  Veröffentlicht.
+- **Android Build 52** auf Gerät oder Emulator prüfen (Fortsetzen beim Legen, übersetzte
+  Beschriftungen, GPS-Kachel); zusätzlich laut Android-Liste vom 12.11.: Startlogo, Sammelmarker,
+  Begrüssungston.
+- **main hinter Production:** iOS-60-Fixes (`c903fded`, `45aaa951`, `0175fdc3`, `00f9b5f7`,
+  `0ef9e943`), T-209 (`4ab945b3`) und die Build-52-Änderungen (`8e55b3a2`, `ec897e6b`) fehlen in main.
+- **PR #76** offen gegen main (Inhalt ist auf iOS 60 und in den Android-Builds bereits enthalten).
+- Expo-Patch-Updates (expo-doctor: rund 25 Pakete eine Patch-Version zurück) bewusst nicht in
+  Build 52; später gemeinsam für beide Plattformen.
+- Unverändert offen: Git-Schlüsselbund, Actions-Minuten im Blick behalten.
+
 ## Stand nach OTA #87 – 2026-11-12 (Abend)
 
 **Erledigt:** Gerätetest #81 bestanden, Karte auf Veröffentlicht. PR #67 gemergt. iOS-60-OTA aus
