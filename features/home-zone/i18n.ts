@@ -3,7 +3,7 @@ import { registerGroupResources } from '@/features/training-groups/registerResou
 export const HOME_ZONE_NS = 'homeZone';
 const de = {
   title: 'Heimzone',
-  intro: 'In geteilten und exportierten Fährten fehlt alles innerhalb der Zone. Deine eigene Ansicht bleibt vollständig.',
+  intro: 'In Exporten und Trainer-Freigaben fehlt alles innerhalb der Zone. Bei Übergabe und geteilter Auswertung fragt ANYVO vorher nach. Deine eigene Ansicht bleibt vollständig.',
   deviceOnly: 'Die Zone wird nur auf diesem Gerät gespeichert. Auf einem anderen Gerät richtest du sie neu ein.',
   mapLabel: 'Karte. Tippe auf die Karte, um die Mitte der Zone zu setzen.',
   mapHint: 'Tippe auf die Karte oder nimm deinen aktuellen Standort.',
@@ -58,7 +58,7 @@ const de = {
 };
 const en: typeof de = {
   title: 'Home zone',
-  intro: 'Shared and exported tracks leave out everything inside the zone. Your own view stays complete.',
+  intro: 'Exports and trainer shares leave out everything inside the zone. Before a handover or a shared evaluation, ANYVO asks first. Your own view stays complete.',
   deviceOnly: 'The zone is stored on this device only. Set it up again on another device.',
   mapLabel: 'Map. Tap the map to set the centre of the zone.',
   mapHint: 'Tap the map or use your current location.',
@@ -113,7 +113,7 @@ const en: typeof de = {
 };
 const fr: typeof de = {
   title: 'Zone domicile',
-  intro: 'Les pistes partagées et exportées ne contiennent rien de ce qui se trouve dans la zone. Ta propre vue reste complète.',
+  intro: "Les exports et les partages avec l'entraîneur ne contiennent rien de ce qui se trouve dans la zone. Avant une remise ou une évaluation partagée, ANYVO te demande d'abord. Ta propre vue reste complète.",
   deviceOnly: 'La zone est enregistrée uniquement sur cet appareil. Configure-la à nouveau sur un autre appareil.',
   mapLabel: 'Carte. Touche la carte pour placer le centre de la zone.',
   mapHint: 'Touche la carte ou utilise ta position actuelle.',
@@ -168,7 +168,7 @@ const fr: typeof de = {
 };
 const it: typeof de = {
   title: 'Zona casa',
-  intro: 'Le piste condivise ed esportate non contengono nulla di ciò che si trova nella zona. La tua vista resta completa.',
+  intro: "Le esportazioni e le condivisioni con l'allenatore non contengono nulla di ciò che si trova nella zona. Prima di una consegna o di una valutazione condivisa, ANYVO ti chiede conferma. La tua vista resta completa.",
   deviceOnly: 'La zona è salvata solo su questo dispositivo. Su un altro dispositivo va impostata di nuovo.',
   mapLabel: 'Mappa. Tocca la mappa per impostare il centro della zona.',
   mapHint: 'Tocca la mappa o usa la tua posizione attuale.',
@@ -223,7 +223,7 @@ const it: typeof de = {
 };
 const gsw: typeof de = {
   title: 'Heizone',
-  intro: 'I teilte und exportierte Fährte fählt alles, wo i de Zone liit. Dini eigeti Aasicht bliibt vollständig.',
+  intro: 'I Export und Trainer-Freigabe fählt alles, wo i de Zone liit. Bi Übergab und teilter Uswertig frögt ANYVO vorher nah. Dini eigeti Aasicht bliibt vollständig.',
   deviceOnly: 'D Zone wird nume uf dem Grät gspeicheret. Uf emene andere Grät richtisch si neu ii.',
   mapLabel: 'Charte. Tipp uf d Charte, zum d Mitti vo de Zone setze.',
   mapHint: 'Tipp uf d Charte oder nimm din aktuelle Standort.',
