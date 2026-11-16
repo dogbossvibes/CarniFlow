@@ -31,3 +31,11 @@ describe('Absuche: Kennzahlen-Beschriftung ist übersetzbar', () => {
     }
   });
 });
+
+describe('Absuche: Kennzahlen-Beschriftung wird nicht abgeschnitten', () => {
+  it('verkleinert lange Beschriftungen statt sie mit … zu kürzen', () => {
+    const tile = source.slice(source.indexOf('metrics.map('), source.indexOf('metrics.map(') + 1600);
+    expect(tile).toContain('adjustsFontSizeToFit');
+    expect(tile).toMatch(/minimumFontScale=\{0\.7\}/);
+  });
+});
