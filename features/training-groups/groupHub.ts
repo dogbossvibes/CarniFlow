@@ -5,6 +5,7 @@ import { useGroupLiveShare } from '@/features/tracking-exchange/live/LiveSharePr
 import { createTrainingGroupService } from '@/features/tracking-exchange/groups/groupService';
 import { createGroupJoinService } from '@/features/tracking-exchange/groups/joinService';
 import { createGroupTrackService } from '@/features/tracking-exchange/groups/trackService';
+import { createGroupNotifyService } from '@/features/tracking-exchange/groups/notifyService';
 import { GroupApiError, type GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import type { TrainingGroup } from '@/features/tracking-exchange/groups/groupModels';
 
@@ -18,6 +19,7 @@ export function useGroupServices() {
     groups: userId ? createTrainingGroupService(client, userId) : null,
     join: userId ? createGroupJoinService(client, userId) : null,
     tracks: userId ? createGroupTrackService(client, userId) : null,
+    notify: userId ? createGroupNotifyService(client, userId) : null,
   }), [client, userId]);
 }
 

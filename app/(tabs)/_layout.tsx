@@ -1,3 +1,4 @@
+import { groupNotificationPath } from '@/features/training-groups/groupNotificationPath';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
@@ -92,7 +93,7 @@ export default function TabLayout() {
 
   // Push-/Notification-Tap → in den passenden Bereich navigieren (data.type).
   useEffect(() => {
-    const route = (data: { type?: string; sessionId?: string } | undefined) => {
+    const route = (data: { type?: string; sessionId?: string; groupId?: string; trackId?: string } | undefined) => {
       switch (data?.type) {
         case 'message':     router.push('/chat'); break;
         case 'plan':        router.push('/plaene'); break;
@@ -100,6 +101,7 @@ export default function TabLayout() {
         case 'appointment': router.push('/training-hub'); break;
         case 'comment':     router.push('/(tabs)/training'); break;
         // P4: Tap auf die Liegezeit-Notification → exakt diese Liegezeit-Session.
+        case 'group':       router.push(groupNotificationPath(data) as never); break;
         case 'liegezeit':   router.push((data.sessionId ? `/track/liegen?id=${data.sessionId}` : '/track/liegen') as never); break;
       }
     };
