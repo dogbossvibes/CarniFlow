@@ -343,6 +343,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.saveError": "Échec de l'enregistrement",
   "track.distance":  "Distance",
   "track.objectsShort": "Objets",
+  "track.deviationShort": "Écart",
   "track.pause":     "Pause",
   "track.resume":    "Continuer",
   "track.mapFollow.on": "La carte suit ta position",
