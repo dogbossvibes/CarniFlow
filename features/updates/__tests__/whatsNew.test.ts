@@ -18,23 +18,29 @@ beforeEach(async () => { await AsyncStorage.clear(); });
 describe('Neu in ANYVO', () => {
   it('zeigt die neue Release-ID auch nach den vorigen Hinweisen genau einmal', async () => {
     // Bereits bestätigte frühere „Neu in ANYVO"-Hinweise dürfen den neuen nicht unterdrücken.
-    for (const previous of ['2026-09-newbie-backpack', '2026-10-tracking-ux']) {
+    for (const previous of ['2026-09-newbie-backpack', '2026-10-tracking-ux', '2026-10-tracking-angle-analysis']) {
       await markWhatsNewSeen(previous);
-      expect(CURRENT_WHATS_NEW_RELEASE?.id).toBe('2026-10-tracking-angle-analysis');
+      expect(CURRENT_WHATS_NEW_RELEASE?.id).toBe('2026-11-group-training-home-zone');
       expect(await pendingWhatsNew()).toEqual(CURRENT_WHATS_NEW_RELEASE);
     }
     await markWhatsNewSeen(CURRENT_WHATS_NEW_RELEASE!.id);
-    expect(await AsyncStorage.getItem(LAST_SEEN_WHATS_NEW_KEY)).toBe('2026-10-tracking-angle-analysis');
+    expect(await AsyncStorage.getItem(LAST_SEEN_WHATS_NEW_KEY)).toBe('2026-11-group-training-home-zone');
     expect(await pendingWhatsNew()).toBeNull();   // nach „Verstanden" nicht erneut
   });
 
-  it('Titel „Neu in ANYVO" und ein einziger Text zur Fährtenerkennung/Winkelanalyse (alle Sprachen vorhanden)', () => {
+  it('Titel „Neu in ANYVO" und drei Texte zu Gruppentraining, Heimzone und Trainer-Kopie (alle Sprachen vorhanden)', () => {
     const release = CURRENT_WHATS_NEW_RELEASE!;
     expect(release.titleKey).toBe('updates.whatsNewTitle');
-    expect(release.itemKeys).toEqual(['updates.whatsNewTrackingAngles']);
+    expect(release.itemKeys).toEqual([
+      'updates.whatsNewGroupTraining', 'updates.whatsNewHomeZone', 'updates.whatsNewTrainerCopy',
+    ]);
     expect(deCH['updates.whatsNewTitle']).toBe('Neu in ANYVO');
-    expect(deCH['updates.whatsNewTrackingAngles']).toBe('Verbesserte Fährtenerkennung und robustere Winkelanalyse.');
-    for (const locale of [deCH, gswCH, en, fr, itLocale]) expect((locale as Record<string, string>)['updates.whatsNewTrackingAngles']).toBeTruthy();
+    expect(deCH['updates.whatsNewGroupTraining']).toBe('Gruppentraining: Fährten für andere legen, übergeben und blind absuchen.');
+    expect(deCH['updates.whatsNewHomeZone']).toBe('Heimzone: Dein Zuhause bleibt beim Teilen und Exportieren von Fährten verborgen.');
+    expect(deCH['updates.whatsNewTrainerCopy']).toBe('Trainer sehen bei Freigaben eine gekürzte Kopie, dein Original bleibt bei dir.');
+    for (const locale of [deCH, gswCH, en, fr, itLocale]) {
+      for (const key of release.itemKeys) expect((locale as Record<string, string>)[key]).toBeTruthy();
+    }
   });
 
   it('zeigt eine spätere Release-ID erneut', async () => {
