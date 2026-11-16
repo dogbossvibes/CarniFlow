@@ -290,3 +290,33 @@ describe('Regel 4 (Betreten): shouldShowActiveFaehrteConflict', () => {
     expect(shouldShowActiveFaehrteConflict(e, null, 'S1', null)).toBe(false);
   });
 });
+
+describe('Start-Taste Legen: isResumeOfActiveFaehrte (keine Fortsetzen-Schleife)', () => {
+  const { isResumeOfActiveFaehrte } = require('../activeFaehrtenModel') as typeof import('../activeFaehrtenModel');
+
+  it('Route trägt genau die aktive Session dieses Hundes → fortsetzen ohne Dialog', () => {
+    const e = entry('max', { status: 'laying', sessionId: 'S1' });
+    expect(isResumeOfActiveFaehrte(e, 'max', 'S1')).toBe(true);
+  });
+
+  it('ohne Route-Session-ID → kein Fortsetzen (Start würde eine zweite Fährte anlegen)', () => {
+    const e = entry('max', { status: 'laying', sessionId: 'S1' });
+    expect(isResumeOfActiveFaehrte(e, 'max', null)).toBe(false);
+    expect(isResumeOfActiveFaehrte(e, 'max', undefined)).toBe(false);
+    expect(isResumeOfActiveFaehrte(e, 'max', '')).toBe(false);
+  });
+
+  it('andere Session, anderer Hund, Eintrag ohne Session-ID oder ungültig → false', () => {
+    expect(isResumeOfActiveFaehrte(entry('max', { status: 'laying', sessionId: 'S1' }), 'max', 'S2')).toBe(false);
+    expect(isResumeOfActiveFaehrte(entry('luna', { status: 'laying', sessionId: 'S1' }), 'max', 'S1')).toBe(false);
+    expect(isResumeOfActiveFaehrte(entry('max', { status: 'laying', sessionId: null }), 'max', 'S1')).toBe(false);
+    expect(isResumeOfActiveFaehrte(null, 'max', 'S1')).toBe(false);
+    expect(isResumeOfActiveFaehrte(entry('max', { status: 'laying', sessionId: 'S1' }), null, 'S1')).toBe(false);
+  });
+
+  it('Start-Taste in legen.tsx nutzt die Regel und fällt nach gescheitertem Fortsetzen auf den Dialog zurück', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../../../app/track/legen.tsx'), 'utf8') as string;
+    expect(src).toContain("if (dId && entry && (resumeFailedRef.current || !isResumeOfActiveFaehrte(entry, dId, routeSessionId))) { showConflict(dId, entry); return; }");
+    expect(src).toMatch(/if \(requestedSessionId && !resumed\) \{\s*beganRef\.current = false;\s*resumeFailedRef\.current = true;/);
+  });
+});

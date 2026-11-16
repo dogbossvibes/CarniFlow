@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { NewDog } from '@/types';
 import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
+import { collectDogStorageRefs, removeDogStorageRefs, type StorageRef } from '@/services/dogStorageCleanup';
 
 export function getDogs(userId: string) {
   return supabase
@@ -57,7 +58,19 @@ const DOG_DEPENDENT_TABLES = [
 
 // Löscht den Hund inkl. abhängiger Daten (best-effort je Tabelle). Gibt erst
 // einen Fehler zurück, wenn das Löschen des Hundes selbst scheitert.
+// Hochgeladene Dateien (Foto, Dokumente, Trainingsmedien) werden vorher ermittelt
+// und erst NACH nachweislich erfolgreichem Löschen des Hundes entfernt.
 export async function deleteDogWithDependents(dogId: string): Promise<{ error: Error | null }> {
+  let ownerId: string | null = null;
+  let storageRefs: StorageRef[] = [];
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    ownerId = user?.id ?? null;
+    if (ownerId) storageRefs = await collectDogStorageRefs(dogId, ownerId);
+  } catch (e) {
+    console.warn('[deleteDog] Dateien nicht ermittelt:', (e as Error)?.message ?? e);
+  }
+
   let widgetDataChanged = false;
   try {
     for (const table of DOG_DEPENDENT_TABLES) {
@@ -65,9 +78,14 @@ export async function deleteDogWithDependents(dogId: string): Promise<{ error: E
       if (!error && table === 'calendar_events') widgetDataChanged = true;
       if (error) console.warn(`[deleteDog] ${table}:`, error.message);   // z. B. Tabelle ohne dog_id → ignorieren
     }
-    const { error } = await supabase.from('dogs').delete().eq('id', dogId);
-    if (!error) widgetDataChanged = true;
-    return { error: error ? new Error(error.message) : null };
+    const { data, error } = await supabase.from('dogs').delete().eq('id', dogId).select('id');
+    if (error) return { error: new Error(error.message) };
+    widgetDataChanged = true;
+
+    // Nur wenn die Datenbank das Löschen bestätigt (RLS kann ohne Fehler 0 Zeilen
+    // löschen), dürfen die Dateien weg — sonst bleiben sie beim weiter bestehenden Hund.
+    if (storageRefs.length > 0 && (data?.length ?? 0) > 0) await removeDogStorageRefs(storageRefs);
+    return { error: null };
   } finally {
     // Calendar deletion can succeed before a later request fails; invalidate once.
     if (widgetDataChanged) notifyDailyWidgetDataChanged();

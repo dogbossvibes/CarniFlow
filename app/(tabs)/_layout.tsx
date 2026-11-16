@@ -20,6 +20,9 @@ import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { UpdateExperience } from '@/features/updates/UpdateExperience';
 import { useOnboardingGate } from '@/hooks/useOnboardingGate';
 
+// Tab ohne sichtbaren Knopf, aber weiterhin als Route erreichbar (siehe unten).
+const HIDDEN_TAB_OPTIONS = { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } };
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 function TabIcon({ name, focused, size }: { name: IconName; focused: boolean; size: number }) {
@@ -192,9 +195,12 @@ export default function TabLayout() {
             tabBarIcon: ({ focused, size }) => <TabIcon name="bar-chart" focused={focused} size={size} />,
           }}
         />
-        {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
-        <Tabs.Screen name="clients"  options={{ href: null }} />
-        <Tabs.Screen name="activity" options={{ href: null }} />
+        {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar.
+            NICHT `href: null`: ab expo-router 58 (Build 60) wird ein so versteckter
+            Tab beim Öffnen automatisch auf den Start-Tab umgeleitet. Daher nur den
+            Tab-Knopf ausblenden; die Seite bleibt per router.push erreichbar. */}
+        <Tabs.Screen name="clients"  options={HIDDEN_TAB_OPTIONS} />
+        <Tabs.Screen name="activity" options={HIDDEN_TAB_OPTIONS} />
         {/* ANYVO CONNECT — nur sichtbar, wenn EXPO_PUBLIC_FEATURE_CONNECT_ENABLED=true.
             href:null blendet den Tab komplett aus (kein Mount, keine CONNECT-Init). */}
         <Tabs.Screen

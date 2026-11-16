@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { uploadFileToStorage } from '@/services/storageUpload';
 
 export async function uploadTrainingImage(uri: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -8,14 +9,7 @@ export async function uploadTrainingImage(uri: string): Promise<string> {
   const mime = ext === 'png' ? 'image/png' : ext === 'heic' ? 'image/heic' : 'image/jpeg';
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const formData = new FormData();
-  formData.append('file', { uri, name: path, type: mime } as any);
-
-  const { error } = await supabase.storage
-    .from('training-photos')
-    .upload(path, formData, { contentType: mime, upsert: true });
-
-  if (error) throw error;
+  await uploadFileToStorage('training-photos', path, uri, mime, { upsert: true });
 
   const { data } = supabase.storage.from('training-photos').getPublicUrl(path);
   return data.publicUrl;
@@ -28,14 +22,7 @@ export async function uploadTrainingVideo(uri: string): Promise<string> {
   const ext  = uri.split('.').pop()?.toLowerCase() || 'mp4';
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const formData = new FormData();
-  formData.append('file', { uri, name: path, type: `video/${ext}` } as any);
-
-  const { error } = await supabase.storage
-    .from('training-videos')
-    .upload(path, formData, { contentType: `video/${ext}`, upsert: true });
-
-  if (error) throw error;
+  await uploadFileToStorage('training-videos', path, uri, `video/${ext}`, { upsert: true });
 
   const { data } = supabase.storage.from('training-videos').getPublicUrl(path);
   return data.publicUrl;
@@ -48,14 +35,7 @@ export async function uploadTrainingAudio(uri: string): Promise<string> {
   const ext  = uri.split('.').pop()?.toLowerCase() || 'm4a';
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const formData = new FormData();
-  formData.append('file', { uri, name: path, type: 'audio/mp4' } as any);
-
-  const { error } = await supabase.storage
-    .from('training-audio')
-    .upload(path, formData, { contentType: 'audio/mp4', upsert: true });
-
-  if (error) throw error;
+  await uploadFileToStorage('training-audio', path, uri, 'audio/mp4', { upsert: true });
 
   const { data } = supabase.storage.from('training-audio').getPublicUrl(path);
   return data.publicUrl;
@@ -71,14 +51,7 @@ export async function uploadDogDocument(uri: string, dogId: string, fileName: st
   const safe = (fileName || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${user.id}/${dogId}/${Date.now()}_${safe}`;
 
-  const formData = new FormData();
-  formData.append('file', { uri, name: safe, type: mime } as any);
-
-  const { error } = await supabase.storage
-    .from('dog-documents')
-    .upload(path, formData, { contentType: mime, upsert: false });
-
-  if (error) throw error;
+  await uploadFileToStorage('dog-documents', path, uri, mime, { upsert: false, fileName: safe });
   return path;
 }
 
@@ -90,14 +63,7 @@ export async function uploadDogImage(uri: string, _userId: string): Promise<stri
   const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const formData = new FormData();
-  formData.append('file', { uri, name: path, type: mime } as any);
-
-  const { error } = await supabase.storage
-    .from('dog-avatars')
-    .upload(path, formData, { contentType: mime, upsert: true });
-
-  if (error) throw error;
+  await uploadFileToStorage('dog-avatars', path, uri, mime, { upsert: true });
 
   const { data } = supabase.storage.from('dog-avatars').getPublicUrl(path);
   return data.publicUrl;

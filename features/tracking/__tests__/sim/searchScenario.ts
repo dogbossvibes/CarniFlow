@@ -1,7 +1,7 @@
 // Fährten-Simulator (T-192) — reiner Testcode.
 // Ein Such-Szenario = Legen (mit Gegenständen) → Liegezeit → Absuche mit Hund und
 // Hundeführer → echter Such-Recorder → Analyse → Bewertung gegen die Wahrheit.
-import { simulateGps, type DeliverySpec, type GpsProfile } from './gpsModel';
+import { simulateGps, type DeliverySpec, type GpsProfile, type SimFix } from './gpsModel';
 import { runLay, SIM_T0_MS, type LayRunResult } from './layRunner';
 import { simulateMotion } from './motionModel';
 import { gpsProfile, motionProfile, LIVE_DELIVERY, type CarryMode, type DeviceClass, type Environment, type Platform } from './profiles';
@@ -40,6 +40,8 @@ export interface SearchScenario {
   manualTap?: { tapAfterS: number };
   /** Der Hund verliert die Fährte (Abriss) und findet wieder hinein. */
   losses?: TrackLoss[];
+  /** Nur für gezielte Regressionstests: Messungen nach dem GPS-Modell verändern (z. B. einen Ausreisser einsetzen). */
+  fixTransform?: (fixes: SimFix[], lay: LayPhase) => SimFix[];
   seed: number;
 }
 
@@ -134,7 +136,8 @@ export async function runSearchScenario(s: SearchScenario): Promise<SearchOutcom
   const carry = s.searchCarry ?? 'hand';
   const t0 = SIM_T0_MS + Math.round((lay.truth.durationS + (s.ageMin ?? 30) * 60) * 1000);
   const profile: GpsProfile = gpsProfile(s.device, s.env, carry);
-  const fixes = simulateGps(truth.handlerTimeline, profile, s.searchDelivery ?? LIVE_DELIVERY, makeRng(seedFrom(key, 'gps')), t0);
+  const simulated = simulateGps(truth.handlerTimeline, profile, s.searchDelivery ?? LIVE_DELIVERY, makeRng(seedFrom(key, 'gps')), t0);
+  const fixes = s.fixTransform ? s.fixTransform(simulated, lay) : simulated;
   const motion = s.searchMotion === false ? [] : simulateMotion(truth.handlerTimeline, motionProfile(s.platform, carry, s.device), makeRng(seedFrom(key, 'motion')), seedFrom(key, 'chain'), t0);
   const appDistance = s.appHandlerDistanceM ?? (handler.lineM >= 8 ? 10 : handler.lineM >= 3 ? 5 : 1);
   // ── Unterbrechungen und Bedienung in Zeitfenster und Aktionen übersetzen.

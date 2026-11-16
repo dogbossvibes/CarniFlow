@@ -96,6 +96,23 @@ export function shouldShowActiveFaehrteConflict(
   return true;
 }
 
+// Start-Taste auf "Fährte legen": true, wenn die Route ausdrücklich GENAU die aktive
+// Fährte dieses Hundes fortsetzt (Route-Session-ID === Registry-Session-ID). Dann
+// darf die Taste direkt fortsetzen statt den Konfliktdialog zu zeigen — sonst führt
+// "Fährte fortsetzen" im Dialog wieder auf denselben Bildschirm (Endlosschleife).
+// Bewusst STRENGER als shouldShowActiveFaehrteConflict: Die Tracking-Store-Session
+// zählt hier nicht, denn ohne Route-ID würde der Start eine NEUE Session anlegen
+// (zweite Fährte desselben Hundes). Rein, keine Mutation.
+export function isResumeOfActiveFaehrte(
+  entry: Partial<ActiveFaehrte> | null | undefined,
+  dogId: string | null | undefined,
+  routeSessionId: string | null | undefined,
+): boolean {
+  if (!dogId || !isValidEntry(entry) || entry.dogId !== dogId) return false;
+  return typeof routeSessionId === 'string' && routeSessionId.length > 0
+    && entry.sessionId != null && entry.sessionId === routeSessionId;
+}
+
 // Registry-Reducer (rein): fügt einen Eintrag pro dog_id ein/aktualisiert ihn.
 // Nicht-offene Status entfernen den Eintrag (z. B. completed/cancelled).
 export function upsertEntry(map: ActiveFaehrtenMap, dogId: string, patch: Partial<ActiveFaehrte>): ActiveFaehrtenMap {
