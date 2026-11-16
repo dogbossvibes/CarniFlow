@@ -40,7 +40,10 @@ const mockServices = {
   ], serverNowMs: 760_000 }) },
 };
 
+let mockFocused = true;
+const mockLiveArgs: unknown[][] = [];
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }), useLocalSearchParams: () => ({ id: '30000000-0000-4000-8000-000000000001', groupId: '10000000-0000-4000-8000-000000000001' }),
+  useIsFocused: () => mockFocused,
   useFocusEffect: (cb: () => void | (() => void)) => { const React = jest.requireActual('react'); React.useEffect(cb, [cb]); } }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeArea' }));
@@ -51,7 +54,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string, params?: Record<str
 jest.mock('@/i18n/format', () => ({ formatTime: () => '23:59' }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-a', name: 'Ayla' }, { id: 'dog-z', name: 'Zora' }] }) }));
 jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), client: {}, state: { phase: 'idle' } }) }));
-jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: () => ({ positions: [] }) }));
+jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: (...args: unknown[]) => { mockLiveArgs.push(args); return { positions: [] }; } }));
 jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, importGroupTrack: async () => null,
   flushPendingHandovers: async () => {}, listPendingHandovers: async () => [] }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
@@ -60,7 +63,7 @@ const text = (tree: ReactTestRenderer) => tree.root.findAll(n => n.type === 'Tex
   .map(n => ([] as unknown[]).concat(n.props.children).filter((c): c is string => typeof c === 'string').join('')).join('\n')
   + (tree.root.findAll(n => n.type === 'Polygon').length ? '\nPOLYGON' : '');
 let tree: ReactTestRenderer;
-afterEach(() => { act(() => tree.unmount()); jest.clearAllMocks(); mockJoined = true; mockExtra = []; mockFetch.mockImplementation(async () => { throw new Error('offline'); }); });
+afterEach(() => { act(() => tree.unmount()); jest.clearAllMocks(); mockFocused = true; mockLiveArgs.length = 0; mockJoined = true; mockExtra = []; mockFetch.mockImplementation(async () => { throw new Error('offline'); }); });
 
 it('zeigt Status, laufende Liegezeit und nur Fläche für fremde Fährten', async () => {
   await act(async () => { tree = renderer.create(<Screen />); });
@@ -118,4 +121,15 @@ it('Stufe 3: «Wer sieht was» öffnet das Blatt statt eines Hinweises', async (
   const modal = tree.root.find(n => n.props.visible === true && typeof n.props.onRequestClose === 'function');
   expect(modal).toBeTruthy();
   expect(text(tree)).toContain('groups.wsCourseWho');
+});
+
+it('fragt Live-Positionen nur ab, solange der Bildschirm sichtbar ist', async () => {
+  await act(async () => { tree = renderer.create(<Screen />); });
+  // Sichtbar: irgendwann mit Training-ID abgefragt (nach dem Laden des Trainings).
+  expect(mockLiveArgs.some(a => a[1] === '30000000-0000-4000-8000-000000000001')).toBe(true);
+  // Verdeckt (z. B. unter «Fährte legen»): keine Abfrage mehr, weder Konto noch Training übergeben.
+  mockFocused = false; mockLiveArgs.length = 0;
+  await act(async () => { tree.update(<Screen />); });
+  expect(mockLiveArgs.length).toBeGreaterThan(0);
+  expect(mockLiveArgs.every(a => a[0] === null && a[1] === null)).toBe(true);
 });
