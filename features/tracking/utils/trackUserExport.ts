@@ -22,6 +22,8 @@ export interface TrackUserExport {
     audit: { revision: number; createdAt: string; changes: { label: string; before: string; after: string }[] }[] };
   /** These are recorded receiver positions, not a separately measured dog track. */
   positionMeaning: 'recorded-receiver-position';
+  /** Heimzone: Koordinaten in einer Schutzzone wurden aus dieser Kopie entfernt (ohne Angabe der Zone). */
+  homeZoneApplied?: true;
 }
 const MAX_POINTS = 100_000;
 export const record = (v: unknown): Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};

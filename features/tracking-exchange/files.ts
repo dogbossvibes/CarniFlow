@@ -2,6 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Crypto from 'expo-crypto';
+import { confirmTrackFileShare } from '@/features/home-zone/confirm';
 import { FILE_EXTENSION, FILE_LIMIT, ExchangeError, canonicalReference, parseFileText, parseFile, type TrackFile } from './contract';
 const MIME='application/vnd.anyvo.track+json';
 export async function importTrackFile(check:()=>void):Promise<TrackFile|null>{
@@ -20,8 +21,11 @@ export async function readTrackFile(uri:string,check:()=>void):Promise<TrackFile
  if(value.kind==='distraction-request'&&await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256,canonicalReference(value.reference))!==value.referenceDigest)throw new ExchangeError('INVALID');
  check();return value;
 }
-export async function shareTrackFile(input:TrackFile,check:()=>void){
+/** false = wegen der Heimzone bewusst nicht geteilt. */
+export async function shareTrackFile(input:TrackFile,check:()=>void):Promise<boolean>{
  check();const value=parseFile(input);if(!FileSystem.cacheDirectory||!await Sharing.isAvailableAsync())throw new ExchangeError('UNAVAILABLE');check();
+ // Heimzone (Issue #115): das Paket enthält die ganze Fährte, deshalb vorher warnen.
+ if(!await confirmTrackFileShare(value))return false;check();
  const text=JSON.stringify(value);parseFileText(text);
  const directory=`${FileSystem.cacheDirectory}track-exchange/`;await FileSystem.makeDirectoryAsync(directory,{intermediates:true});check();
  // Android recipients may open their granted URI after the share sheet closes.
@@ -32,5 +36,5 @@ export async function shareTrackFile(input:TrackFile,check:()=>void){
   if(old.exists&&!old.isDirectory&&typeof old.modificationTime==='number'&&old.modificationTime*1000<Date.now()-86400000)await FileSystem.deleteAsync(directory+name,{idempotent:true});
  }
  const uri=`${directory}${value.kind==='distraction-return'?'Verleitung':'Faehrte'}-${Crypto.randomUUID()}.${FILE_EXTENSION}`;
- await FileSystem.writeAsStringAsync(uri,text);check();await Sharing.shareAsync(uri,{mimeType:MIME,UTI:'com.anyvo.track',dialogTitle:value.kind==='distraction-return'?'Verleitung zurückschicken':'Fährte teilen'});check();
+ await FileSystem.writeAsStringAsync(uri,text);check();await Sharing.shareAsync(uri,{mimeType:MIME,UTI:'com.anyvo.track',dialogTitle:value.kind==='distraction-return'?'Verleitung zurückschicken':'Fährte teilen'});check();return true;
 }

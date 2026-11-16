@@ -4,6 +4,8 @@ import { Asset } from 'expo-asset';
 import * as Crypto from 'expo-crypto';
 import { buildTrackUserExport, trackExportGpx } from '../utils/trackUserExport';
 import type { ReportLabels } from '../utils/trackReportPdf';
+import { applyHomeZones } from '@/features/home-zone/zones';
+import { loadHomeZones } from '@/features/home-zone/store';
 
 export type UserExportFormat = 'gpx' | 'json' | 'pdf';
 const formats = {
@@ -28,7 +30,11 @@ async function pruneExports(directory: string): Promise<void> {
 export async function shareTrackUserExport(value: unknown, format: UserExportFormat, labels: ReportLabels, includeNotes = false): Promise<void> {
   if (!await Sharing.isAvailableAsync()) throw new Error('sharing-unavailable');
   if (!FileSystem.cacheDirectory) throw new Error('cache-unavailable');
-  const snapshot = buildTrackUserExport(value, new Date().toISOString(), includeNotes);
+  // Heimzone (Issue #115): immer hier anwenden, damit kein Exportweg sie umgehen kann.
+  // Ein Lesefehler der Zonen bricht den Export ab, statt ungeschützt zu teilen.
+  const zones = await loadHomeZones();
+  const { data: snapshot, effect } = applyHomeZones(buildTrackUserExport(value, new Date().toISOString(), includeNotes), zones);
+  if (format === 'gpx' && effect.allRemoved) throw new Error('home-zone-empty');
   const spec = formats[format];
   const directory = `${FileSystem.cacheDirectory}track-exports/`;
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });

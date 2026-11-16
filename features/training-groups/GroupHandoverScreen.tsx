@@ -10,9 +10,12 @@ import { ContactScreenHeader } from '@/features/contacts/ContactScreenHeader';
 import { contactStyles as cs } from '@/features/contacts/contactStyles';
 import { useGroupServices } from './groupHub';
 import { submitHandover, type HandoverResult } from './groupTrackLocal';
+import { useTranslation } from 'react-i18next';
+import { localTrackNeedsHomeZoneWarning } from '@/features/home-zone/confirm';
+import { HOME_ZONE_NS } from '@/features/home-zone/i18n';
 
-type Phase = 'sending' | HandoverResult | 'failed';
-const TEXT: Record<Phase, TranslationKey> = {
+type Phase = 'sending' | HandoverResult | 'failed' | 'zone';
+const TEXT: Record<Exclude<Phase, 'zone'>, TranslationKey> = {
   sending: 'groups.handoverSending', sent: 'groups.handoverSent', queued: 'groups.handoverQueued',
   dropped: 'groups.handoverDropped', failed: 'groups.handoverFailed',
 };
@@ -22,9 +25,11 @@ export default function GroupHandoverScreen() {
   const params = useLocalSearchParams<{ trackId: string; localId: string; groupId: string; sessionId: string }>();
   const router = useRouter();
   const { t } = useT();
+  const { t: z } = useTranslation(HOME_ZONE_NS);
   const services = useGroupServices();
   const [phase, setPhase] = useState<Phase>('sending');
   const alive = useRef(true);
+  const confirmed = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const valid = [params.trackId, params.localId, params.groupId, params.sessionId].every(v => typeof v === 'string' && v.length > 0);
 
@@ -32,11 +37,15 @@ export default function GroupHandoverScreen() {
     router.replace({ pathname: '/groups/session/[id]', params: { id: params.sessionId, groupId: params.groupId } } as never);
   }, [params.groupId, params.sessionId, router]);
 
-  const send = useCallback(async () => {
+  const send = useCallback(async (zoneConfirmed = false) => {
     const tracks = services.tracks, userId = services.userId;
     if (!tracks || !userId || !valid) { setPhase('failed'); return; }
     setPhase('sending');
     try {
+      // Heimzone (Issue #115): die Übergabe enthält die ganze Fährte, deshalb vorher fragen.
+      if (zoneConfirmed) confirmed.current = true;
+      if (!confirmed.current && await localTrackNeedsHomeZoneWarning(params.localId)) { if (alive.current) setPhase('zone'); return; }
+      if (!alive.current) return;
       const result = await submitHandover(tracks, userId, {
         trackId: params.trackId, localId: params.localId, groupId: params.groupId, sessionId: params.sessionId, createdAtMs: Date.now(),
       });
@@ -62,8 +71,13 @@ export default function GroupHandoverScreen() {
         <View style={cs.scroll}>
           <AnyvoCard>
             {phase === 'sending' ? <ActivityIndicator color={C.trackPrimary} style={{ marginBottom: 10 }} /> : null}
-            <Text style={[cs.body, phase === 'sent' && { color: C.trackPrimary }]} accessibilityRole="alert" accessibilityLiveRegion="polite">{t(TEXT[phase])}</Text>
-            {phase !== 'sending' && phase !== 'sent' ? (
+            <Text style={[cs.body, phase === 'sent' && { color: C.trackPrimary }]} accessibilityRole="alert" accessibilityLiveRegion="polite">{phase === 'zone' ? `${z('fullTitle')}. ${z('handoverBody')}` : t(TEXT[phase])}</Text>
+            {phase === 'zone' ? (
+              <View style={cs.actions}>
+                <AnyvoButton style={cs.flex} label={z('handoverSkip')} onPress={toTraining} />
+                <AnyvoButton style={cs.flex} label={z('handoverConfirm')} variant="secondary" onPress={() => { void send(true); }} />
+              </View>
+            ) : phase !== 'sending' && phase !== 'sent' ? (
               <View style={cs.actions}>
                 {phase === 'queued' || phase === 'failed'
                   ? <AnyvoButton style={cs.flex} label={t('groups.retry')} variant="secondary" onPress={() => { void send(); }} /> : null}
