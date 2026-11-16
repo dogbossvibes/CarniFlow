@@ -1471,6 +1471,9 @@ export default function TrackRunScreen() {
                     className={`text-[8.5px] font-bold tracking-[1px] uppercase mt-px ${isGpsTile && gpsQualityColor ? '' : 'text-ft-muted'}`}
                     style={isGpsTile && gpsQualityColor ? { color: gpsQualityColor } : undefined}
                     numberOfLines={1}
+                    // Lange Qualitätswörter (z. B. EN «GPS · EXCELLENT») verkleinern statt abschneiden.
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
                   >
                     {mm.label}
                   </Text>
