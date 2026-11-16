@@ -51,7 +51,7 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 52,
+      "versionCode": 53,
       "runtimeVersion": "1.0.8-sdk58-android-v1",
       "config": {
         "googleMaps": {
@@ -101,7 +101,10 @@
           "image": "./assets/images/anyvologo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0F1115"
+          "backgroundColor": "#0F1115",
+          "android": {
+            "imageWidth": 150
+          }
         }
       ],
       "expo-notifications",
