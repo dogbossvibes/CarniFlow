@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/hooks/useSession';
 import { requestPasswordReauthentication, updatePassword } from '@/services/auth';
-import { canChangeAnyvoPassword, getAuthProvider, isReauthenticationError, providerLabel, validateNewPassword } from '@/features/auth/accountSecurity';
+import { canChangeAnyvoPassword, getAuthProvider, isLeakedPasswordError, isReauthenticationError, providerLabel, validateNewPassword } from '@/features/auth/accountSecurity';
 import { useT } from '@/i18n';
 
 export default function ChangePasswordScreen() {
@@ -39,7 +39,7 @@ export default function ChangePasswordScreen() {
     setSaving(false);
     if (updateError) {
       if (isReauthenticationError(updateError.message)) setShowNonce(true);
-      setError(updateError.message || t('auth.passwordUpdateError'));
+      setError(isLeakedPasswordError(updateError.message) ? t('auth.errorPasswordLeaked') : (updateError.message || t('auth.passwordUpdateError')));
       return;
     }
 

@@ -1165,6 +1165,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "auth.hidePassword": "Masquer le mot de passe",
   "auth.errorMissingCredentials": "Saisis l’e-mail et le mot de passe.",
   "auth.errorPasswordMin8": "Mot de passe : au moins 8 caractères",
+  "auth.errorPasswordLeaked": "Ce mot de passe est connu à la suite de fuites de données. Choisis-en un autre.",
   "auth.errorInvalidCredentials": "E-mail ou mot de passe incorrect. Réessayer ?",
   "auth.errorEmailUnconfirmed": "Presque terminé ! Confirme d’abord ton e-mail.",
   "auth.errorAlreadyRegistered": "Cet e-mail existe déjà; connecte-toi simplement.",

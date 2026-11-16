@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { signOut, updatePassword } from '@/services/auth';
-import { validateNewPassword } from '@/features/auth/accountSecurity';
+import { isLeakedPasswordError, validateNewPassword } from '@/features/auth/accountSecurity';
 import { useT } from '@/i18n';
 
 export default function PasswordRecoveryScreen() {
@@ -64,7 +64,7 @@ export default function PasswordRecoveryScreen() {
     const { error } = await updatePassword(pw1);
     setSaving(false);
     if (error) {
-      Alert.alert(t('common.error'), error.message || t('auth.passwordUpdateError'));
+      Alert.alert(t('common.error'), isLeakedPasswordError(error.message) ? t('auth.errorPasswordLeaked') : (error.message || t('auth.passwordUpdateError')));
       return;
     }
 
