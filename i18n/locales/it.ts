@@ -512,6 +512,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.saveError": "Salvataggio non riuscito",
   "track.distance": "Distanza",
   "track.objectsShort": "Ogg.",
+  "track.deviationShort": "Scost.",
   "track.pause": "Pausa",
   "track.resume": "Avanti",
   "track.searchDuration": "Durata della ricerca",
