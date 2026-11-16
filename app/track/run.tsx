@@ -80,6 +80,7 @@ import { computeTrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyti
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
+import { isBlindSearch } from '@/features/training-groups/blindSearch';
 
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
 const SHOW_GPS_DEBUG = __DEV__;
@@ -744,6 +745,16 @@ export default function TrackRunScreen() {
   // „Suche läuft", Start-Haptik, „Fährtenansatz erkannt" (Lock-Übergang),
   // Toasts/Banner.
   const searchGuidanceActive = s.recording && s.searchStartState === 'START_LOCKED';
+  // Gruppentraining «Blind absuchen» (Stufe 2b): reine Anzeigeregel. Aufzeichnung, Abweichungs-
+  // berechnung und Auswertung laufen unverändert; ausgeblendet werden nur Verlauf, Marker,
+  // Teilstrecken, Führung (Sprache/Haptik) und Abweichungswarnungen bis zum Ende der Absuche.
+  const [blindSearch, setBlindSearch] = useState(false);
+  useEffect(() => {
+    let current = true;
+    if (typeof id === 'string') void isBlindSearch(id).then(value => { if (current) setBlindSearch(value); }).catch(() => {});
+    return () => { current = false; };
+  }, [id]);
+  const guidanceVisible = searchGuidanceActive && !blindSearch;
 
   // Search-Recovery-State: Seeds (bereits angesagt/ausgelöst in DIESEM Run) aus dem
   // Snapshot; jede neue Ansage/Auslösung wird sofort in den Run-State gespiegelt.
@@ -757,12 +768,12 @@ export default function TrackRunScreen() {
     initialFiredIds: snapData.recovery?.hapticFiredIds,
     onFired: (id: string) => useTrackingStore.getState().noteSearchHapticFired(id),
   }), [snapData.recovery]);
-  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery,
+  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn && !blindSearch, stepLengthM, guidanceObjects, voiceRecovery,
     { handlerPosition: s.position, configuredDogLeadM: searchHandlerDistanceM, activeObjectWait: s.activeObjectWait });
 
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
-  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);
+  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);
 
   // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
   // akzeptierter Handler-Fixes und des gespeicherten Endpunkts (letzter Punkt
@@ -899,7 +910,7 @@ export default function TrackRunScreen() {
   );
 
   useEffect(() => {
-    if (!voiceOn || !searchGuidanceActive || snapData.segments.length === 0) return;
+    if (!voiceOn || !guidanceVisible || snapData.segments.length === 0) return;
     const result = searchSegmentAnnouncements({
       segments: snapData.segments,
       currentStep: metersToSteps(s.dogProgressM, stepLengthM),   // hundebezogen (5/10-m-Versatz entlang der Fährte)
@@ -911,7 +922,7 @@ export default function TrackRunScreen() {
       requestVoice({ eventType: 'segment', text: message, language: speechLanguage(i18n.language as never),
         priority: 2, onceKey: `segment:${message}`, phase: 'search' });
     });
-  }, [searchGuidanceActive, s.dogProgressM, snapData.segments, voiceOn, stepLengthM]);
+  }, [guidanceVisible, s.dogProgressM, snapData.segments, voiceOn, stepLengthM]);
 
   // Off-Track-Feedback (Phase 2): Voice + Haptik NUR auf echten State-Übergängen.
   // Die State-Machine ist bereits debounced → offTrackState ändert sich nur bei einer
@@ -925,7 +936,7 @@ export default function TrackRunScreen() {
     // Guard ZUERST: solange keine aktive Suche läuft, wird weder Feedback gegeben
     // noch prevOffTrackRef fortgeschrieben (ein Übergang wird nicht „verbraucht";
     // der Recovery-Seed aus resumeSearch bleibt bis zum ersten aktiven Tick stehen).
-    if (!searchGuidanceActive) return;
+    if (!guidanceVisible) return;
     const fb = offTrackTransitionFeedback(prevOffTrackRef.current, s.offTrackState);
     prevOffTrackRef.current = s.offTrackState;
     if (!fb) return;
@@ -943,13 +954,13 @@ export default function TrackRunScreen() {
     } else {
       setRecoveryVisible(false);
     }
-  }, [s.offTrackState, searchGuidanceActive, voiceOn, t]);
+  }, [s.offTrackState, guidanceVisible, voiceOn, t]);
   // Timer beim Verlassen aufräumen (kein setState nach Unmount).
   useEffect(() => () => { if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current); }, []);
 
   // Permanentes Off-Track-Banner leitet sich vom aktuellen State ab (nur während der
   // aktiven Absuche; im Arming-Overlay unsichtbar).
-  const offBanner = !arming && s.recording ? offTrackBanner(s.offTrackState) : null;
+  const offBanner = !arming && s.recording && !blindSearch ? offTrackBanner(s.offTrackState) : null;
   // Search Start Acquisition (Track-Assoziation am Beginn der Absuche): kurzes,
   // unaufdringliches Banner zwischen "Jetzt starten" (Arming-Overlay schliesst)
   // und dem eindeutigen Start-Lock. SEEKING_START zeigt bewusst nichts (der
@@ -984,8 +995,8 @@ export default function TrackRunScreen() {
   }, [s.dogProgressM, snapData.segments, stepLengthM]);
 
   const hasLaid = snapData.laidPoints.length > 1;
-  const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
-  const devOff = s.offTrackState !== 'on_track';
+  const devShown = hasLaid && !blindSearch && Number.isFinite(s.deviationM) ? s.deviationM : null;
+  const devOff = !blindSearch && s.offTrackState !== 'on_track';
 
   const handleCancel = () => {
     Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button antippen.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
@@ -1216,7 +1227,7 @@ export default function TrackRunScreen() {
   // der Referenz — derselbe dogProgressM wie Hundemarker, Sprachführung und
   // Haptik — gegen die Referenzlänge; nächster offener Gegenstand über seine
   // kanonische Bogenlänge (atM). Keine Luftlinie, keine Rohspur.
-  const scaleReadout = !arming && s.recording ? searchDistanceReadout(s.dogProgressM, s.trackLengthM) : null;
+  const scaleReadout = !arming && s.recording && !blindSearch ? searchDistanceReadout(s.dogProgressM, s.trackLengthM) : null;
   const nextObject = scaleReadout
     ? nextObjectDistance(snapData.laidObjects.map((o, i) => ({ atM: o.atM, status: s.objectStatuses[i] })), s.dogProgressM)
     : null;
@@ -1224,7 +1235,7 @@ export default function TrackRunScreen() {
   // Hinweis «Nächstes Ereignis» (reine Anzeige): Distanz relativ zur virtuellen
   // Hundeposition (dogProgressM) — derselbe Maßstab wie die Sprachansagen.
   // Off-Track-/Start-/Ende-Banner haben Vorrang.
-  const nextEvent = searchGuidanceActive && !offBanner && !recoveryVisible && !searchStartBanner && !trackEndReached
+  const nextEvent = guidanceVisible && !offBanner && !recoveryVisible && !searchStartBanner && !trackEndReached
     ? nextSearchEvents(searchEvents, s.dogProgressM)
     : null;
   const nextEventText = nextEvent
@@ -1324,12 +1335,13 @@ export default function TrackRunScreen() {
               <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={17} color={pocketLock ? FT.accText : FT.text} />
             </Pressable>
           )}
-          {view === 'map' ? (
+          {view === 'map' || blindSearch ? (
             <TrackingMap
               distractionTracks={distractionTracks}
                   layColor={layColor}
-              layPoints={snapData.laidLatLng} dimLay
-              runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
+              layPoints={blindSearch ? [] : snapData.laidLatLng} dimLay
+              {...(blindSearch ? { startAnchor: snapData.laidLatLng[0] ?? null } : {})}
+              runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
               dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
@@ -1340,7 +1352,7 @@ export default function TrackRunScreen() {
               searchView={arming ? null : {
                 handlerProgressM: s.progressM,
                 dogProgressM: s.dogProgressM,
-                offTrack: s.offTrackState === 'off_track',
+                offTrack: !blindSearch && s.offTrackState === 'off_track',
                 topInsetPt: 132,
                 bottomInsetPt: mapOverlayLayout.contentBottom + 44,
               }}

@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { GroupApiError, type createGroupRpcClient } from './groupRpc';
 import { id, number, record, values } from './groupModels';
-import { parseReference, type ExchangeReference } from '../contract';
+import { parseTrackTransferReference, type TrackTransferReference } from '@/features/tracking-transfer/reference';
 
 // Stufe 2 Gruppentraining: Fährten für andere legen.
 // Server: supabase/migrations/20261113090000_training_group_stage2a.sql (training_group_tracks_v1).
@@ -9,8 +9,8 @@ import { parseReference, type ExchangeReference } from '../contract';
 // nur Leger:in und Hundeführer:in.
 type Client = ReturnType<typeof createGroupRpcClient>;
 
-/** Stufe 2b schaltet «Fährte legen für …» frei (Recorder, Übergabe, Absuche). */
-export const GROUP_TRACK_HANDOVER_READY: boolean = false;
+/** Stufe 2b: «Fährte legen für …» mit Recorder, Übergabe und Absuche. */
+export const GROUP_TRACK_HANDOVER_READY: boolean = true;
 
 export type GroupTrackStatus = 'laying' | 'lying' | 'searching' | 'searched' | 'revoked';
 export interface GroupTrackArea { centerLat: number; centerLng: number; radiusM: number }
@@ -91,12 +91,13 @@ export function createGroupTrackService(client: Client, userId: string) {
     },
     setBlind: (trackId: string, blind: boolean) => single('set_blind', { trackId, blind }, trackId),
     cancel: (trackId: string) => single('cancel', { trackId }, trackId),
-    submit: (trackId: string, reference: ExchangeReference) => single('submit', { trackId, package: parseReference(reference) }, trackId),
-    async fetch(trackId: string): Promise<{ track: GroupTrack; reference: ExchangeReference }> {
+    /** Paket im Format der Fährten-Übergabe: Zeitstempel und Teilstrecken bleiben für die Absuche erhalten. */
+    submit: (trackId: string, reference: TrackTransferReference) => single('submit', { trackId, package: parseTrackTransferReference(reference) }, trackId),
+    async fetch(trackId: string): Promise<{ track: GroupTrack; reference: TrackTransferReference }> {
       const data = await call('fetch', { trackId });
       const track = parseGroupTrack(data.track);
       if (track.trackId !== trackId || (track.layerUserId !== userId && track.handlerUserId !== userId)) throw new GroupApiError('GROUP_INVALID_RESPONSE');
-      try { return { track, reference: parseReference(data.package) }; }
+      try { return { track, reference: parseTrackTransferReference(data.package) }; }
       catch { throw new GroupApiError('GROUP_INVALID_RESPONSE'); }
     },
     searchStart: (trackId: string) => single('search_start', { trackId }, trackId),

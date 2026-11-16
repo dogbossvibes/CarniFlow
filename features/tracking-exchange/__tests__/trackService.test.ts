@@ -15,8 +15,10 @@ const raw = (over: Record<string, unknown> = {}) => ({ trackId: '50000000-0000-4
   laidAtMs: null, searchStartedAtMs: null, searchedAtMs: null, area: null, distanceM: null, ...over });
 const lying = { status: 'lying', laidAtMs: 10_000, area: { centerLat: 47.37, centerLng: 8.54, radiusM: 75 } };
 const ok = (body: Record<string, unknown>) => ({ version: 1, serverNowMs: 1, ...body });
-const reference = { version: 1, points: [{ lat: 47.37, lng: 8.54, breakBefore: false }, { lat: 47.371, lng: 8.541, breakBefore: false }],
-  markers: [], distanceM: 120, date: null };
+// Format der Fährten-Übergabe (TrackTransferReference): Zeitstempel bleiben für die Absuche erhalten.
+const pt = (lat: number, lng: number, t: number) => ({ lat, lng, t, accuracy: 3, altitude: null, speed: null, heading: null, breakBefore: false, measuredDistanceM: null });
+const reference = { version: 1, startedAtMs: 1_763_000_000_000, finishedAtMs: 1_763_000_600_000, distanceM: 120, durationSeconds: 600,
+  points: [pt(47.37, 8.54, 1_763_000_000_000), pt(47.371, 8.541, 1_763_000_600_000)], markers: [], segments: [], manualAngleGeometry: null };
 
 function client(respond: (action: string, request: Record<string, unknown>) => Record<string, unknown>) {
   const calls: { endpoint: string; action: string; request: Record<string, unknown> }[] = [];
@@ -27,7 +29,7 @@ function client(respond: (action: string, request: Record<string, unknown>) => R
 describe('Fährten im Gruppentraining', () => {
   beforeEach(() => { mockUuid = 0; });
 
-  it('Übergabe bleibt bis Stufe 2b abgeschaltet', () => { expect(GROUP_TRACK_HANDOVER_READY).toBe(false); });
+  it('Übergabe ist mit Stufe 2b eingeschaltet', () => { expect(GROUP_TRACK_HANDOVER_READY).toBe(true); });
 
   it('liest Status und Fläche; liegend ohne Fläche ist ungültig', () => {
     expect(parseGroupTrack(raw({ ...lying })).area).toEqual({ centerLat: 47.37, centerLng: 8.54, radiusM: 75 });
@@ -68,7 +70,7 @@ describe('Fährten im Gruppentraining', () => {
     const good = client(() => ok({ track: raw({ ...lying }), package: reference }));
     await expect(createGroupTrackService(good.client, HANDLER).fetch('50000000-0000-4000-8000-000000000001')).resolves.toMatchObject({ reference: { distanceM: 120 } });
     await expect(createGroupTrackService(good.client, 'c3333333-3333-4333-8333-333333333333').fetch('50000000-0000-4000-8000-000000000001')).rejects.toThrow('GROUP_INVALID_RESPONSE');
-    const broken = client(() => ok({ track: raw({ ...lying }), package: { version: 1, points: [] } }));
+    const broken = client(() => ok({ track: raw({ ...lying }), package: { version: 1, points: [{ lat: 1, lng: 1, breakBefore: false }], markers: [], distanceM: null, date: null } }));
     await expect(createGroupTrackService(broken.client, HANDLER).fetch('50000000-0000-4000-8000-000000000001')).rejects.toThrow('GROUP_INVALID_RESPONSE');
   });
 
