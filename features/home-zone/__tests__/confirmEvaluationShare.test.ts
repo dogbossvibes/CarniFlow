@@ -49,3 +49,14 @@ it('fragt zur Sicherheit, wenn das Paket fehlt oder die Zone nicht lesbar ist', 
   await expect(confirmEvaluationShare(far)).resolves.toBe(false);
   expect(alert).toHaveBeenCalledTimes(2);
 });
+
+it('#146 fremd gelegt: Paket ohne gelegte Linie; geprüft wird nur die Absuche, der Text nennt keine gelegte Linie', async () => {
+  mockZones.mockResolvedValue([zone]);
+  press(0);
+  // Die Linie der Leger:in läge in der Zone, verlässt das Gerät aber nicht: keine Rückfrage.
+  await expect(confirmEvaluationShare({ ...far, laid: [] }, false)).resolves.toBe(true);
+  expect(alert).not.toHaveBeenCalled();
+  await expect(confirmEvaluationShare({ ...searchInZone, laid: [] }, false)).resolves.toBe(false);
+  expect(alert).toHaveBeenCalledTimes(1);
+  expect(alert.mock.calls[0][1]).toBe('evaluationSearchBody');
+});

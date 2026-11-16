@@ -19,6 +19,18 @@ describe('Auswertung: Antworten', () => {
   it('liest den Freigabe-Stand', () => {
     expect(parseShareState(state).candidates[0]).toEqual({ userId: A, displayName: 'Sandra', isTrainer: false, isLayer: true });
   });
+  it('#146: gelegte Linie geht nur mit, wenn der Server es ausdrücklich sagt (älterer Server: nein)', () => {
+    expect(parseShareState(state).laidLineShared).toBe(false);
+    expect(parseShareState({ ...state, laidLineShared: false }).laidLineShared).toBe(false);
+    expect(parseShareState({ ...state, laidLineShared: 'true' }).laidLineShared).toBe(false);
+    expect(parseShareState({ ...state, laidLineShared: true }).laidLineShared).toBe(true);
+  });
+  it('#146: liest eine Auswertung ohne gelegte Linie', () => {
+    const detail = parseDetail({ trackId: T, groupId: G, sessionId: S, handlerUserId: B, handlerName: 'Bea', layerUserId: A, layerName: 'Sandra',
+      dogName: 'Luna', metrics, mine: false, updatedAtMs: 1, laid: [], search: [{ lat: 47, lng: 8 }, { lat: 47.1, lng: 8.1 }] });
+    expect(detail.laid).toEqual([]);
+    expect(detail.search).toHaveLength(2);
+  });
   it('lehnt unvollständige Antworten ab', () => {
     expect(() => parseShareState({ ...state, shareOutside: undefined })).toThrow(GroupApiError);
     expect(() => parseDetail({ trackId: T })).toThrow(GroupApiError);
@@ -61,6 +73,21 @@ describe('Auswertung: Paket aus der eigenen Fährte', () => {
     expect(buildEvaluationPackage(laid, { distanceMeters: 175 })).toBeNull();
     expect(buildEvaluationPackage(laid, { run: { ...run, run_points: [] } })).toBeNull();
     expect(buildEvaluationPackage([], { run })).toBeNull();
+  });
+  it('#146 fremd gelegt: ohne gelegte Linie, Absuche und Kennzahlen bleiben', () => {
+    const pkg = buildEvaluationPackage(laid, { distanceMeters: 175, run }, false)!;
+    expect(pkg.laid).toEqual([]);
+    expect(pkg.search).toHaveLength(2);
+    expect(pkg.metrics.distanceM).toBe(175);
+    expect(Object.keys(pkg).sort()).toEqual(['laid', 'metrics', 'search', 'version']);
+    expect(JSON.stringify(pkg)).not.toContain('8.5415');
+    // Auch wenn die gelegten Punkte lokal fehlen, lässt sich die Absuche teilen.
+    expect(buildEvaluationPackage([], { run }, false)?.laid).toEqual([]);
+    expect(buildEvaluationPackage(laid, { run: { ...run, run_points: [] } }, false)).toBeNull();
+  });
+  it('#146 selbst gelegt: mit gelegter Linie (Standard)', () => {
+    expect(buildEvaluationPackage(laid, { run }, true)?.laid).toEqual(laid);
+    expect(buildEvaluationPackage(laid, { run })?.laid).toEqual(laid);
   });
   it('dünnt lange Linien aus und behält Anfang, Ende und Unterbrüche', () => {
     const pts = Array.from({ length: 12000 }, (_, i) => ({ lat: 47 + i / 1e6, lng: 8, ...(i === 7777 ? { breakBefore: true as const } : {}) }));
