@@ -13,6 +13,7 @@ import { TrackObjectCorrections } from '@/features/tracking/components/TrackObje
 import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
+import { LinkedTrainingsCard } from '@/features/training/trackLinks/components/LinkedTrainingsCard';
 import { refreshTrainerShareCopies, shareTrackWithHomeZone } from '@/features/home-zone/trainerShare';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -441,6 +442,8 @@ export default function TrackAuswertungScreen() {
           )}
 
           {data.owner_id === authenticatedSession?.user.id && <DistractionEntry parentId={String(id)} />}
+          {/* #114: verknüpfte Trainings, nur für die Besitzerin; keine Koordinaten, nicht Teil von Teilen/Export. */}
+          {!!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id && <LinkedTrainingsCard ownerId={authenticatedSession.user.id} sessionId={String(id)} />}
           {data.status === 'completed' && <ExchangeEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && (

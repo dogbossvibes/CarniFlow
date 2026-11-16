@@ -177,4 +177,24 @@ export const MIGRATIONS: LocalMigration[] = [
     owner_id text not null, session_id text not null, payload_json text not null, primary key(owner_id,session_id)
   );` },
   { version: 12, name: 'track_file_exchange', sql: EXCHANGE_SCHEMA },
+  {
+    version: 13,
+    name: 'training_unit_track_links',
+    // Verknüpfung Training ↔ Fährte/Absuche (#114). Eigene Tabelle statt
+    // sync_queue: ältere Clients verwerfen unbekannte Queue-Typen. Kein
+    // Fremdschlüssel: die Fährte kann nur auf dem Server liegen, und eine
+    // wartende Verknüpfung übersteht den Resync der Fährte.
+    sql: `create table if not exists local_training_unit_tracks (
+      id text primary key, owner_id text not null, training_unit_id text not null,
+      training_session_id text not null, track_run_id text,
+      state text not null check (state in ('pending','synced','delete_pending')),
+      created_at text not null, updated_at text not null, last_error text
+    );
+    create unique index if not exists idx_unit_track_link_key
+      on local_training_unit_tracks (owner_id, training_unit_id, training_session_id, coalesce(track_run_id, ''));
+    create index if not exists idx_unit_track_link_session
+      on local_training_unit_tracks (owner_id, training_session_id);
+    create index if not exists idx_unit_track_link_state
+      on local_training_unit_tracks (owner_id, state);`,
+  },
 ];
