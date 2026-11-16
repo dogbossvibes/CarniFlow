@@ -733,5 +733,53 @@
     "reason": "Nutzerentscheid Android-Build-60-Abgleich: alte Android-Runtime 1.0.4 (Aug.–Okt. 2026), Code seither überarbeitet; Sammelentscheid wie iOS-Abschnitt 5. Kundenstand ist Build 49/47.",
     "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
     "date": "2026-11-12"
+  },
+  {
+    "group": "81e2cb25-44a8-4bec-89fe-560c0365d037",
+    "reason": "Nutzerentscheid 16.11.2026: Tagesbegrüssung (alte Runtime 1.0.5-motion-v4). Code vollständig vorhanden (HomeDayGreeting.tsx); die Tondatei wurde am 09.11.2026 bewusst durch den neuen ANYVO-Jingle ersetzt (cc227992).",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "c898c1ad-8a14-4cb3-a22e-8d319bccf69f",
+    "reason": "Nutzerentscheid 16.11.2026: Kartenebenen Standard/Satellit/Hybrid (nur alte Runtime 1.0.5-motion-v4). Fehlt bewusst: war weder im App-Store-Build 57 (Source 17443616) noch in Build 60; Karte ist fest auf Hybrid. Bei Bedarf als eigene Aufgabe neu umsetzen.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "8d8919bb-adda-425d-bf27-41f5f8bec0eb",
+    "reason": "Nutzerentscheid 16.11.2026: Startlogo nach erstem Root-Layout ausblenden (nur alte Runtime 1.0.5-motion-v4). Fehlt: war weder in Build 57 noch in Build 60; seit SDK 58 steuert der Router das Startlogo, auf Build 60 ist das Problem nicht aufgetreten. Nicht gesondert auf Gerät nachgestellt.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "5a201ec3-2667-4036-b38e-f0bdd1101e33",
+    "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.5-motion-v4). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "a4e1f26a-4e1a-4db1-a4d9-06311e2bc90c",
+    "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.4). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "c49bc11c-e5be-4239-bb2e-5cee1e2e0d5d",
+    "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.5). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "a266b0f3-ac00-4c31-95f2-69a374c31610",
+    "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.5-motion-v3). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
+  },
+  {
+    "group": "8a52374d-0237-43ba-a81a-b7aedb5b0b79",
+    "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.5-motion-v2). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
+    "date": "2026-11-16"
   }
 ]
