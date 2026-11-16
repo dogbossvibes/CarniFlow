@@ -66,7 +66,9 @@ grant execute on function public.training_unit_track_link_allowed(uuid, uuid, uu
 
 alter table public.training_unit_tracks enable row level security;
 
-revoke all on table public.training_unit_tracks from public, anon;
+-- Supabase vergibt neuen Tabellen standardmässig alle Rechte an anon und
+-- authenticated. Zuerst alles entziehen, dann nur Lesen, Anlegen und Lösen geben.
+revoke all on table public.training_unit_tracks from public, anon, authenticated;
 grant select, insert, delete on table public.training_unit_tracks to authenticated;
 
 drop policy if exists training_unit_tracks_select on public.training_unit_tracks;

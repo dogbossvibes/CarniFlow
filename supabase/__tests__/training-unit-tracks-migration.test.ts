@@ -29,7 +29,8 @@ describe('Migration: Training mit Fährte/Absuche verknüpfen (#114)', () => {
 
   it('erlaubt nur der Besitzerin Lesen, Anlegen und Lösen', () => {
     expect(code).toMatch(/alter table public\.training_unit_tracks enable row level security/);
-    expect(code).toMatch(/revoke all on table public\.training_unit_tracks from public, anon/);
+    // Supabase-Standardrechte würden authenticated sonst auch UPDATE geben.
+    expect(code).toMatch(/revoke all on table public\.training_unit_tracks from public, anon, authenticated;\s+grant select, insert, delete on table/);
     expect(code).toMatch(/grant select, insert, delete on table public\.training_unit_tracks to authenticated/);
     expect(code).not.toMatch(/grant[^;]*\bupdate\b/i);
     expect(code).not.toMatch(/for (update|all)\b/i);

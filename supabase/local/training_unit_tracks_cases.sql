@@ -27,9 +27,8 @@ create function pg_temp.as_user(p uuid) returns void language sql as $$
 $$;
 
 -- OWNER (zwei Hunde, zwei Fährten, eine Absuche), OTHER (eigenes Training, eigene Fährte).
-insert into auth.users(id,aud,role,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,is_sso_user,is_anonymous)
-select u,'authenticated','authenticated','ut-'||n||'@local.test',now(),'{}','{}',now(),now(),false,false
-from (values ('a1111111-1111-4111-8111-111111111111'::uuid,'owner'),('b2222222-2222-4222-8222-222222222222','other')) t(u,n);
+-- Nur die ID: funktioniert mit dem vollen lokalen Supabase-Stack und mit dem nackten Datenbank-Image.
+insert into auth.users(id) values ('a1111111-1111-4111-8111-111111111111'), ('b2222222-2222-4222-8222-222222222222');
 insert into public.dogs(id,owner_id,name) values
  ('a0000000-0000-4000-8000-0000000000a1','a1111111-1111-4111-8111-111111111111','Luna'),
  ('a0000000-0000-4000-8000-0000000000a2','a1111111-1111-4111-8111-111111111111','Balu'),
