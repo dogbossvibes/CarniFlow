@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, RefreshControl, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
@@ -238,7 +238,11 @@ export default function GroupSessionScreen() {
     ? [{ trackId: tr.trackId, area: tr.area, color: trackColor(tr) }] : []);
   const courseViews: CourseView[] = visibleTracks.flatMap(tr => mineTrack(tr) && tr.status !== 'revoked' && courses[tr.trackId]
     ? [{ trackId: tr.trackId, points: courses[tr.trackId], color: trackColor(tr), startOnly: blindForMe(tr) }] : []);
-  const livePositions = useGroupLivePositions(joined && active && isLiveShareReleaseReady() ? userId : null, joined && active ? sessionId : null, live.client);
+  // Nur abfragen, solange dieser Bildschirm sichtbar ist: er bleibt unter «Fährte legen» gemountet
+  // und würde sonst während der GPS-Aufzeichnung alle 2 s weiterfragen (wie live/GroupTrainingScreen).
+  const focused = useIsFocused();
+  const watchLive = focused && joined && active;
+  const livePositions = useGroupLivePositions(watchLive && isLiveShareReleaseReady() ? userId : null, watchLive ? sessionId : null, live.client);
   const positionViews = livePositions.positions.flatMap(p => {
     const who = participants.find(x => x.userId === p.userId && x.dogId === p.dogId);
     return who ? [{ shareId: p.shareId, name: `${who.displayName} · ${who.dogName}`, latitude: p.latitude, longitude: p.longitude, color: dogColor(who.dogId, who.colorKey) }] : [];

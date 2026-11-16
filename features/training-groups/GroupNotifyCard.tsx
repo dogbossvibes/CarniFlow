@@ -13,18 +13,24 @@ const ROWS: { key: keyof GroupNotifySettings; label: TranslationKey }[] = [
   { key: 'trainingStarted', label: 'groups.notifyStarted' },
 ];
 
+type Service = ReturnType<typeof createGroupNotifyService>;
+
 /** Mitteilungs-Einstellungen für Gruppentrainings (Stufe 3). Ohne Server-Antwort keine Schalter. */
-export function GroupNotifyCard({ service }: { service: ReturnType<typeof createGroupNotifyService> | null }) {
+export function GroupNotifyCard({ service }: { service: Service | null }) {
   const { t } = useT();
-  const [settings, setSettings] = useState<GroupNotifySettings | null>(null);
+  // Die Antwort merkt sich, zu welchem Dienst sie gehört: nach einem Kontowechsel gelten die
+  // alten Schalter sofort nicht mehr, ohne den Zustand im Effekt zurückzusetzen.
+  const [loaded, setLoaded] = useState<{ service: Service; settings: GroupNotifySettings } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (!service) return;
     let alive = true;
-    setSettings(null);
-    if (service) void service.get().then(v => { if (alive) setSettings(v); }).catch(() => undefined);
+    void service.get().then(v => { if (alive) setLoaded({ service, settings: v }); }).catch(() => undefined);
     return () => { alive = false; };
   }, [service]);
+  const settings = service && loaded?.service === service ? loaded.settings : null;
   if (!service || !settings) return null;
+  const setSettings = (next: GroupNotifySettings) => setLoaded({ service, settings: next });
   const toggle = (key: keyof GroupNotifySettings, value: boolean) => {
     const before = settings;
     setSettings({ ...settings, [key]: value });
