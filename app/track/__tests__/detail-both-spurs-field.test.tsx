@@ -35,6 +35,7 @@ jest.mock('@/features/tracking/components/TrackAngleList',()=>({TrackAngleList:(
 jest.mock('@/components/help/HelpButton',()=>({HelpButton:()=>null}));
 jest.mock('@/features/tracking-distractions/DistractionEntry',()=>({DistractionEntry:()=>null}));
 jest.mock('@/features/tracking-exchange/ExchangeEntry',()=>({ExchangeEntry:()=>null}));
+jest.mock('@/features/training-groups/GroupEvaluationCard',()=>({GroupEvaluationCard:()=>null}));
 jest.mock('@/features/tracking/components/TrackObjectCorrections',()=>({TrackObjectCorrections:()=>null}));
 jest.mock('@/features/tracking/components/TrackExportActions',()=>({TrackExportActions:()=>null}));
 jest.mock('@/components/ui/AnyvoButton',()=>({AnyvoButton:()=>null}));

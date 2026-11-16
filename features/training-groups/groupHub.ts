@@ -6,6 +6,7 @@ import { createTrainingGroupService } from '@/features/tracking-exchange/groups/
 import { createGroupJoinService } from '@/features/tracking-exchange/groups/joinService';
 import { createGroupTrackService } from '@/features/tracking-exchange/groups/trackService';
 import { createGroupNotifyService } from '@/features/tracking-exchange/groups/notifyService';
+import { createGroupEvaluationService } from '@/features/tracking-exchange/groups/evaluationService';
 import { GroupApiError, type GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import type { TrainingGroup } from '@/features/tracking-exchange/groups/groupModels';
 
@@ -20,6 +21,7 @@ export function useGroupServices() {
     join: userId ? createGroupJoinService(client, userId) : null,
     tracks: userId ? createGroupTrackService(client, userId) : null,
     notify: userId ? createGroupNotifyService(client, userId) : null,
+    evaluations: userId ? createGroupEvaluationService(client, userId) : null,
   }), [client, userId]);
 }
 
