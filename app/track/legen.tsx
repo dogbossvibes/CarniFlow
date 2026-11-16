@@ -31,7 +31,7 @@ import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
-import { reopenTarget, shouldShowActiveFaehrteConflict, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
+import { isResumeOfActiveFaehrte, reopenTarget, shouldShowActiveFaehrteConflict, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import { clearPending } from '@/features/tracking/store/trackPersist';
 import * as Crypto from 'expo-crypto';
 import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
@@ -312,6 +312,9 @@ export default function LegenScreen() {
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
   const conflictShownRef = useRef(false);
+  // Fortsetzen ist einmal gescheitert (Recovery nicht ladbar) → die Start-Taste zeigt wieder
+  // den Konfliktdialog, damit die Fährte bewusst abgebrochen werden kann (keine Sackgasse).
+  const resumeFailedRef = useRef(false);
   const quickPickerLayout = getTrackQuickPickerLayout({
     windowHeight,
     safeAreaTop: insets.top,
@@ -361,9 +364,13 @@ export default function LegenScreen() {
     rec.noteUserTapStart();
     const dId = activeDog?.id ?? null;
     const entry = dId ? useActiveFaehrten.getState().get(dId) : null;
-    if (dId && entry) { showConflict(dId, entry); return; }   // KEINE zweite Fährte
+    // Genau diese aktive Fährte wird fortgesetzt (Route trägt ihre Session-ID) → direkt
+    // weiter; begin() lädt die Recovery. Ohne diese Ausnahme führt "Fährte fortsetzen"
+    // im Konfliktdialog wieder hierher zurück (Endlosschleife).
+    const routeSessionId = typeof params.id === 'string' ? params.id : null;
+    if (dId && entry && (resumeFailedRef.current || !isResumeOfActiveFaehrte(entry, dId, routeSessionId))) { showConflict(dId, entry); return; }   // KEINE zweite Fährte
     proceedToStart();
-  }, [activeDog?.id, showConflict, proceedToStart, rec]);
+  }, [activeDog?.id, showConflict, proceedToStart, rec, params.id]);
 
   // Beim Betreten mit einem Hund, der bereits eine aktive Fährte hat, sofort den
   // Dialog zeigen (einmalig) — statt still eine zweite Aufnahme vorzubereiten.
@@ -439,6 +446,7 @@ export default function LegenScreen() {
       dogId: activeDog?.id, userId: session?.user?.id }).catch(() => null) : null;
     if (requestedSessionId && !resumed) {
       beganRef.current = false;
+      resumeFailedRef.current = true;
       Alert.alert(t('common.error'), t('track.continuation.resumeFailed'));
       return;
     }
