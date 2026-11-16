@@ -1,5 +1,22 @@
 # ANYVO – Active Work
 
+## Stand nach Android-OTA #145 und #148 – 2026-11-16 (Nacht)
+
+**Erledigt:** Android Build 53: OTA #145 (Gruppentraining Stufe 3, PR #135) und OTA #148
+(Stufe 4a mit Heimzonen-Abfrage) live. iOS 60: Gerätetest #137 bestanden, Karte auf
+Veröffentlicht. PRs #139 und #140 gemergt. Issues #141–#144 und #146 angelegt.
+
+**Offen:**
+- **Gerätetest #145 und #148** auf Android Build 53 mit zwei Konten (Punkte in den Karten);
+  danach Karten auf Veröffentlicht.
+- **Issue #146** im Konzept «Gruppenfährten» entscheiden, bevor Stufe 4a auf iOS 60 folgt.
+- **Stufe 4a auf iOS 60:** eigene Charge mit eigener Freigabe, Basis `60d72b82` plus main.
+- **PR #147** (genauerer Einleitungstext der Heimzone) mergen; Auslieferung mit der nächsten Charge.
+- **App Store:** Build 60 (1.0.8) ist eingereicht; Antwort von Apple abwarten.
+- **Vor Play-Produktion Android:** #141 (FCM) und #142 (Standort teilen) erledigen.
+- Übrige offene Punkte unverändert, siehe Abschnitte darunter (der dortige Punkt «Gerätetest #137»
+  ist erledigt).
+
 ## Stand nach OTA #137 und App-Store-Einreichung – 2026-11-16 (spät)
 
 **Erledigt:** OTA #137 (Folgekorrekturen Gruppentraining, PR #135) auf iOS 60 live. Build 60
