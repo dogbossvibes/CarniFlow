@@ -11,11 +11,15 @@ export interface WhatsNewRelease {
 }
 
 // Set to null for releases without a customer-facing announcement.
+// Neue Kennung nur bei Chargen mit für Kunden sichtbaren Neuerungen; reine Fehlerkorrekturen
+// lassen Kennung und Text unverändert (bereits bestätigte Geräte sehen dann nichts erneut).
 export const CURRENT_WHATS_NEW_RELEASE: WhatsNewRelease | null = {
-  id: '2026-10-tracking-angle-analysis',
+  id: '2026-11-group-training-home-zone',
   titleKey: 'updates.whatsNewTitle',
   itemKeys: [
-    'updates.whatsNewTrackingAngles',
+    'updates.whatsNewGroupTraining',
+    'updates.whatsNewHomeZone',
+    'updates.whatsNewTrainerCopy',
   ],
 };
 
