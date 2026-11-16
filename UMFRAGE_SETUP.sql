@@ -1,5 +1,9 @@
 -- ANYVO — Trainer-Terminumfrage (Doodle-Style)
 -- Im Supabase SQL-Editor ausführen.
+--
+-- ACHTUNG (2026-11-14): Die Policies unten sind zu offen und durch
+-- supabase/migrations/20261114220000_umfrage_rls_hardening.sql ersetzt.
+-- Diese Datei nicht erneut ausführen, ohne die Migration danach wieder anzuwenden.
 
 create table if not exists trainer_umfragen (
   id uuid default gen_random_uuid() primary key,

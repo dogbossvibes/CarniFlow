@@ -14,6 +14,7 @@ import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { createSupabaseTransferClient } from './rpc';
 import { createTransferLocalStore } from './localStore';
+import { confirmLocalTrackHandover } from '@/features/home-zone/confirm';
 import { createTransferJournal } from './operationJournal';
 import { createTrackTransferService, transferCrypto, type TransferOffer } from './service';
 import { transferErrorKey } from './i18n';
@@ -91,6 +92,8 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
     const selectedSource = sourceId, selectedPerson = personId;
     Alert.alert(t('confirm'), `${contactName(selectedPerson)}\n\n${t('consent')}`, [
       { text: t('cancel'), style: 'cancel' }, { text: t('send'), onPress: () => { void act(async () => {
+        // Heimzone (Issue #115): eine Übergabe enthält die ganze Fährte, deshalb vorher warnen.
+        if (!await confirmLocalTrackHandover(selectedSource)) return;
         await service.offer(selectedSource, selectedPerson); if (!alive.current) return;
         await refresh(); if (alive.current) { setNotice(t('sent')); setShowComposer(false); }
       }); } },

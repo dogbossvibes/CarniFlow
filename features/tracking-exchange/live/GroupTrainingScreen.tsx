@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useTranslation } from 'react-i18next';
+import { HOME_ZONE_NS } from '@/features/home-zone/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
 import { C } from '@/constants/colors';
@@ -32,6 +33,7 @@ export default function GroupTrainingScreen() {
   const router = useRouter();
   const focused = useIsFocused();
   const { t } = useTranslation('groupIntegration');
+  const { t: homeZoneText } = useTranslation(HOME_ZONE_NS);
   const { session: auth } = useSession();
   const userId = auth?.user.id ?? null;
   const { dogs, refresh: refreshDogs } = useDogs();
@@ -80,7 +82,8 @@ export default function GroupTrainingScreen() {
   const accessError = data.error === 'TRACKING_ACTIVE_REQUIRED' || live.state.issue === 'active_required'
     ? t('activeRequired') : null;
   const error = !userId ? t('account') : accessError ?? (code ? t(code) : live.state.issue === 'maintenance' ? t('maintenance') : live.state.permissionDenied ? t('permission')
-    : live.state.issue === 'storage' ? t('storage') : (live.state.phase === 'error' || (live.state.phase === 'stopped' && live.state.issue === 'connection')) ? t('liveError') : null);
+    : live.state.issue === 'storage' ? t('storage') : (live.state.phase === 'error' || (live.state.phase === 'stopped' && live.state.issue === 'connection')) ? t('liveError')
+    : live.state.phase === 'sharing' && live.state.homeZonePaused ? homeZoneText('livePaused') : null);
   const stopThen = async (operation: Parameters<typeof act>[0]) => { await live.stop(); await act(operation); };
   const leaveSession = () => {
     if (!activeSession || !joined) return;

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useDogs } from '@/hooks/useDogs';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
@@ -15,7 +17,8 @@ import type { GroupErrorCode } from '@/features/tracking-exchange/groups/groupRp
 import { formatGroupCode, groupJoinLink, type GroupJoinCode, type PendingJoinRequest } from '@/features/tracking-exchange/groups/joinService';
 import { useGroupLiveShare } from '@/features/tracking-exchange/live/LiveShareProvider';
 import { useConnectedInviteTargets } from './useConnectedInviteTargets';
-import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, useGroupServices } from './groupHub';
+import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, secondsUntilMidnight, useGroupServices } from './groupHub';
+import { parseSession } from '@/features/tracking-exchange/groups/groupModels';
 
 type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; serverNowMs: number };
 
@@ -35,6 +38,10 @@ export default function GroupDetailScreen() {
   const [invited, setInvited] = useState<Set<string>>(() => new Set());
   const [contactsRevision, setContactsRevision] = useState(0);
   const contacts = useConnectedInviteTargets(userId, contactsRevision);
+  const { dogs } = useDogs();
+  const [starting, setStarting] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [startDogs, setStartDogs] = useState<string[]>([]);
   const generation = useRef(0);
 
   const load = useCallback(async () => {
@@ -85,6 +92,23 @@ export default function GroupDetailScreen() {
   const memberIds = new Set(group?.members.map(m => m.userId) ?? []);
   const inviteTargets = contacts.filter(c => !memberIds.has(c.userId));
 
+  const defaultTitle = () => new Date().toLocaleDateString(undefined, { weekday: 'long' });
+  // Gruppentraining starten: erster Hund eröffnet, weitere Hunde treten bei; danach direkt hinein.
+  const startTraining = () => {
+    const groups = services.groups;
+    const [first, ...rest] = startDogs;
+    if (!groups || !first) return;
+    const opened: { id: string | null } = { id: null };
+    void run('start', async () => {
+      const result = await groups.open(groupId, sessionTitle, first, secondsUntilMidnight());
+      const sessionId = parseSession(result.session).sessionId;
+      opened.id = sessionId;
+      for (const dogId of rest) await groups.join(sessionId, dogId);
+    }, () => {
+      setStarting(false); setStartDogs([]);
+      if (opened.id) router.push({ pathname: '/groups/session/[id]', params: { id: opened.id, groupId } } as never);
+    });
+  };
   const createCode = () => {
     const join = services.join;
     if (join) void run('code', async () => { setCode(await join.createCode(groupId)); });
@@ -129,12 +153,51 @@ export default function GroupDetailScreen() {
 
           {group?.status === 'active' && (
             <AnyvoCard>
-              <Text style={cs.section}>{t('groups.training')}</Text>
-              <Text style={cs.body}>{runningSessions.length > 0 ? t('groups.trainingRunning', { count: runningSessions.length }) : t('groups.trainingNone')}</Text>
-              <View style={cs.actions}>
-                <AnyvoButton style={cs.flex} label={t('groups.openTraining')} icon="people-outline"
-                  onPress={() => router.push({ pathname: '/track/live', params: { groupId } } as never)} />
-              </View>
+              <Text style={cs.section}>{t('groups.running')}</Text>
+              {runningSessions.length === 0 ? <Text style={cs.body}>{t('groups.trainingNone')}</Text> : null}
+              {runningSessions.map((session, index) => (
+                <View key={session.sessionId}>
+                  {index > 0 ? <View style={cs.divider} /> : null}
+                  <TouchableOpacity style={cs.row} accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/groups/session/[id]', params: { id: session.sessionId, groupId } } as never)}>
+                    <View style={cs.rowText}>
+                      <Text style={cs.rowTitle}>{session.title}</Text>
+                      <Text style={cs.rowSub}>{t('groups.sessionEnds', { time: formatTime(new Date(session.expiresAtMs)) })}</Text>
+                    </View>
+                    <Text style={cs.textButtonLabel}>{t('groups.open')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {manage && (starting ? (
+                <View style={{ gap: 8, marginTop: 12 }}>
+                  <Text style={cs.section}>{t('groups.start')}</Text>
+                  <Text style={cs.hint}>{t('groups.startTitle')}</Text>
+                  <TextInput style={cs.input} value={sessionTitle} onChangeText={setSessionTitle} maxLength={80}
+                    accessibilityLabel={t('groups.startTitle')} placeholderTextColor={C.trackTextMut} />
+                  <Text style={cs.hint}>{t('groups.startDogs')}</Text>
+                  {dogs.length === 0 ? <Text style={cs.body}>{t('groups.noDogs')}</Text> : null}
+                  {dogs.map(dog => {
+                    const on = startDogs.includes(dog.id);
+                    return (
+                      <TouchableOpacity key={dog.id} style={cs.row} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
+                        onPress={() => setStartDogs(prev => on ? prev.filter(x => x !== dog.id) : [...prev, dog.id])}>
+                        <Text style={[cs.rowTitle, { flex: 1 }]}>{dog.name}</Text>
+                        <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={on ? C.trackPrimary : C.trackTextMut} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <Text style={cs.hint}>{t('groups.startUntil')}</Text>
+                  <View style={cs.actions}>
+                    <AnyvoButton style={cs.flex} label={t('groups.cancel')} variant="ghost" onPress={() => setStarting(false)} />
+                    <AnyvoButton style={cs.flex} label={t('groups.startSubmit')} loading={busy === 'start'}
+                      disabled={!sessionTitle.trim() || startDogs.length === 0 || !!busy} onPress={startTraining} />
+                  </View>
+                </View>
+              ) : (
+                <View style={cs.actions}>
+                  <AnyvoButton style={cs.flex} label={t('groups.start')} icon="play-outline" onPress={() => { setSessionTitle(defaultTitle()); setStarting(true); }} />
+                </View>
+              ))}
               <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.startHint')}</Text>
             </AnyvoCard>
           )}

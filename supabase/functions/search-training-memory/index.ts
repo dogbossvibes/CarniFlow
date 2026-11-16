@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getEmbeddingProvider, normalizeText, MIN_CONTENT_LENGTH } from '../_shared/embedding.ts'
+import { SERVER_AI_FLAG, serverAiDisabledResponse } from '../_shared/ai-guard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,10 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  // KI serverseitig standardmässig aus (Produktentscheidung «keine KI», EU AI Act/Datenschutz).
+  const aiDisabled = serverAiDisabledResponse(Deno.env.get(SERVER_AI_FLAG), corsHeaders)
+  if (aiDisabled) return aiDisabled
 
   try {
     const supabase = createClient(
@@ -43,8 +48,8 @@ serve(async (req) => {
 
     const { data, error } = await supabase.rpc('match_training_embeddings', {
       query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
+      match_threshold: Math.min(Math.max(Number(matchThreshold) || 0.5, 0.3), 1),
+      match_count: Math.min(Math.max(Math.trunc(Number(matchCount) || 10), 1), 20),
       filter_user_id: targetUserId ?? user.id,
       filter_dog_id: dogId ?? null,
       filter_category: category ?? null,
