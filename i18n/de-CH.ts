@@ -458,6 +458,7 @@ export const deCH = {
   'track.saveError': 'Speichern fehlgeschlagen',
   'track.distance':  'Distanz',
   'track.objectsShort': 'Gegenst.',
+  'track.deviationShort': 'Abweich.',
   'track.pause':     'Pause',
   'track.resume':    'Weiter',
   'track.mapFollow.on': 'Karte folgt deiner Position',

@@ -1265,9 +1265,9 @@ export default function TrackRunScreen() {
     : null;
 
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
-    { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
-    { value: devShown != null ? `${devOff ? '+' : ''}${formatApproxDeviationM(devShown)}` : '—', label: 'Abweich.', warn: devOff },
+    { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} ${t('track.stepsShort')}` },
+    { value: `${s.foundObjects}/${s.totalObjects}`, label: t('track.objectsShort') },
+    { value: devShown != null ? `${devOff ? '+' : ''}${formatApproxDeviationM(devShown)}` : '—', label: t('track.deviationShort'), warn: devOff },
     { value: s.accuracy != null ? `±${Math.round(s.accuracy)} m` : '—', label: gpsLabel },
   ];
 
@@ -1337,7 +1337,7 @@ export default function TrackRunScreen() {
               const on = view === k;
               return (
                 <Pressable key={k} onPress={() => setView(k)} className={`px-[11px] py-1.5 rounded-lg ${on ? 'bg-ft-acc' : ''}`}>
-                  <Text className={`text-[11.5px] font-bold ${on ? 'text-ft-acc-text' : 'text-ft-muted'}`}>{k === 'map' ? 'Karte' : 'Skizze'}</Text>
+                  <Text className={`text-[11.5px] font-bold ${on ? 'text-ft-acc-text' : 'text-ft-muted'}`}>{k === 'map' ? t('track.viewMap') : t('track.viewSketch')}</Text>
                 </Pressable>
               );
             })}
