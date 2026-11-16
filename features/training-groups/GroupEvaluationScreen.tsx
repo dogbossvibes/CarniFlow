@@ -30,7 +30,10 @@ function region(points: EvalPoint[]) {
     latitudeDelta: Math.max(0.002, (maxLat - minLat) * 1.4), longitudeDelta: Math.max(0.002, (maxLng - minLng) * 1.4) };
 }
 
-/** Trainer-Sicht (Stufe 4a): eine geteilte Auswertung mit gelegter und abgesuchter Linie. */
+/**
+ * Trainer-Sicht (Stufe 4a): eine geteilte Auswertung mit abgesuchter Linie und Kennzahlen.
+ * Die gelegte Linie ist nur dabei, wenn die Hundeführerin selbst gelegt hat (#146); sonst ist `laid` leer.
+ */
 export default function GroupEvaluationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const trackId = typeof id === 'string' ? id : '';
@@ -52,6 +55,10 @@ export default function GroupEvaluationScreen() {
 
   const errorKey = groupErrorText(error);
   const m = detail?.metrics;
+  const hasLaid = (detail?.laid.length ?? 0) > 0;
+  const points = detail ? [...detail.laid, ...detail.search] : [];
+  // Start der gelegten Linie; ohne gelegte Linie kein Startpunkt (der Beginn der Absuche ist nicht der Start der Fährte).
+  const start = detail?.laid[0];
   return (
     <View style={cs.root}>
       <SafeAreaView edges={['top']} style={cs.flex}>
@@ -63,21 +70,24 @@ export default function GroupEvaluationScreen() {
           {!detail && loading ? <Text style={cs.hint}>{t('groups.loading')}</Text> : null}
           {detail ? (
             <>
-              <View style={s.frame}>
-                <MapView style={s.map} initialRegion={region([...detail.laid, ...detail.search])} showsUserLocation={false}
-                  accessibilityLabel={t('groups.evalMapLabel')}>
-                  {splitAtBreaks(detail.laid).map((part, i) => (
-                    <Polyline key={`laid-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-                      strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 6]} />
-                  ))}
-                  {splitAtBreaks(detail.search).map((part, i) => (
-                    <Polyline key={`search-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-                      strokeColor={C.trackWarning} strokeWidth={3} />
-                  ))}
-                  <Marker coordinate={{ latitude: detail.laid[0].lat, longitude: detail.laid[0].lng }} title={t('groups.startPoint')} />
-                </MapView>
-                <Text style={s.legend}>{t('groups.evalLegend')}</Text>
-              </View>
+              {points.length > 0 ? (
+                <View style={s.frame}>
+                  <MapView style={s.map} initialRegion={region(points)} showsUserLocation={false}
+                    accessibilityLabel={t(hasLaid ? 'groups.evalMapLabel' : 'groups.evalMapLabelSearchOnly')}>
+                    {splitAtBreaks(detail.laid).map((part, i) => (
+                      <Polyline key={`laid-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+                        strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 6]} />
+                    ))}
+                    {splitAtBreaks(detail.search).map((part, i) => (
+                      <Polyline key={`search-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+                        strokeColor={C.trackWarning} strokeWidth={3} />
+                    ))}
+                    {start ? <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} title={t('groups.startPoint')} /> : null}
+                  </MapView>
+                  <Text style={s.legend}>{t(hasLaid ? 'groups.evalLegend' : 'groups.evalLegendSearchOnly')}</Text>
+                </View>
+              ) : null}
+              {!hasLaid ? <Text style={cs.hint}>{t('groups.evalNoLaidLine')}</Text> : null}
               {m ? (
                 <AnyvoCard>
                   <View style={s.stats}>
