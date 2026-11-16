@@ -1,5 +1,29 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #131 und #132 – 2026-11-16 (Nacht)
+
+**Erledigt:** OTA #131 (Training mit Fährte verknüpfen, iOS 60 und erste OTA auf Android
+Build 53) und OTA #132 (Gruppentraining Stufe 3, iOS 60) live. Karte #123 nach Gerätetest auf
+Veröffentlicht. PRs #124–#130 und #133 gemergt; #76 gilt durch #128 als gemergt. Release-Quellen
+auf GitHub gesichert. Acht Oktober-OTAs alter iOS-Runtimes untersucht und ausgenommen (#133).
+
+**Offen:**
+- **Gerätetest #131** auf iOS Build 60 und Android Build 53 (Punkte in der Karte); danach auf
+  Veröffentlicht. Wichtigster Punkt: Training speichern während laufender Aufzeichnung, Fährte
+  ohne Lücke.
+- **Gerätetest #108** auf Build 60 weiterhin offen.
+- **Board:** Wert «iOS 60 + Android 53» im Feld Release-Ziel fehlt; Karte #131 hat das Feld leer.
+- **Folgekorrekturen aus den Reviews:** Live-Positionen im Gruppentraining nur bei sichtbarem
+  Bildschirm abfragen (heute alle 2 s auch unter «Fährte legen»); ESLint-Fehler in
+  `GroupNotifyCard.tsx` in main beheben (in der Release-Quelle per Kommentar markiert).
+- **App Store:** Build 60 nicht eingereicht. Empfehlung: neuer Build mit aktuellem Stand statt
+  Build 60 (eingebauter Stand von Anfang November). Entscheid der Nutzerin offen.
+- **Android für Kunden:** Play-Produktion für Build 53 nicht freigegeben; Gruppentraining
+  Stufe 3 fehlt dort noch.
+- **main hinter Production:** nur noch die Release-Merges und Kommentarzeilen sowie die
+  Android-Linie (T-209 `4ab945b3`, Build-52/53-Änderungen `8e55b3a2`, `ec897e6b`, `4aac8786`).
+- Kartenebenen-Auswahl (Standard/Satellit/Hybrid) ist nicht umgesetzt; bei Bedarf eigene Aufgabe.
+
 ## Stand nach OTA #123 und Android Build 53 – 2026-11-16 (Abend)
 
 **Erledigt:** iOS-60-OTA #123 live (Heimzone, gekürzte Kopie für Trainer-Freigaben; Stand
