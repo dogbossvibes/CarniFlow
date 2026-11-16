@@ -20,6 +20,7 @@ export function GroupNotifyCard({ service }: { service: ReturnType<typeof create
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- aus PR #130 (main 723b8c31): Schalter beim Dienstwechsel bewusst leeren; nur Kommentar, kein Code geändert
     setSettings(null);
     if (service) void service.get().then(v => { if (alive) setSettings(v); }).catch(() => undefined);
     return () => { alive = false; };
