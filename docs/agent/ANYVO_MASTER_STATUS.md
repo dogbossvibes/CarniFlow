@@ -1,5 +1,25 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA #137 und App-Store-Einreichung – 2026-11-16 (spät)
+
+Aktueller Production-Stand **iOS 60** (Runtime `1.0.8-sdk58-v1`), frisch aus EAS nachkontrolliert.
+Ersetzt für iOS 60 die Angabe «Aktiv» im Abschnitt darunter; Android unverändert wie dort.
+- **Aktiv:** Source `60d72b82` (aktive Production `c3fd9879` plus main `8fb4647c`, dazu zwei
+  ESLint-Kommentarzeilen für Altbestand), Group `89a9042e-6994-4228-b3d3-5000c78ca615`.
+  Release-Karte Issue #137: Folgekorrekturen Gruppentraining (PR #135). Testweg Nachher,
+  **Gerätetest offen**.
+- **Release-Quelle:** `release/ios60-main-8fb4647c-20261117` (Datum im Namen versehentlich 17.11.).
+- **Jede weitere iOS-60-OTA muss `60d72b82` enthalten.** Vor der nächsten OTA aus main wieder
+  eine Release-Quelle aus dem Live-Commit plus main bauen.
+- **App Store:** Die Nutzerin hat Build 60 (1.0.8) am 16.11.2026 in App Store Connect zur Prüfung
+  eingereicht (vom MASTER nicht nachprüfbar). Sobald 1.0.8 im Store freigegeben ist, erreicht jede
+  Production-OTA dieser Runtime alle Store-Kunden, nicht mehr nur TestFlight: Testweg entsprechend
+  streng wählen. Der eingebaute Stand von Build 60 ist von Anfang November (`3858c0ff`); der
+  aktuelle Stand kommt per OTA ab dem zweiten Start. Build 57 (1.0.6) bleibt bis zur Freigabe
+  der Kundenstand.
+- **Android Build 53:** unverändert (Group `c0de00de`, Source `47b82b3a`). Gruppentraining Stufe 3
+  und PR #135 sind dort nicht ausgeliefert; auf Wunsch der Nutzerin später als eigene Charge.
+
 ## Stand iOS 60 und Android Build 53 nach drei OTAs – 2026-11-16 (Nacht)
 
 Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt die Angaben «Aktiv» im

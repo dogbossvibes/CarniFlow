@@ -1,5 +1,22 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #137 und App-Store-Einreichung – 2026-11-16 (spät)
+
+**Erledigt:** OTA #137 (Folgekorrekturen Gruppentraining, PR #135) auf iOS 60 live. Build 60
+(1.0.8) von der Nutzerin im App Store zur Prüfung eingereicht. PR #136 gemergt.
+
+**Offen:**
+- **Gerätetest #137** auf Build 60: «Fährte legen für» starten und zurückkehren, Positionen der
+  anderen erscheinen wieder; Mitteilungs-Schalter umstellen. Danach Karte auf Veröffentlicht.
+- **App-Prüfung von Apple** abwarten; bei Rückfragen oder Ablehnung Wortlaut an den MASTER.
+  Datenschutz-Angaben im Store gegen Standort-Teilen, Kontakte und Mitteilungen prüfen (Hinweis
+  an die Nutzerin gegeben, Ergebnis nicht bekannt).
+- **Android Build 53:** Gruppentraining Stufe 3 samt PR #135 als eigene Charge, auf Wunsch der
+  Nutzerin später. Play-Produktion nicht freigegeben.
+- **Ab Store-Freigabe von 1.0.8:** iOS-60-OTAs erreichen alle Kunden; Testweg strenger wählen.
+- Übrige offene Punkte unverändert, siehe Abschnitt darunter (der dortige Punkt «PR #135
+  ausliefern» ist für iOS 60 erledigt).
+
 ## Stand nach OTA #131 und #132 – 2026-11-16 (Nacht, nachgeführt)
 
 **Erledigt:** OTA #131 (Training mit Fährte verknüpfen, iOS 60 und erste OTA auf Android
