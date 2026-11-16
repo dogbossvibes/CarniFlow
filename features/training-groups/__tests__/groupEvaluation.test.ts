@@ -83,3 +83,32 @@ describe('Anzeige', () => {
     expect(parts.map(p => p.length)).toEqual([2, 2]);
   });
 });
+
+describe('Issue #146: Zustimmung der Leger:in', () => {
+  const summary = { trackId: T, groupId: G, sessionId: S, handlerUserId: B, handlerName: 'Bea', layerUserId: A, layerName: 'Sandra',
+    dogName: 'Luna', metrics, mine: false, updatedAtMs: 1 };
+  const search = [{ lat: 47, lng: 8 }, { lat: 47.1, lng: 8.1 }];
+  it('ohne Zustimmung: keine gelegte Linie, Absuche bleibt', () => {
+    const detail = parseDetail({ ...summary, laidShared: false, search });
+    expect(detail.laid).toEqual([]);
+    expect(detail.laidShared).toBe(false);
+    expect(detail.search).toHaveLength(2);
+  });
+  it('älterer Server ohne die neuen Felder: wie bisher', () => {
+    expect(parseDetail({ ...summary, laid: search, search }).laidShared).toBe(true);
+    const old = parseShareState(state);
+    expect(old.blocked).toBe(false);
+    expect(old.laidShared).toBe(true);
+  });
+  it('Stand: blocked und laidShared', () => {
+    const next = parseShareState({ ...state, blocked: true, laidShared: false });
+    expect([next.blocked, next.laidShared]).toEqual([true, false]);
+  });
+  it('Zustimmung lesen und setzen', async () => {
+    const call = jest.fn(async (_u: string, _e: string, action: string) => ({ version: 1, serverNowMs: 1, groupId: G, laidLine: action === 'consent_get' ? null : true }));
+    const service = createGroupEvaluationService({ call } as never, A);
+    await expect(service.consent(G)).resolves.toBeNull();
+    await expect(service.setConsent(G, true)).resolves.toBe(true);
+    expect(call).toHaveBeenLastCalledWith(A, 'training_group_eval_v1', 'consent_set', { groupId: G, value: true });
+  });
+});

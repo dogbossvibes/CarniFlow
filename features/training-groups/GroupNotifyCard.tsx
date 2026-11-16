@@ -10,6 +10,7 @@ const ROWS: { key: keyof GroupNotifySettings; label: TranslationKey }[] = [
   { key: 'joinRequests', label: 'groups.notifyJoin' },
   { key: 'trackReady', label: 'groups.notifyReady' },
   { key: 'trackSearched', label: 'groups.notifySearched' },
+  { key: 'evaluationShared', label: 'groups.notifyEvalShared' },
   { key: 'trainingStarted', label: 'groups.notifyStarted' },
 ];
 

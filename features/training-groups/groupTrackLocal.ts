@@ -39,7 +39,11 @@ export async function readLaidReference(userId: string, localId: string): Promis
   return { reference: projectTrackTransferSource(session, points, markers), dogId: session.dog_id };
 }
 
-export interface PendingHandover { trackId: string; localId: string; groupId: string; sessionId: string; createdAtMs: number }
+export interface PendingHandover { trackId: string; localId: string; groupId: string; sessionId: string; createdAtMs: number;
+  /** Issue #146: Fährte berührt die Heimzone der Leger:in; vor der Übergabe als «nie teilbar» markieren. */
+  homeZone?: boolean }
+/** Markiert die Fährte auf dem Server als nie teilbar (evaluations.block). */
+export type BlockEvaluation = (trackId: string) => Promise<unknown>;
 const handoverKey = (userId: string) => `anyvo_group_track_handover_v1:${userId}`;
 
 export async function listPendingHandovers(userId: string): Promise<PendingHandover[]> {
@@ -69,10 +73,15 @@ async function releaseLayerDog(dogId: string, localId: string) {
 
 export type HandoverResult = 'sent' | 'queued' | 'dropped';
 /** Schickt die gelegte Fährte. Unklarer Ausgang (Netz) → in der Warteschlange lassen. */
-export async function submitHandover(service: GroupTrackService, userId: string, entry: PendingHandover): Promise<HandoverResult> {
+export async function submitHandover(service: GroupTrackService, userId: string, entry: PendingHandover, block?: BlockEvaluation): Promise<HandoverResult> {
   await addPendingHandover(userId, entry);
   const { reference, dogId } = await readLaidReference(userId, entry.localId);
   try {
+    // Erst markieren, dann übergeben: ohne Markierung verlässt eine Heimzonen-Fährte das Gerät nicht.
+    if (entry.homeZone) {
+      if (!block) return 'queued';
+      await block(entry.trackId);
+    }
     await service.submit(entry.trackId, reference);
   } catch (error) {
     if (error instanceof GroupApiError && (error.code === 'GROUP_CONNECTION' || error.code === 'GROUP_INVALID_RESPONSE'
@@ -87,10 +96,10 @@ export async function submitHandover(service: GroupTrackService, userId: string,
   return 'sent';
 }
 
-export async function flushPendingHandovers(service: GroupTrackService, userId: string, sessionId?: string) {
+export async function flushPendingHandovers(service: GroupTrackService, userId: string, sessionId?: string, block?: BlockEvaluation) {
   for (const entry of await listPendingHandovers(userId)) {
     if (sessionId && entry.sessionId !== sessionId) continue;
-    try { await submitHandover(service, userId, entry); } catch { /* bleibt sichtbar als «wird gelegt» */ }
+    try { await submitHandover(service, userId, entry, block); } catch { /* bleibt sichtbar als «wird gelegt» */ }
   }
 }
 

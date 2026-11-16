@@ -52,7 +52,7 @@ select pg_temp.ok('join request notifies the owner (German)',
 select pg_temp.ok('requester gets nothing', not exists(select 1 from qa_outbox where user_id='b2222222-2222-4222-8222-222222222222'));
 select pg_temp.as_user('a1111111-1111-4111-8111-111111111111');
 select pg_temp.ok('settings default: three on, training start off',
- pg_temp.n('get','{}')->'settings' = '{"joinRequests":true,"trackReady":true,"trackSearched":true,"trainingStarted":false}'::jsonb);
+ pg_temp.n('get','{}')->'settings' @> '{"joinRequests":true,"trackReady":true,"trackSearched":true,"trainingStarted":false}'::jsonb);
 select pg_temp.ok('owner switches join requests off',
  (pg_temp.n('set','{"joinRequests":false}')->'settings'->>'joinRequests')::boolean = false);
 select pg_temp.as_user('c3333333-3333-4333-8333-333333333333');

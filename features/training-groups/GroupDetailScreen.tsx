@@ -22,7 +22,9 @@ import { parseSession } from '@/features/tracking-exchange/groups/groupModels';
 import type { EvaluationSummary } from '@/features/tracking-exchange/groups/evaluationService';
 import { formatEvalLine } from './evaluationFormat';
 
-type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; evaluations: EvaluationSummary[]; serverNowMs: number };
+type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; evaluations: EvaluationSummary[];
+  /** Eigene Zustimmung zur gelegten Linie; undefined = nicht abfragbar (Karte bleibt weg). */
+  laidConsent: boolean | null | undefined; serverNowMs: number };
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,14 +58,15 @@ export default function GroupDetailScreen() {
       const group = list.groups.find(g => g.groupId === groupId) ?? null;
       const manage = !!group && canManageGroup(group, services.userId);
       const evals = services.evaluations;
-      const [sessions, requests, evaluations] = await Promise.all([
+      const [sessions, requests, evaluations, laidConsent] = await Promise.all([
         group?.status === 'active' ? groups.sessions(groupId).then(r => r.sessions) : Promise.resolve([]),
         manage ? join.pending(groupId) : Promise.resolve([]),
         // Stufe 4a: geteilte Auswertungen; ohne Server-Stufe 4a einfach leer.
         group?.status === 'active' && evals ? evals.list(groupId).catch(() => [] as EvaluationSummary[]) : Promise.resolve([] as EvaluationSummary[]),
+        group?.status === 'active' && evals ? evals.consent(groupId).catch(() => undefined) : Promise.resolve(undefined),
       ]);
       if (token !== generation.current) return;
-      setData({ group, sessions, requests, evaluations, serverNowMs: list.serverNowMs });
+      setData({ group, sessions, requests, evaluations, laidConsent, serverNowMs: list.serverNowMs });
       setError(null);
     } catch (e) {
       if (token === generation.current) setError(groupErrorCode(e));
@@ -319,6 +322,18 @@ export default function GroupDetailScreen() {
                 </View>
               ))}
               <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.evaluationsHint')}</Text>
+            </AnyvoCard>
+          )}
+
+          {group?.status === 'active' && me && services.evaluations && data?.laidConsent !== undefined && (
+            <AnyvoCard>
+              <View style={[cs.row, { minHeight: 48 }]}>
+                <Text style={[cs.body, { flex: 1 }]}>{t('groups.laidLineSwitch')}</Text>
+                <Switch value={data?.laidConsent === true} disabled={!!busy} accessibilityLabel={t('groups.laidLineSwitch')}
+                  trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }}
+                  onValueChange={value => { const evals = services.evaluations; if (evals) void run('laid-consent', () => evals.setConsent(groupId, value)); }} />
+              </View>
+              <Text style={cs.hint}>{t('groups.laidLineSwitchHint')}</Text>
             </AnyvoCard>
           )}
 

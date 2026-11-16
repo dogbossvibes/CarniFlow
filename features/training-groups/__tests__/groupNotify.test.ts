@@ -8,7 +8,7 @@ const G = '10000000-0000-4000-8000-000000000001', S = '30000000-0000-4000-8000-0
 
 describe('Mitteilungs-Einstellungen', () => {
   it('Standard wie besprochen: nur «Gruppentraining gestartet» aus', () => {
-    expect(GROUP_NOTIFY_DEFAULTS).toEqual({ joinRequests: true, trackReady: true, trackSearched: true, trainingStarted: false });
+    expect(GROUP_NOTIFY_DEFAULTS).toEqual({ joinRequests: true, trackReady: true, trackSearched: true, trainingStarted: false, evaluationShared: true });
   });
   it('lehnt unvollständige Antworten ab', () => {
     expect(() => parseNotifySettings({ settings: { joinRequests: true } })).toThrow(GroupApiError);
@@ -17,7 +17,8 @@ describe('Mitteilungs-Einstellungen', () => {
     const all = { joinRequests: true, trackReady: false, trackSearched: true, trainingStarted: true };
     const call = jest.fn(async () => ({ version: 1, serverNowMs: 1, settings: all }));
     const service = createGroupNotifyService({ call } as never, 'u');
-    await expect(service.set({ trackReady: false, trainingStarted: true, extra: 1 } as never)).resolves.toEqual(all);
+    // Älterer Server ohne evaluationShared: Standard an.
+    await expect(service.set({ trackReady: false, trainingStarted: true, extra: 1 } as never)).resolves.toEqual({ ...all, evaluationShared: true });
     expect(call).toHaveBeenCalledWith('u', 'training_group_notify_v1', 'set', { trackReady: false, trainingStarted: true });
   });
 });

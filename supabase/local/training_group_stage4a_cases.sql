@@ -1,5 +1,6 @@
 -- LOCAL ONLY: local Docker/Unix socket. All fixtures roll back.
--- Verifies 20261116210000_training_group_stage4a.sql on top of baseline, stage1, 2a, 2b, 3 and contacts.
+-- Verifies 20261116210000_training_group_stage4a.sql on top of baseline, stage1, 2a, 2b, 3 and contacts,
+-- with 20261116230000_training_group_stage4a_layer_consent.sql applied.
 \set ON_ERROR_STOP on
 begin;
 do $$ begin if inet_server_addr() is not null then raise exception 'Local Unix socket required'; end if; end $$;
@@ -56,6 +57,8 @@ select pg_temp.j('approve','{"groupId":"10000000-0000-4000-8000-000000000001","r
 select pg_temp.j('approve','{"groupId":"10000000-0000-4000-8000-000000000001","requestId":"20000000-0000-4000-8000-000000000003"}');
 
 -- ── Gruppeneinstellungen ────────────────────────────────────────────────────
+-- Seit 20261116230000 (Issue #146) braucht die gelegte Linie die Zustimmung der Leger:in; hier erteilt.
+select pg_temp.e('consent_set','{"groupId":"10000000-0000-4000-8000-000000000001","value":true}');
 select pg_temp.ok('share outside is off by default, old fields stay',
  (select (x->>'shareOutside')::boolean = false and x->'members'->0 ? 'isOrganizer' and x->'members'->0 ? 'role'
   from (select pg_temp.g('list','{}')->'groups'->0 x) q));

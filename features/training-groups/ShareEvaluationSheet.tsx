@@ -74,7 +74,8 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
         {phase === 'failed' ? <Text style={s.hint}>{t('groups.evalLoadFailed')}</Text> : null}
         {state && (phase === 'ready' || phase === 'saving') ? (
           <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 6 }}>
-            {!state.searched ? <Text style={s.hint}>{t('groups.evalNotSearched')}</Text> : (
+            {state.blocked ? <Text style={s.hint}>{t('groups.evalBlocked')}</Text>
+            : !state.searched ? <Text style={s.hint}>{t('groups.evalNotSearched')}</Text> : (
               <>
                 <Text style={s.section}>{t('groups.evalInGroup')}</Text>
                 <View style={s.card}>
@@ -94,6 +95,14 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
                       trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
                   </View>
                 </View>
+                <View style={s.card}>
+                  <View style={s.row}>
+                    <Text style={s.label}>{t('groups.evalLaidRow')}</Text>
+                    <Text style={[s.muted, { fontSize: 12, textAlign: 'right', maxWidth: '60%' }]}>
+                      {t(state.laidShared ? 'groups.evalLaidReleased' : 'groups.evalLaidNotReleased', { name: state.candidates.find(c => c.isLayer)?.displayName ?? t('groups.evalLayer') })}
+                    </Text>
+                  </View>
+                </View>
                 {state.shareOutside && onOpenTrainerShare ? (
                   <>
                     <Text style={s.section}>{t('groups.evalMyTrainers')}</Text>
@@ -111,7 +120,7 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
         ) : null}
         {error ? <Text style={[s.hint, { color: C.trackDanger }]} accessibilityRole="alert">{error}</Text> : null}
         <AnyvoButton label={t('groups.evalSave')} onPress={() => void save()} loading={phase === 'saving'}
-          disabled={!state || !state.searched || phase !== 'ready'} />
+          disabled={!state || !state.searched || state.blocked || phase !== 'ready'} />
       </SafeAreaView>
     </Modal>
   );

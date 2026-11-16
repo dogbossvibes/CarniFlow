@@ -5,14 +5,16 @@ import { record } from './groupModels';
 // Server: supabase/migrations/20261116170000_training_group_stage3.sql (training_group_notify_v1).
 type Client = ReturnType<typeof createGroupRpcClient>;
 
-export interface GroupNotifySettings { joinRequests: boolean; trackReady: boolean; trackSearched: boolean; trainingStarted: boolean }
-export const GROUP_NOTIFY_DEFAULTS: GroupNotifySettings = { joinRequests: true, trackReady: true, trackSearched: true, trainingStarted: false };
+export interface GroupNotifySettings { joinRequests: boolean; trackReady: boolean; trackSearched: boolean; trainingStarted: boolean; evaluationShared: boolean }
+export const GROUP_NOTIFY_DEFAULTS: GroupNotifySettings = { joinRequests: true, trackReady: true, trackSearched: true, trainingStarted: false, evaluationShared: true };
 const KEYS = Object.keys(GROUP_NOTIFY_DEFAULTS) as (keyof GroupNotifySettings)[];
 
 export function parseNotifySettings(value: unknown): GroupNotifySettings {
   const r = record(record(value).settings);
   const out = { ...GROUP_NOTIFY_DEFAULTS };
   for (const key of KEYS) {
+    // evaluationShared kam mit Issue #146 dazu; ältere Server liefern es nicht.
+    if (key === 'evaluationShared' && r[key] === undefined) continue;
     if (typeof r[key] !== 'boolean') throw new GroupApiError('GROUP_INVALID_RESPONSE');
     out[key] = r[key] as boolean;
   }

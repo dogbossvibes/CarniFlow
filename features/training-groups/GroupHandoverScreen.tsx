@@ -14,8 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { localTrackNeedsHomeZoneWarning } from '@/features/home-zone/confirm';
 import { HOME_ZONE_NS } from '@/features/home-zone/i18n';
 
-type Phase = 'sending' | HandoverResult | 'failed' | 'zone';
-const TEXT: Record<Exclude<Phase, 'zone'>, TranslationKey> = {
+type Phase = 'sending' | HandoverResult | 'failed' | 'zone' | 'consent';
+const TEXT: Record<Exclude<Phase, 'zone' | 'consent'>, TranslationKey> = {
   sending: 'groups.handoverSending', sent: 'groups.handoverSent', queued: 'groups.handoverQueued',
   dropped: 'groups.handoverDropped', failed: 'groups.handoverFailed',
 };
@@ -30,6 +30,8 @@ export default function GroupHandoverScreen() {
   const [phase, setPhase] = useState<Phase>('sending');
   const alive = useRef(true);
   const confirmed = useRef(false);
+  // Issue #146: einmal pro Gruppe fragen, ob die gelegte Linie in Auswertungen erscheinen darf.
+  const consentChecked = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const valid = [params.trackId, params.localId, params.groupId, params.sessionId].every(v => typeof v === 'string' && v.length > 0);
 
@@ -38,17 +40,25 @@ export default function GroupHandoverScreen() {
   }, [params.groupId, params.sessionId, router]);
 
   const send = useCallback(async (zoneConfirmed = false) => {
-    const tracks = services.tracks, userId = services.userId;
+    const tracks = services.tracks, userId = services.userId, evals = services.evaluations;
     if (!tracks || !userId || !valid) { setPhase('failed'); return; }
     setPhase('sending');
     try {
       // Heimzone (Issue #115): die Übergabe enthält die ganze Fährte, deshalb vorher fragen.
       if (zoneConfirmed) confirmed.current = true;
+      if (!consentChecked.current) {
+        consentChecked.current = true;
+        // Nicht abfragbar (offline, älterer Server): nicht fragen, es bleibt beim Nein.
+        const undecided = services.evaluations ? await services.evaluations.consent(params.groupId).then(v => v === null, () => false) : false;
+        if (undecided) { if (alive.current) setPhase('consent'); return; }
+      }
       if (!confirmed.current && await localTrackNeedsHomeZoneWarning(params.localId)) { if (alive.current) setPhase('zone'); return; }
       if (!alive.current) return;
       const result = await submitHandover(tracks, userId, {
         trackId: params.trackId, localId: params.localId, groupId: params.groupId, sessionId: params.sessionId, createdAtMs: Date.now(),
-      });
+        // Mit Heimzone übergeben: Fährte wird nie als Auswertung teilbar.
+        ...(confirmed.current ? { homeZone: true } : {}),
+      }, evals ? id => evals.block(id) : undefined);
       if (!alive.current) return;
       setPhase(result);
       if (result === 'sent') toTraining();
@@ -56,6 +66,13 @@ export default function GroupHandoverScreen() {
       if (alive.current) setPhase('failed');
     }
   }, [params.groupId, params.localId, params.sessionId, params.trackId, services, toTraining, valid]);
+
+  // Antwort speichern und weiter übergeben. Klappt das Speichern nicht, bleibt es beim Nein und die Frage kommt beim nächsten Mal wieder.
+  const answerConsent = (value: boolean) => {
+    const evals = services.evaluations;
+    setPhase('sending');
+    void (evals ? evals.setConsent(params.groupId, value).catch(() => undefined) : Promise.resolve()).then(() => { if (alive.current) void send(); });
+  };
 
   const started = useRef(false);
   useEffect(() => {
@@ -71,8 +88,18 @@ export default function GroupHandoverScreen() {
         <View style={cs.scroll}>
           <AnyvoCard>
             {phase === 'sending' ? <ActivityIndicator color={C.trackPrimary} style={{ marginBottom: 10 }} /> : null}
+            {phase === 'consent' ? (
+              <View style={{ gap: 8 }}>
+                <Text style={cs.section} accessibilityRole="header">{t('groups.consentTitle')}</Text>
+                <Text style={cs.body}>{t('groups.consentBody')}</Text>
+                <Text style={cs.hint}>{t('groups.consentHint')}</Text>
+                <AnyvoButton label={t('groups.consentYes')} onPress={() => answerConsent(true)} />
+                <AnyvoButton label={t('groups.consentNo')} variant="secondary" onPress={() => answerConsent(false)} />
+              </View>
+            ) : (
             <Text style={[cs.body, phase === 'sent' && { color: C.trackPrimary }]} accessibilityRole="alert" accessibilityLiveRegion="polite">{phase === 'zone' ? `${z('fullTitle')}. ${z('handoverBody')}` : t(TEXT[phase])}</Text>
-            {phase === 'zone' ? (
+            )}
+            {phase === 'consent' ? null : phase === 'zone' ? (
               <View style={cs.actions}>
                 <AnyvoButton style={cs.flex} label={z('handoverSkip')} onPress={toTraining} />
                 <AnyvoButton style={cs.flex} label={z('handoverConfirm')} variant="secondary" onPress={() => { void send(true); }} />

@@ -64,7 +64,7 @@ export default function GroupEvaluationScreen() {
           {detail ? (
             <>
               <View style={s.frame}>
-                <MapView style={s.map} initialRegion={region([...detail.laid, ...detail.search])} showsUserLocation={false}
+                <MapView style={s.map} initialRegion={region(detail.laid.length ? [...detail.laid, ...detail.search] : detail.search)} showsUserLocation={false}
                   accessibilityLabel={t('groups.evalMapLabel')}>
                   {splitAtBreaks(detail.laid).map((part, i) => (
                     <Polyline key={`laid-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
@@ -74,9 +74,9 @@ export default function GroupEvaluationScreen() {
                     <Polyline key={`search-${i}`} coordinates={part.map(p => ({ latitude: p.lat, longitude: p.lng }))}
                       strokeColor={C.trackWarning} strokeWidth={3} />
                   ))}
-                  <Marker coordinate={{ latitude: detail.laid[0].lat, longitude: detail.laid[0].lng }} title={t('groups.startPoint')} />
+                  {detail.laid[0] ? <Marker coordinate={{ latitude: detail.laid[0].lat, longitude: detail.laid[0].lng }} title={t('groups.startPoint')} /> : null}
                 </MapView>
-                <Text style={s.legend}>{t('groups.evalLegend')}</Text>
+                <Text style={s.legend}>{t(detail.laidShared ? 'groups.evalLegend' : 'groups.evalLaidMissing')}</Text>
               </View>
               {m ? (
                 <AnyvoCard>

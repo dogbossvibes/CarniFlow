@@ -106,7 +106,7 @@ export default function GroupSessionScreen() {
         catch (e) { if (!(e instanceof GroupApiError) || e.code !== 'GROUP_UNAVAILABLE') throw e; }
       }
       // Ohne Netz gelegte Fährten nachreichen, bevor die Liste gelesen wird.
-      if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId);
+      if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId, services.evaluations ? id => services.evaluations!.block(id) : undefined);
       const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs };
       const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;

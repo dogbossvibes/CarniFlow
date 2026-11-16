@@ -57,6 +57,7 @@ export function GroupEvaluationCard({ localId, onGate, onOpenTrainerShare }: {
   if (!trackId) return null;
   const names = state ? state.candidates.filter(c => state.recipientUserIds.includes(c.userId)).map(c => c.displayName) : [];
   const status = !state ? (failed ? t('groups.evalLoadFailed') : '…')
+    : state.blocked ? t('groups.evalBlocked')
     : state.group ? t('groups.evalStatusGroup')
     : names.length ? t('groups.evalStatusSome', { names: names.join(', ') })
     : t('groups.evalStatusNone');
@@ -69,7 +70,7 @@ export function GroupEvaluationCard({ localId, onGate, onOpenTrainerShare }: {
         </View>
         <Ionicons name="people-outline" size={22} color={C.trackPrimary} />
       </View>
-      {state && state.searched ? (
+      {state && state.searched && !state.blocked ? (
         <AnyvoButton label={t(state.shared ? 'groups.evalChange' : 'groups.evalShare')} icon="share-social-outline" variant="secondary"
           onPress={() => setOpen(true)} />
       ) : null}

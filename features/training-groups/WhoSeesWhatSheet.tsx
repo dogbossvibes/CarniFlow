@@ -47,6 +47,7 @@ export function WhoSeesWhatSheet({ visible, onClose, sharing, canShare, onShare 
               trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
           </View>
         ) : null}
+        <Text style={s.hint}>{t('groups.wsEvalHint')}</Text>
         <Text style={s.hint}>{t('groups.wsLeave')}</Text>
         <AnyvoButton label={t('groups.understood')} onPress={onClose} />
       </SafeAreaView>

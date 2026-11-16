@@ -13,7 +13,7 @@ jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeArea' })
 jest.mock('@/components/ui/AnyvoButton', () => ({ AnyvoButton: 'AnyvoButton' }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 
-const base = { trackId: T, groupId: G, shareOutside: false, searched: true, shared: false, group: false, recipientUserIds: [] as string[],
+const base = { trackId: T, groupId: G, shareOutside: false, searched: true, shared: false, group: false, blocked: false, laidShared: false, recipientUserIds: [] as string[],
   candidates: [{ userId: A, displayName: 'Sandra', isTrainer: false, isLayer: true }, { userId: C, displayName: 'Carla', isTrainer: true, isLayer: false }] };
 const pkg = { version: 1, laid: [], search: [], metrics: {} };
 let tree: ReactTestRenderer;
@@ -96,4 +96,21 @@ it('Heimzone: Einschränken oder unverändertes Speichern fragt nicht', async ()
   expect(mockConfirm).not.toHaveBeenCalled();
   expect(mockRead).not.toHaveBeenCalled();
   expect(service.share).toHaveBeenCalledWith(T, [C], false, null);
+});
+
+it('Issue #146: zeigt, ob die Leger:in ihre Linie freigegeben hat', async () => {
+  await open();
+  const texts = () => tree.root.findAll(n => (n.type as unknown) === 'Text').flatMap(n => ([] as unknown[]).concat(n.props.children)).filter(c => typeof c === 'string');
+  expect(texts()).toContain('groups.evalLaidNotReleased');
+  act(() => tree.unmount());
+  await open({ ...base, laidShared: true });
+  expect(texts()).toContain('groups.evalLaidReleased');
+});
+
+it('Issue #146: markierte Fährte (Heimzone der Leger:in) ist nicht teilbar, ohne Grund zu nennen', async () => {
+  const service = await open({ ...base, blocked: true });
+  expect(switches()).toHaveLength(0);
+  expect(save().props.disabled).toBe(true);
+  expect(service.share).not.toHaveBeenCalled();
+  expect(JSON.stringify(tree.toJSON())).not.toMatch(/heim|zone/i);
 });

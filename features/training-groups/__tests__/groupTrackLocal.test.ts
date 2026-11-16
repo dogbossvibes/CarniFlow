@@ -97,4 +97,29 @@ describe('Übergabe durch die Leger:in', () => {
     expect(await listPendingHandovers(userId)).toEqual([]);
     expect(mockClearPending).not.toHaveBeenCalled();
   });
+
+  it('Issue #146: Heimzonen-Fährte wird zuerst markiert, dann übergeben', async () => {
+    const order: string[] = [];
+    const submit = jest.fn(async () => { order.push('submit'); return {}; });
+    const block = jest.fn(async () => { order.push('block'); });
+    await expect(submitHandover({ submit } as never, userId, { ...entry, homeZone: true }, block)).resolves.toBe('sent');
+    expect(block).toHaveBeenCalledWith(input.trackId);
+    expect(order).toEqual(['block', 'submit']);
+  });
+
+  it('Issue #146: Markieren klappt nicht → nichts wird übergeben, bleibt in der Warteschlange mit Markierung', async () => {
+    const submit = jest.fn(async () => ({}));
+    const block = jest.fn(async () => { throw new GroupApiError('GROUP_CONNECTION'); });
+    await expect(submitHandover({ submit } as never, userId, { ...entry, homeZone: true }, block)).resolves.toBe('queued');
+    expect(submit).not.toHaveBeenCalled();
+    expect((await listPendingHandovers(userId))[0].homeZone).toBe(true);
+    await expect(submitHandover({ submit } as never, userId, { ...entry, homeZone: true })).resolves.toBe('queued');
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('Issue #146: ohne Heimzone wird nicht markiert', async () => {
+    const submit = jest.fn(async () => ({})), block = jest.fn(async () => {});
+    await submitHandover({ submit } as never, userId, entry, block);
+    expect(block).not.toHaveBeenCalled();
+  });
 });
