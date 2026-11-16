@@ -22,16 +22,18 @@ describe('zentraler Guard', () => {
   it('genau EINE Definition: recording UND START_LOCKED (bestehende Recorder-Authorities)', () => {
     expect((run.match(/const searchGuidanceActive = /g) ?? []).length).toBe(1);
     expect(run).toContain("const searchGuidanceActive = s.recording && s.searchStartState === 'START_LOCKED';");
+    // Gruppentraining «Blind absuchen»: Führung zusätzlich aus, solange blind (reine Anzeigeregel).
+    expect(run).toContain('const guidanceVisible = searchGuidanceActive && !blindSearch;');
   });
   it('ACTIVE SEARCH GUIDANCE hängt am Guard: Voice, Haptik, Ende, Segmente, Off-Track', () => {
     expect(block('const voiceRecovery = useMemo', 'const hapticRecovery')).toContain('enabled: searchGuidanceActive,');
-    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
+    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);');
     expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain('recording: searchGuidanceActive,');
     for (const field of ['paused: s.paused,', 'sessionId: effectiveId,', 'runId: runIdRef.current,'])
       expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain(field);
-    expect(run).toContain('if (!voiceOn || !searchGuidanceActive || snapData.segments.length === 0) return;');
+    expect(run).toContain('if (!voiceOn || !guidanceVisible || snapData.segments.length === 0) return;');
     const off = block('const fb = offTrackTransitionFeedback', 'const offBanner');
-    expect(run).toMatch(/if \(!searchGuidanceActive\) return;\s*const fb = offTrackTransitionFeedback\(prevOffTrackRef\.current, s\.offTrackState\);\s*prevOffTrackRef\.current = s\.offTrackState;/);
+    expect(run).toMatch(/if \(!guidanceVisible\) return;\s*const fb = offTrackTransitionFeedback\(prevOffTrackRef\.current, s\.offTrackState\);\s*prevOffTrackRef\.current = s\.offTrackState;/);
     expect(off).not.toContain('!s.recording');
     // keine verstreuten Alt-Bedingungen mehr in den Guidance-Pfaden
     expect(run).not.toContain('recording: s.recording && !arming');

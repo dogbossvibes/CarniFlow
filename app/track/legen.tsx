@@ -168,7 +168,11 @@ export default function LegenScreen() {
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
   const { height: windowHeight } = useWindowDimensions();
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
-  const params = useLocalSearchParams<{ dogId?: string; id?: string }>();
+  const params = useLocalSearchParams<{ dogId?: string; id?: string; groupTrackId?: string; groupId?: string; groupSessionId?: string }>();
+  // Gruppentraining (Stufe 2b): Fährte für den Hund einer anderen Person. Aufzeichnung unverändert;
+  // nur das Ziel nach dem Stoppen ist die Übergabe statt der eigenen Liegezeit.
+  const groupHandover = typeof params.groupTrackId === 'string' && typeof params.groupId === 'string' && typeof params.groupSessionId === 'string'
+    ? { trackId: params.groupTrackId, groupId: params.groupId, sessionId: params.groupSessionId } : null;
   const { session } = useSession();
   const { dogs, refresh: refreshDogs } = useDogs();
   useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
@@ -643,7 +647,7 @@ export default function LegenScreen() {
 
     // Registry: Übergang laying → resting. Liegezeit-Start = jetzt (deckt sich mit
     // dem Store-Übergang in setLayFinishedAt). Kennzahlen für die Karten mitgeben.
-    if (activeDog) {
+    if (activeDog && !(groupHandover && id)) {
       const finalMarkers = useTrackingStore.getState().markers;
       useActiveFaehrten.getState().upsert(activeDog.id, {
         status: 'resting', sessionId: id, layStartedAt: Date.now(),
@@ -653,7 +657,11 @@ export default function LegenScreen() {
       });
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
-    if (id) {
+    if (id && groupHandover) {
+      setPhase('warmup');
+      // Gruppentraining: gelegte Fährte an die Hundeführerin übergeben (Liegezeit zählt dort).
+      setPendingExit({ href: `/groups/handover?trackId=${groupHandover.trackId}&localId=${id}&groupId=${groupHandover.groupId}&sessionId=${groupHandover.sessionId}` });
+    } else if (id) {
       setPhase('warmup');
       setPendingExit({ href: `/track/liegen?id=${id}${dq}` });   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {

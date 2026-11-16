@@ -290,7 +290,10 @@ describe('Verdrahtung (Source)', () => {
     const src = fs.readFileSync('app/track/[id].tsx', 'utf8');
     // Kunden-Fährtendiagnose (Karte) enthält die Teilen-Zeile — weiterhin unterhalb des Inhalts, vor dem Footer.
     expect(src).toContain('{data && <CustomerTrackDiagnosisCard sessionLocalId={String(id)} detail={data} />}');
-    expect(src.indexOf('<CustomerTrackDiagnosisCard')).toBeLessThan(src.indexOf('{/* Footer */}'));
+    // Seit 4d42e782 rendert TrackEvaluationLayout den Footer nach seinem Inhalt: Karte muss darin stehen.
+    expect(src.indexOf('<TrackEvaluationLayout')).toBeGreaterThan(-1);
+    expect(src.indexOf('<CustomerTrackDiagnosisCard')).toBeGreaterThan(src.indexOf('<TrackEvaluationLayout'));
+    expect(src.indexOf('<CustomerTrackDiagnosisCard')).toBeLessThan(src.indexOf('</TrackEvaluationLayout>'));
     const card = fs.readFileSync('features/tracking/components/CustomerTrackDiagnosisCard.tsx', 'utf8');
     expect(card).toContain('<SupportDiagnosticsRow sessionLocalId={sessionLocalId} detail={detail} />');
     const row = fs.readFileSync('features/tracking/components/SupportDiagnosticsRow.tsx', 'utf8');

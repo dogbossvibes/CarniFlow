@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { NewDog } from '@/types';
+import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
 import { collectDogStorageRefs, removeDogStorageRefs, type StorageRef } from '@/services/dogStorageCleanup';
 
 export function getDogs(userId: string) {
@@ -17,6 +18,7 @@ export async function addDog(userId: string, dog: NewDog) {
     .insert(payload)
     .select()
     .single();
+  if (!error) notifyDailyWidgetDataChanged();
   return { data, error };
 }
 
@@ -30,11 +32,13 @@ export function updateDog(dogId: string, updates: Partial<NewDog>) {
     .update(updates)
     .eq('id', dogId)
     .select()
-    .single();
+    .single()
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 export function deleteDog(dogId: string) {
-  return supabase.from('dogs').delete().eq('id', dogId);
+  return supabase.from('dogs').delete().eq('id', dogId)
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 // Tabellen mit direkter dog_id-Referenz — werden vor dem Hund gelöscht, damit
@@ -67,15 +71,23 @@ export async function deleteDogWithDependents(dogId: string): Promise<{ error: E
     console.warn('[deleteDog] Dateien nicht ermittelt:', (e as Error)?.message ?? e);
   }
 
-  for (const table of DOG_DEPENDENT_TABLES) {
-    const { error } = await supabase.from(table).delete().eq('dog_id', dogId);
-    if (error) console.warn(`[deleteDog] ${table}:`, error.message);   // z. B. Tabelle ohne dog_id → ignorieren
-  }
-  const { data, error } = await supabase.from('dogs').delete().eq('id', dogId).select('id');
-  if (error) return { error: new Error(error.message) };
+  let widgetDataChanged = false;
+  try {
+    for (const table of DOG_DEPENDENT_TABLES) {
+      const { error } = await supabase.from(table).delete().eq('dog_id', dogId);
+      if (!error && table === 'calendar_events') widgetDataChanged = true;
+      if (error) console.warn(`[deleteDog] ${table}:`, error.message);   // z. B. Tabelle ohne dog_id → ignorieren
+    }
+    const { data, error } = await supabase.from('dogs').delete().eq('id', dogId).select('id');
+    if (error) return { error: new Error(error.message) };
+    widgetDataChanged = true;
 
-  // Nur wenn die Datenbank das Löschen bestätigt (RLS kann ohne Fehler 0 Zeilen
-  // löschen), dürfen die Dateien weg — sonst bleiben sie beim weiter bestehenden Hund.
-  if (storageRefs.length > 0 && (data?.length ?? 0) > 0) await removeDogStorageRefs(storageRefs);
-  return { error: null };
+    // Nur wenn die Datenbank das Löschen bestätigt (RLS kann ohne Fehler 0 Zeilen
+    // löschen), dürfen die Dateien weg — sonst bleiben sie beim weiter bestehenden Hund.
+    if (storageRefs.length > 0 && (data?.length ?? 0) > 0) await removeDogStorageRefs(storageRefs);
+    return { error: null };
+  } finally {
+    // Calendar deletion can succeed before a later request fails; invalidate once.
+    if (widgetDataChanged) notifyDailyWidgetDataChanged();
+  }
 }

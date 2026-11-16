@@ -400,5 +400,338 @@
     "reason": "Nutzerentscheid Build-60-Abgleich #38: GPS-Start-Logik durch Build-58-Fährtenbasis geschützt; Trainingsvorlagen werden in Trainingsdoku neu (T-184) neu bewertet (GPS-Start abgesichert; Trainingsvorlagen und sichtbares Bear)",
     "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
+  },
+  {
+    "group": "168ae23f-676f-455c-8f15-bb475910d83e",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 über verifizierte Basisplan-Liste (Client und Server) gelöst; Preis-Fallback mit PR #89 bereinigt (fix(subscription): recognize Android base plans and store prices)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "ee582684-c777-4fe3-a0aa-6a2278572078",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (Health, report export, Shelly help and permanent ACTIVE access)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "b486ae49-a047-417a-86d4-07a07794ee8b",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (fix: durable tracking writes, medication dates, sync and export action)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "3060767c-baa4-4bf1-83e9-a8a92e9f39df",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (fix: native45 compatible durable tracking and medication/export fixes)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "d7c6f457-695b-4531-9952-1a06cb3e4b47",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (fix: field-informed tracking badges object counts and history preview)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "5af04065-9b6d-4bee-96ae-115d0bc8b4c6",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (fix: field-informed tracking badges object counts and history preview)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "1d64e5ed-925a-4988-8733-8c2155635acf",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (Preserve Android original object snapshot for new completed searches)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "f5575fc8-042d-492a-bf2e-5f402e63db8d",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 3) (Preserve Android original object snapshot for new completed searches)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "8b13ffce-e5c5-4237-bcdb-75ad3f6ed3c1",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: nachgezogen mit PR #91 (Auswertungs-Footer über der Android-Systemleiste) (Android evaluation footer safe area and reachable save actions preserv)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "b20cfdd8-4293-415c-81cc-80ac9c2acc71",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: nachgezogen mit PR #91 (Auswertungs-Footer über der Android-Systemleiste) (Android evaluation footer safe area and reachable save actions preserv)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "f52ffbb1-7711-4373-a659-0bd843741189",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: nachgezogen mit PR #91 (Auswertungs-Footer über der Android-Systemleiste) (Android evaluation footer safe area and reachable save actions preserv)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "a7ec4e94-bde2-4f0f-bbbc-bc38e0b1c410",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: bewusst nicht übernommen, weder Android noch iOS: Funktion hat nicht korrekt funktioniert (Build47: new sharing and groups hub, first steps and contextual help; )",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "79568808-5b94-4385-95c4-0f4af6c77fee",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Joker and rubber materials: scoring-safe objects, stable recovery, gui)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "49157c45-de0e-4642-b9f3-f31511355eff",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Joker and rubber materials: scoring-safe objects, stable recovery, gui)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "98d81197-92a8-40cd-ae3d-7937bc6219a5",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (P1 line smoothing: current accepted turn evidence without one-fix dela)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "0924d84e-ce43-4277-baab-7f835e14922d",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (P1 line smoothing: current accepted turn evidence without one-fix dela)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "197688a1-6dd2-41d2-89b2-7fe698867159",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Journal and preparation: focus/resume refresh, complete note display, )",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "2cfd0175-d03c-4dac-841f-fb78c61a711b",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Exercise choices: one picker, existing variant identity preserved, exp)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "b60775e0-531e-47f7-a983-38fe23071eda",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Training journal: prepare, document observations, retain next-session )",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "de8f127e-0105-49bd-95a7-8606def6d994",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (GPS-Start abgesichert; Trainingsvorlagen und sichtbares Bearbeiten; be)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "6aa534dd-c13b-4a48-9050-1240bedb5b56",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (GPS-Start abgesichert; Trainingsvorlagen und sichtbares Bearbeiten; be)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "88442f0b-2f3a-40a8-9db9-fc6143736202",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Trainingshistorie vor Übernahme frisch prüfen; verspätete Antworten si)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "89625848-00c4-4b88-bae7-57354246d27c",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: in Build 60 anders gelöst: Trainingsdoku neu (T-184) bzw. Build-58-Fährtenbasis (Trainingshistorie vor Übernahme frisch prüfen; verspätete Antworten si)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "d310b572-e4fa-4673-b01c-7c6d382d81d4",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Gemeinsam trainieren: geprüfte zeitlich begrenzte Standortfreigabe mit)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "91021808-3db0-40b8-9a61-12dcd00aa128",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Gemeinsam trainieren: geprüfte zeitlich begrenzte Standortfreigabe mit)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "7a205f87-e7b6-45e5-a249-3be6a3032dae",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: bewusst nicht übernommen, weder Android noch iOS: Funktion hat nicht korrekt funktioniert (Planlinie); Läufigkeit ist in Build 60 enthalten (Planlinie und Läufigkeit: Prognose, Zuchtbeobachtungen und Kalender; T)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "1a3e0055-a1b2-42cc-92d1-cee81fe6a254",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: bewusst nicht übernommen, weder Android noch iOS: Funktion hat nicht korrekt funktioniert (Planlinie); Läufigkeit ist in Build 60 enthalten (Planlinie und Läufigkeit: Prognose, Zuchtbeobachtungen und Kalender; T)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "51e3a51a-4428-4eb2-b390-229f107858cf",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: bewusst nicht übernommen, weder Android noch iOS: Funktion hat nicht korrekt funktioniert (Fährtenansicht: sichere Planauswahl und vollständig sichtbarer Diagnos)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "e9cde79c-c489-43b8-9ec9-944767977206",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: vorerst ausgenommen; im Android-Build auf dem Gerät prüfen und bei Bedarf nachziehen (Fährtenkarte: kompakte Sammelmarker, alle Details weiterhin antippbar)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "220ac7ff-f9cc-432c-97d7-0350de02325b",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: bewusst nicht übernommen, weder Android noch iOS: Funktion hat nicht korrekt funktioniert (Fährtenkarte: klare Übersicht, Kartentypwechsel und kompakte Richtungs)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "17aabc80-e8ff-432f-b3d0-4dafb1dc1f42",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: vorerst ausgenommen; im Android-Build auf dem Gerät prüfen und bei Bedarf nachziehen (App-Start: Startlogo nach erstem Root-Layout ohne Tippen ausblenden)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "24fcdd3e-6bfc-440c-bc6e-77d6bdd97317",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Abo: erneuter Kauf, sichere Wiederherstellung und automatische Aktivie)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "ec1b7fa2-409b-4591-8e80-cc3e478ed6e3",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Abo: erneuter Kauf, sichere Wiederherstellung und automatische Aktivie)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "3b0dafb5-c24c-4350-a30c-805e85dff2ed",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Abo: erneuter Kauf, sichere Wiederherstellung und automatische Aktivie)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "f43a7b44-9257-40ab-9561-a4ec23b63fa7",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine exp)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "12520579-2390-49d6-b1a8-abfc3dc11161",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine exp)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "4d3845d7-8ca1-409c-9637-923da370b988",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich enthalten; Widget-Aktualisierung mit PR #92 (Widget «Heute») nachgezogen (Kalender: eigene Termine sicher löschen; bestehende Fährten und Daten )",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "006c2319-cc8f-42e1-a842-34c5baad6bd7",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich enthalten; Widget-Aktualisierung mit PR #92 (Widget «Heute») nachgezogen (Kalender: eigene Termine sicher löschen; bestehende Fährten und Daten )",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "283b31ad-749d-4f74-99b1-13f87ced600f",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Fährtenkarte: Lege- und Suchspur klarer unterscheiden; Gegenstände und)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "dd38f420-0432-4955-9e6a-ce0df2f4c6b3",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Fährtenkarte: Lege- und Suchspur klarer unterscheiden; Gegenstände und)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "6f50426f-4533-4e9f-8999-5214e55e710f",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: Diagnose-/Entwicklerwerkzeug, für Kundinnen und Kunden nicht nötig (QA-Diagnose: Sollwinkel-Zeitmarkierungen für Feldtests)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "5a89cf23-925b-450d-a2ea-e68f594bc848",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: Diagnose-/Entwicklerwerkzeug, für Kundinnen und Kunden nicht nötig (QA-Diagnose: Sollwinkel-Zeitmarkierungen für Feldtests)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "4c44785c-4f9d-444d-9bd9-3ebd8d654e22",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Geteilte Hunde: freigegebene Gesundheitsdaten sicher lesend öffnen)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "4a1c3aa9-0c01-41d5-a194-937578177813",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Geteilte Hunde: freigegebene Gesundheitsdaten sicher lesend öffnen)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "92fb3b6e-87ec-4d2d-b2f9-91c35cd2c8ea",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Dezentes Bedienfeedback: Tastendruck und erfolgreiche Dokumentablage)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "d2e49733-966d-48ec-bc8a-de0157343541",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Dezentes Bedienfeedback: Tastendruck und erfolgreiche Dokumentablage)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "845881b1-453c-4962-9589-2cd9f5b90f5f",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: Diagnose-/Entwicklerwerkzeug, für Kundinnen und Kunden nicht nötig (TrackLab Diagnose: Aufnahme- und Exportstand nachvollziehbar)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "08992810-12c7-4b60-9938-e2f66511f5e7",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: Diagnose-/Entwicklerwerkzeug, für Kundinnen und Kunden nicht nötig (TrackLab Diagnose: Aufnahme- und Exportstand nachvollziehbar)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "2dde9e07-a8af-455a-b424-85a605563133",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Bedienung: flexible Texte, zugaengliche Felder und Kalender)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "e38f222d-5fd4-4123-97af-27bfb8af32a3",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Bedienung: flexible Texte, zugaengliche Felder und Kalender)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "0c80972b-6aae-41f7-9644-7b62d8810270",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Gesundheitsakte: sichere Speicherung und verlässliche Gaben-Historie)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "group": "d494ff1d-b404-4926-8fff-6931cf3aee19",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: inhaltlich in der Build-60-Basis enthalten (Prüfergebnis Abschnitt 2) (Gesundheitsakte: sichere Speicherung und verlässliche Gaben-Historie)",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "runtimeVersion": "1.0.1",
+    "platform": "android",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: alte Android-Runtime 1.0.1 (Aug.–Okt. 2026), Code seither überarbeitet; Sammelentscheid wie iOS-Abschnitt 5. Kundenstand ist Build 49/47.",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "runtimeVersion": "1.0.3",
+    "platform": "android",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: alte Android-Runtime 1.0.3 (Aug.–Okt. 2026), Code seither überarbeitet; Sammelentscheid wie iOS-Abschnitt 5. Kundenstand ist Build 49/47.",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
+  },
+  {
+    "runtimeVersion": "1.0.4",
+    "platform": "android",
+    "reason": "Nutzerentscheid Android-Build-60-Abgleich: alte Android-Runtime 1.0.4 (Aug.–Okt. 2026), Code seither überarbeitet; Sammelentscheid wie iOS-Abschnitt 5. Kundenstand ist Build 49/47.",
+    "decidedBy": "Nutzerin via Cloud-Sitzung Android-Angleichung",
+    "date": "2026-11-12"
   }
 ]

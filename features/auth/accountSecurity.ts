@@ -50,6 +50,13 @@ export function validateNewPassword(password: string, confirm: string): string |
   return null;
 }
 
+// Supabase «Prevent use of leaked passwords» (HaveIBeenPwned) lehnt bekannte
+// Passwörter mit «Password is known to be weak and easy to guess …» ab.
+export function isLeakedPasswordError(message: string | null | undefined): boolean {
+  const normalized = (message ?? '').toLowerCase();
+  return normalized.includes('known to be weak') || normalized.includes('pwned');
+}
+
 export function isReauthenticationError(message: string): boolean {
   const normalized = message.toLowerCase();
   return normalized.includes('nonce')

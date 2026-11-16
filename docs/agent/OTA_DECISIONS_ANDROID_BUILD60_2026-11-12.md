@@ -30,6 +30,15 @@ Schritt 1 der Android-Angleichung an iOS Build 60 (nur lesend, nichts ausgenomme
 - **RevenueCat**: `eas.json` setzt nur `EXPO_PUBLIC_REVENUECAT_IOS_KEY`; `lib/purchases.ts` liest auch `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`. In der EAS-Production-Umgebung prüfen.
 - Die iOS-Prüfung gegen denselben Kandidaten zeigt ebenfalls offene Zeilen (u. a. „Abo: erneuter Kauf …“, „App-Start: Startlogo …“), siehe Abschnitte 2 und 4.
 
+## Entscheid und Stand (2026-11-12)
+
+Die Nutzerin hat am 2026-11-12 alle Empfehlungen dieser Liste bestätigt. Die Ausnahmen stehen in `docs/agent/ota-coverage-exceptions.json` (52 Gruppen einzeln begründet, dazu je ein Sammeleintrag für die Android-Runtimes `1.0.1`, `1.0.3`, `1.0.4`, auf `platform: android` beschränkt). Die Kästchen in den Tabellen unten sind damit erledigt und bleiben nur als Verlauf stehen.
+
+- **Nachgezogen (PRs, vor dem Build mergen):** #89 Abo-Preis-Fallback, #91 Auswertungs-Footer, #92 Widget «Heute», #93 `versionCode` 51 und Android-Runtime.
+- **Ausgenommen:** alle übrigen Zeilen, Begründung je Gruppe in der Ausnahmedatei.
+- **Auf dem Android-Gerät prüfen:** Startlogo (`17aabc80`), Sammelmarker (`e9cde79c`), Lege-/Suchspur (`283b31ad`), Begrüssungston.
+- **Prüfung:** `node scripts/check-ota-coverage.mjs --platform android --candidate <main + diese Änderung>` → 158 geprüft, 31 enthalten, 127 ausgenommen, **0 offen** (ohne `--live`; vor dem Build mit `--live` wiederholen). iOS-Ergebnis unverändert.
+
 ## Prüfergebnis Abschnitt 2 (2026-11-12)
 
 Methode: Für jede OTA die hinzugefügten Zeilen (Diff gegen ihre Basis) und die neu eingeführten Bezeichner/Texte im Kandidaten gesucht, Rest von Hand angesehen. Nur lesend, keine Geräteprüfung. „Zeilen“ = gefundene/hinzugefügte Zeilen ab 25 Zeichen.
@@ -93,6 +102,19 @@ Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Stor
 
 - **`modules/anyvo-daily-widget`**: Android-Startbildschirm-Widget „Heute“ (`app/widgets/today.tsx`, `features/widgets/*`). Fehlt komplett. Ohne Nachziehen verschwindet das Widget bei Nutzer:innen, die es eingerichtet haben. **Nutzerentscheid 2026-11-12: nachziehen**; damit auch die Widget-Aktualisierung aus `4d3845d7`.
 - **`modules/anyvo-greeting-audio`**: Android-eigene Wiedergabe des Begrüssungstons. Build 60 spielt den Ton über `features/home/useGreetingSound.ts`; ob das auf Android gleich funktioniert (Audiofokus, Lautlos), auf dem Gerät prüfen.
+
+## Prüfergebnis Abschnitt 3 (2026-11-12)
+
+Gleiche Methode wie bei Abschnitt 2 (hinzugefügte Zeilen der OTA im Kandidaten gesucht, datenkritische Reste von Hand angesehen). Nur lesend, keine Geräteprüfung. **Alle fünf sind inhaltlich enthalten – Empfehlung: ausnehmen mit Begründung „inhaltlich in Build-60-Basis enthalten“.**
+
+| Gruppe(n) | OTA | Zeilen | Befund |
+|---|---|---|---|
+| `ee582684` | Health, report export, Shelly help and permanent ACTIVE access | 1625/1674 | Gesundheitsakte, Fährtenbericht (PDF/GPX/JSON über `TrackExportActions`, in der Auswertung eingebunden), dauerhafter ACTIVE-Zugang vorhanden; Gesundheitsakte seither umgebaut |
+| `b486ae49`, `3060767c` | Durable tracking writes, medication dates, sync and export | 218/238 | `createBufferedPointWriter`, `layRecorderOwnership`, `backgroundTransitionQueue`, `flushSearchPoints`, `finalizeLocalTrackRun` vorhanden. Die Hintergrund-Ortung speichert Punkte in Build 60 unabhängig vom Bildschirm (awaited Persistenz im Task selbst, Build-58-Fährtenbasis) statt über den früheren Handler. Medikamenten-Datumsfeld (`DateField`, `stabilizeIOSBounds`) vorhanden |
+| `d7c6f457`, `5af04065` | Tracking badges, object counts, history preview | 16/17 | vorhanden; es fehlt nur ein Kommentar in `TrackingMap` |
+| `1d64e5ed`, `f5575fc8` | Preserve Android original object snapshot | 46/50 | Original-Gegenstandsstand (`objectSnapshotInput`, `objectScoreBasis`) und `trackObjectReview` vorhanden, Bewertungsbasis leicht anders aufgebaut |
+
+Kundendaten: Fährtenspeicherung, Gegenstände und Medikamentendaten sind der Kern dieser OTAs. Im Upgrade-Test von Build 49 gezielt prüfen: Fährte legen und absuchen mit Bildschirm aus, App während der Aufnahme beenden und fortsetzen, bestehende Medikamenteneinträge öffnen/bearbeiten/speichern.
 
 ## 1. Bestätigt fehlend – Android-eigene Änderungen (inhaltlich geprüft) (2)
 
