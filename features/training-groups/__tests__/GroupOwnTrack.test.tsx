@@ -2,7 +2,7 @@ import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Alert } from 'react-native';
-import renderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import renderer, { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import Screen from '../GroupSessionScreen';
 import HandoverScreen from '../GroupHandoverScreen';
 
@@ -73,7 +73,7 @@ const text = (tree: ReactTestRenderer) => tree.root.findAll(n => n.type === 'Tex
 const button = (tree: ReactTestRenderer, label: string) => tree.root.find(n => n.props.label === label && typeof n.props.onPress === 'function');
 const radios = (tree: ReactTestRenderer) => [...new Map(tree.root.findAll(n => n.props.accessibilityRole === 'radio' && typeof n.props.onPress === 'function')
   .map(n => [n.props.onPress, n])).values()];
-const radioText = (n: renderer.ReactTestInstance) => n.findAll(c => (c.type as unknown) === 'Text').map(c => ([] as unknown[]).concat(c.props.children).join('')).join('');
+const radioText = (n: ReactTestInstance) => n.findAll(c => (c.type as unknown) === 'Text').map(c => ([] as unknown[]).concat(c.props.children).join('')).join('');
 const switches = (tree: ReactTestRenderer) => tree.root.findAll(n => n.props.accessibilityLabel === 'groups.blindTitle' && typeof n.props.onValueChange === 'function');
 async function open() {
   let tree!: ReactTestRenderer;
