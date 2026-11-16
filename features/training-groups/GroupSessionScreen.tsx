@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, RefreshControl, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,10 @@ import { GroupApiError, type GroupErrorCode } from '@/features/tracking-exchange
 import { canManageGroup, type GroupParticipant, type GroupSession, type GroupSessionSummary, type TrainingGroup } from '@/features/tracking-exchange/groups/groupModels';
 import { formatDuration, GROUP_TRACK_HANDOVER_READY, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
-import { GroupTracksMap } from './GroupTracksMap';
+import { GroupTracksMap, type CourseView } from './GroupTracksMap';
+import { WhoSeesWhatSheet } from './WhoSeesWhatSheet';
+import { useGroupLivePositions } from '@/features/tracking-exchange/live/useGroupLivePositions';
+import { isLiveShareReleaseReady } from '@/features/tracking-exchange/live/releaseGate';
 import { findImportedGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
 
 type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[] };
@@ -47,6 +51,8 @@ export default function GroupSessionScreen() {
   const [blind, setBlind] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const generation = useRef(0);
+  const [courses, setCourses] = useState<Record<string, { lat: number; lng: number }[]>>({});
+  const [sheet, setSheet] = useState(false);
 
   // Für mich gelegte Fährten sofort aufs Gerät holen (Absuche auch ohne Netz) und eine lokal
   // abgeschlossene Absuche als «abgesucht» nachreichen. Fehler bleiben still: nächster Durchlauf.
@@ -66,6 +72,21 @@ export default function GroupSessionScreen() {
         if (local?.searched && track.status === 'searching') await tracks.searched(track.trackId).catch(() => null);
       }
     } finally { preparing.current = false; }
+  }, [services.tracks]);
+
+  // Genauer Verlauf nur für eigene bzw. für mich gelegte Fährten (Server liefert ihn nur dann).
+  const courseRequests = useRef(new Set<string>());
+  const loadCourses = useCallback(async (uid: string, list: GroupTrack[]) => {
+    const tracks = services.tracks;
+    if (!tracks) return;
+    const wanted = list.filter(tr => (tr.layerUserId === uid || tr.handlerUserId === uid)
+      && (tr.status === 'lying' || tr.status === 'searching' || tr.status === 'searched') && !courseRequests.current.has(tr.trackId)).slice(0, 10);
+    for (const tr of wanted) {
+      courseRequests.current.add(tr.trackId);
+      const fetched = await tracks.fetch(tr.trackId).catch(() => null);
+      if (!fetched) { courseRequests.current.delete(tr.trackId); continue; }
+      setCourses(prev => ({ ...prev, [tr.trackId]: fetched.reference.points.map(p => ({ lat: p.lat, lng: p.lng })) }));
+    }
   }, [services.tracks]);
 
   const load = useCallback(async (quiet = false) => {
@@ -90,14 +111,14 @@ export default function GroupSessionScreen() {
       const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;
       setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover });
-      if (services.userId) void prepareHandlerTracks(services.userId, trackList.tracks);
+      if (services.userId) { void prepareHandlerTracks(services.userId, trackList.tracks); void loadCourses(services.userId, trackList.tracks); }
       setError(null);
     } catch (e) {
       if (token === generation.current) setError(groupErrorCode(e));
     } finally {
       if (token === generation.current) setLoading(false);
     }
-  }, [groupId, prepareHandlerTracks, services, sessionId]);
+  }, [groupId, loadCourses, prepareHandlerTracks, services, sessionId]);
 
   // Abfragen nur, solange der Bildschirm sichtbar und die App im Vordergrund ist.
   useFocusEffect(useCallback(() => {
@@ -209,8 +230,29 @@ export default function GroupSessionScreen() {
     return { text: t('groups.statusRevoked'), color: C.trackTextMut, bg: 'rgba(255,255,255,0.05)' };
   };
   const visibleTracks = (data?.tracks ?? []).filter(tr => tr.status !== 'revoked' || tr.layerUserId === userId || tr.handlerUserId === userId);
-  const areas = visibleTracks.flatMap(tr => tr.area && tr.status !== 'revoked' ? [{ trackId: tr.trackId, area: tr.area,
-    color: dogColor(tr.dogId, byParticipation.get(tr.handlerParticipationId)?.colorKey ?? null) }] : []);
+  const trackColor = (tr: GroupTrack) => dogColor(tr.dogId, byParticipation.get(tr.handlerParticipationId)?.colorKey ?? null);
+  const mineTrack = (tr: GroupTrack) => tr.layerUserId === userId || tr.handlerUserId === userId;
+  // Blind und noch nicht abgesucht: für die Hundeführerin weder Linie noch Fläche, nur der Start.
+  const blindForMe = (tr: GroupTrack) => tr.handlerUserId === userId && tr.blind && tr.status !== 'searched';
+  const areas = visibleTracks.flatMap(tr => tr.area && tr.status !== 'revoked' && !mineTrack(tr)
+    ? [{ trackId: tr.trackId, area: tr.area, color: trackColor(tr) }] : []);
+  const courseViews: CourseView[] = visibleTracks.flatMap(tr => mineTrack(tr) && tr.status !== 'revoked' && courses[tr.trackId]
+    ? [{ trackId: tr.trackId, points: courses[tr.trackId], color: trackColor(tr), startOnly: blindForMe(tr) }] : []);
+  const livePositions = useGroupLivePositions(joined && active && isLiveShareReleaseReady() ? userId : null, joined && active ? sessionId : null, live.client);
+  const positionViews = livePositions.positions.flatMap(p => {
+    const who = participants.find(x => x.userId === p.userId && x.dogId === p.dogId);
+    return who ? [{ shareId: p.shareId, name: `${who.displayName} · ${who.dogName}`, latitude: p.latitude, longitude: p.longitude, color: dogColor(who.dogId, who.colorKey) }] : [];
+  });
+  const sharing = live.state.phase === 'sharing' || live.state.phase === 'starting';
+  const toggleShare = (on: boolean) => {
+    if (!on) { void live.stop(); return; }
+    const dogId = mine[0]?.dogId;
+    const recipients = [...new Set(others.map(p => p.userId))];
+    if (!userId || !dogId || !recipients.length) return;
+    const names = recipients.map(uid => memberName(uid));
+    void live.startNamed({ shareId: Crypto.randomUUID(), userId, sessionId, dogId, recipientIds: recipients, durationMs: 2 * 60 * 60 * 1000 }, names)
+      .then(ok => { if (!ok) Alert.alert(t('groups.shareLocation'), t('groups.shareFailed')); });
+  };
 
   const dogChoice = (list: { id: string; name: string; track_overlay_color_key?: string | null }[]) => list.length === 0
     ? <Text style={cs.body}>{t('groups.noDogs')}</Text>
@@ -248,7 +290,8 @@ export default function GroupSessionScreen() {
             </AnyvoCard>
           )}
 
-          {joined && areas.length > 0 ? <GroupTracksMap areas={areas} /> : null}
+          {joined && (areas.length > 0 || courseViews.length > 0 || positionViews.length > 0)
+            ? <GroupTracksMap areas={areas} courses={courseViews} positions={positionViews} /> : null}
 
           {joined && (
             <AnyvoCard>
@@ -365,12 +408,11 @@ export default function GroupSessionScreen() {
 
           {joined && active && (
             <View style={cs.actions}>
-              <AnyvoButton style={cs.flex} label={t('groups.shareLocation')} icon="navigate-outline" variant="secondary"
-                onPress={() => router.push({ pathname: '/track/live', params: { groupId } } as never)} />
-              <AnyvoButton style={cs.flex} label={t('groups.whoSeesWhat')} icon="eye-outline" variant="secondary"
-                onPress={() => Alert.alert(t('groups.whoSeesWhat'), t('groups.whoSeesWhatBody'))} />
+              <AnyvoButton style={cs.flex} label={t('groups.whoSeesWhat')} icon="eye-outline" variant="secondary" onPress={() => setSheet(true)} />
             </View>
           )}
+          <WhoSeesWhatSheet visible={sheet} onClose={() => setSheet(false)} sharing={sharing}
+            canShare={joined && active && others.length > 0} onShare={toggleShare} />
 
           {joined && active && (
             <View style={{ alignItems: 'center', gap: 4 }}>
