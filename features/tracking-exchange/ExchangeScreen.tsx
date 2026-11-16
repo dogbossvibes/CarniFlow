@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect, react-hooks/refs -- Altbestand (bereits im Live-Stand 072b3b07), bewusst unveraendert; nur Kommentar, keine Verhaltensaenderung. */
 import { takePendingTrackFile } from './pending';
 import { GROUP_DISTRACTION_RELEASE_READY } from './groups/releaseGate';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
