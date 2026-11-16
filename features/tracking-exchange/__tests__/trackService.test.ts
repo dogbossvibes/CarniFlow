@@ -1,5 +1,5 @@
 import { GroupApiError } from '../groups/groupRpc';
-import { createGroupTrackService, formatDuration, lyingMs, parseGroupTrack, GROUP_TRACK_HANDOVER_READY } from '../groups/trackService';
+import { areaCorners, createGroupTrackService, formatDuration, lyingMs, parseGroupTrack, GROUP_TRACK_HANDOVER_READY } from '../groups/trackService';
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 let mockUuid = 0;
@@ -32,7 +32,7 @@ describe('Fährten im Gruppentraining', () => {
   it('Übergabe ist mit Stufe 2b eingeschaltet', () => { expect(GROUP_TRACK_HANDOVER_READY).toBe(true); });
 
   it('liest Status und Fläche; liegend ohne Fläche ist ungültig', () => {
-    expect(parseGroupTrack(raw({ ...lying })).area).toEqual({ centerLat: 47.37, centerLng: 8.54, radiusM: 75 });
+    expect(parseGroupTrack(raw({ ...lying })).area).toEqual({ centerLat: 47.37, centerLng: 8.54, radiusM: 75, polygon: null });
     expect(() => parseGroupTrack(raw({ status: 'lying', laidAtMs: 1 }))).toThrow('GROUP_INVALID_RESPONSE');
     expect(() => parseGroupTrack(raw({ handlerUserId: LAYER }))).toThrow('GROUP_INVALID_RESPONSE');
     expect(() => parseGroupTrack(raw({ status: 'lost' }))).toThrow('GROUP_INVALID_RESPONSE');
@@ -78,5 +78,25 @@ describe('Fährten im Gruppentraining', () => {
     const c = client((_a, r) => ok({ track: raw({ trackId: r.trackId, ...lying }) }));
     await createGroupTrackService(c.client, LAYER).submit('50000000-0000-4000-8000-000000000001', reference as never);
     expect(c.calls[0]).toMatchObject({ action: 'submit', request: { trackId: '50000000-0000-4000-8000-000000000001', package: reference } });
+  });
+});
+
+describe('Stufe 3: kantige Fläche', () => {
+  const square = [{ lat: 47.369, lng: 8.539 }, { lat: 47.369, lng: 8.541 }, { lat: 47.371, lng: 8.541 }, { lat: 47.371, lng: 8.539 }];
+  it('übernimmt das Rechteck vom Server', () => {
+    const area = parseGroupTrack(raw({ ...lying, area: { ...lying.area, polygon: square } })).area;
+    expect(area?.polygon).toEqual(square);
+    expect(areaCorners(area!)).toEqual(square);
+  });
+  it('lehnt ungültige Ecken ab', () => {
+    expect(() => parseGroupTrack(raw({ ...lying, area: { ...lying.area, polygon: square.slice(0, 2) } }))).toThrow(GroupApiError);
+    expect(() => parseGroupTrack(raw({ ...lying, area: { ...lying.area, polygon: [...square.slice(0, 3), { lat: 'x', lng: 1 }] } }))).toThrow(GroupApiError);
+  });
+  it('ohne Server-Rechteck (alter Server) trotzdem eckig, nie rund', () => {
+    const corners = areaCorners({ centerLat: 47.37, centerLng: 8.54, radiusM: 75, polygon: null });
+    expect(corners).toHaveLength(4);
+    const lats = new Set(corners.map(c => c.lat)), lngs = new Set(corners.map(c => c.lng));
+    expect(lats.size).toBe(2); expect(lngs.size).toBe(2);
+    expect(Math.max(...lats) - Math.min(...lats)).toBeCloseTo(150 / 111320, 6);
   });
 });

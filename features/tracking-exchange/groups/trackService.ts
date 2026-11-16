@@ -13,7 +13,7 @@ type Client = ReturnType<typeof createGroupRpcClient>;
 export const GROUP_TRACK_HANDOVER_READY: boolean = true;
 
 export type GroupTrackStatus = 'laying' | 'lying' | 'searching' | 'searched' | 'revoked';
-export interface GroupTrackArea { centerLat: number; centerLng: number; radiusM: number }
+export interface GroupTrackArea { centerLat: number; centerLng: number; radiusM: number; polygon: { lat: number; lng: number }[] | null }
 export interface GroupTrack {
   trackId: string; sessionId: string; layerUserId: string; handlerUserId: string; handlerParticipationId: string;
   dogId: string; blind: boolean; status: GroupTrackStatus; createdAtMs: number;
@@ -30,7 +30,15 @@ export function parseGroupTrack(value: unknown): GroupTrack {
   let area: GroupTrackArea | null = null;
   if (r.area !== null && r.area !== undefined) {
     const a = record(r.area);
-    area = { centerLat: number(a.centerLat), centerLng: number(a.centerLng), radiusM: number(a.radiusM) };
+    // Stufe 3: kantige Fläche (Rechteck). Ältere Server liefern nur Mittelpunkt und Radius.
+    const polygon = a.polygon === undefined || a.polygon === null ? null : values(a.polygon, raw => {
+      const corner = record(raw);
+      const point = { lat: number(corner.lat), lng: number(corner.lng) };
+      if (Math.abs(point.lat) > 90 || Math.abs(point.lng) > 180) throw new GroupApiError('GROUP_INVALID_RESPONSE');
+      return point;
+    }, 8);
+    if (polygon && polygon.length < 3) throw new GroupApiError('GROUP_INVALID_RESPONSE');
+    area = { centerLat: number(a.centerLat), centerLng: number(a.centerLng), radiusM: number(a.radiusM), polygon };
     if (Math.abs(area.centerLat) > 90 || Math.abs(area.centerLng) > 180 || area.radiusM < 25 || area.radiusM > 50000) throw new GroupApiError('GROUP_INVALID_RESPONSE');
   }
   const track: GroupTrack = {
@@ -105,3 +113,13 @@ export function createGroupTrackService(client: Client, userId: string) {
   };
 }
 export type GroupTrackService = ReturnType<typeof createGroupTrackService>;
+
+/** Ecken der Fläche: Rechteck vom Server, sonst ein Quadrat um Mittelpunkt und Radius (nie rund). */
+export function areaCorners(area: GroupTrackArea): { lat: number; lng: number }[] {
+  if (area.polygon && area.polygon.length >= 3) return area.polygon;
+  const dLat = area.radiusM / 111320, dLng = area.radiusM / (111320 * Math.max(Math.cos(area.centerLat * Math.PI / 180), 0.2));
+  return [
+    { lat: area.centerLat - dLat, lng: area.centerLng - dLng }, { lat: area.centerLat - dLat, lng: area.centerLng + dLng },
+    { lat: area.centerLat + dLat, lng: area.centerLng + dLng }, { lat: area.centerLat + dLat, lng: area.centerLng - dLng },
+  ];
+}
