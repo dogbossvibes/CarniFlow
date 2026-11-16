@@ -15,6 +15,7 @@ import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
 import { LinkedTrainingsCard } from '@/features/training/trackLinks/components/LinkedTrainingsCard';
 import { refreshTrainerShareCopies, shareTrackWithHomeZone } from '@/features/home-zone/trainerShare';
+import { GroupEvaluationCard, type OutsideShareGate } from '@/features/training-groups/GroupEvaluationCard';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -268,6 +269,9 @@ export default function TrackAuswertungScreen() {
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Stufe 4a: Gruppenfährten nur ausserhalb der Gruppe teilen, wenn die Gruppe es erlaubt.
+  const isOwnTrack = !!data && !!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id;
+  const [outsideGate, setOutsideGate] = useState<OutsideShareGate>('pending');
   const [selectedTrainer, setSelectedTrainer] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>[number] | null>(null);
   const segmentAnalysis = useMemo(() => analyzeTrackSegments({
     segments: coerceTrackSegments(data?.track_data?.segments),
@@ -446,6 +450,10 @@ export default function TrackAuswertungScreen() {
           {!!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id && <LinkedTrainingsCard ownerId={authenticatedSession.user.id} sessionId={String(id)} />}
           {data.status === 'completed' && <ExchangeEntry sourceId={String(id)} />}
 
+          {data.status === 'completed' && !!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id && (
+            <GroupEvaluationCard localId={String(id)} onGate={setOutsideGate} onOpenTrainerShare={() => { void openSharePicker(); }} />
+          )}
+
           {data.status === 'completed' && (
             <View style={[s.card, s.shareCard]}>
               <View style={s.shareHeader}>
@@ -463,7 +471,10 @@ export default function TrackAuswertungScreen() {
                   </Pressable>
                 </View>
               ))}
-              {!shares.some(share => !share.revoked_at) && (
+              {!shares.some(share => !share.revoked_at) && outsideGate === 'blocked' && (
+                <Text style={s.shareHint}>{t('groups.evalOutsideBlocked')}</Text>
+              )}
+              {!shares.some(share => !share.revoked_at) && (outsideGate === 'not-group' || outsideGate === 'allowed' || !isOwnTrack) && (
                 <Pressable accessibilityRole="button" accessibilityLabel="Mit Trainer teilen" onPress={openSharePicker} style={s.shareButton}>
                   <Ionicons name="person-add-outline" size={18} color="#04110F" />
                   <Text style={s.shareButtonText}>Mit Trainer teilen</Text>

@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 export type GroupEndpoint = 'training_group_v1' | 'training_group_session_v1'
   | 'training_group_distraction_v1' | 'training_group_track_v1' | 'training_group_live_v1' | 'training_group_join_v1'
-  | 'training_group_tracks_v1' | 'training_group_notify_v1';
+  | 'training_group_tracks_v1' | 'training_group_notify_v1' | 'training_group_eval_v1';
 export type GroupErrorCode = 'TRACKING_ACTIVE_REQUIRED' | 'GROUP_SOURCE_INCOMPLETE' | 'GROUP_LIMIT' | 'GROUP_UNAVAILABLE' | 'GROUP_INVALID_REQUEST' | 'GROUP_CONFLICT'
   | 'GROUP_EXPIRED' | 'GROUP_REVOKED' | 'GROUP_REFERENCE_INCOMPLETE' | 'GROUP_REFERENCE_CHANGED'
   | 'GROUP_MAINTENANCE_UNAVAILABLE' | 'GROUP_ACCOUNT_CHANGED' | 'GROUP_CONNECTION' | 'GROUP_INVALID_RESPONSE';
