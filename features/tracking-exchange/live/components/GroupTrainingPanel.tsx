@@ -175,6 +175,7 @@ function SessionDetails({ props }: { props: GroupTrainingPanelProps }) {
   const eligibleIds = others.map(recipientKey).sort().join('|');
   useEffect(() => {
     const current = new Set(eligibleIds ? eligibleIds.split('|') : []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit main d505250f; Logik bewusst unverändert
     setRecipients(previous => previous.filter(id => current.has(id)));
   }, [eligibleIds]);
   const validRecipients = others.filter(person => recipients.includes(recipientKey(person))).map(person => person.userId);

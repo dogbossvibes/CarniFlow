@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { NewDog } from '@/types';
+import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
 
 export function getDogs(userId: string) {
   return supabase
@@ -16,6 +17,7 @@ export async function addDog(userId: string, dog: NewDog) {
     .insert(payload)
     .select()
     .single();
+  if (!error) notifyDailyWidgetDataChanged();
   return { data, error };
 }
 
@@ -29,11 +31,13 @@ export function updateDog(dogId: string, updates: Partial<NewDog>) {
     .update(updates)
     .eq('id', dogId)
     .select()
-    .single();
+    .single()
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 export function deleteDog(dogId: string) {
-  return supabase.from('dogs').delete().eq('id', dogId);
+  return supabase.from('dogs').delete().eq('id', dogId)
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 // Tabellen mit direkter dog_id-Referenz — werden vor dem Hund gelöscht, damit
@@ -54,10 +58,18 @@ const DOG_DEPENDENT_TABLES = [
 // Löscht den Hund inkl. abhängiger Daten (best-effort je Tabelle). Gibt erst
 // einen Fehler zurück, wenn das Löschen des Hundes selbst scheitert.
 export async function deleteDogWithDependents(dogId: string): Promise<{ error: Error | null }> {
-  for (const table of DOG_DEPENDENT_TABLES) {
-    const { error } = await supabase.from(table).delete().eq('dog_id', dogId);
-    if (error) console.warn(`[deleteDog] ${table}:`, error.message);   // z. B. Tabelle ohne dog_id → ignorieren
+  let widgetDataChanged = false;
+  try {
+    for (const table of DOG_DEPENDENT_TABLES) {
+      const { error } = await supabase.from(table).delete().eq('dog_id', dogId);
+      if (!error && table === 'calendar_events') widgetDataChanged = true;
+      if (error) console.warn(`[deleteDog] ${table}:`, error.message);   // z. B. Tabelle ohne dog_id → ignorieren
+    }
+    const { error } = await supabase.from('dogs').delete().eq('id', dogId);
+    if (!error) widgetDataChanged = true;
+    return { error: error ? new Error(error.message) : null };
+  } finally {
+    // Calendar deletion can succeed before a later request fails; invalidate once.
+    if (widgetDataChanged) notifyDailyWidgetDataChanged();
   }
-  const { error } = await supabase.from('dogs').delete().eq('id', dogId);
-  return { error: error ? new Error(error.message) : null };
 }

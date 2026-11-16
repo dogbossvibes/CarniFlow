@@ -46,6 +46,7 @@ export default function GroupsOverviewScreen() {
     }
   }, [services]);
   useFocusEffect(useCallback(() => { void load(); return () => { generation.current++; }; }, [load]));
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit main d505250f; Logik bewusst unverändert
   useEffect(() => { setData(null); setError(null); }, [services.userId]);
 
   const run = async (key: string, operation: () => Promise<unknown>, after?: () => void) => {

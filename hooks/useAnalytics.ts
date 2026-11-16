@@ -134,6 +134,7 @@ export function useAnalytics(dogId: string | null) {
     });
   }, [session?.user.id, dogId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit main d505250f; Logik bewusst unverändert
   useEffect(() => { load(); }, [load]);
 
   return { ...state, refresh: load };

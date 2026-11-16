@@ -19,6 +19,21 @@ test('GitHub und lokaler Preflight führen alle Prozessregressionen aus', () => 
   assert(pkg.scripts['test:process'].includes('packagePreparation.node.test.mjs'));
   assert.match(readFileSync(join(root, 'scripts/preflight.mjs'), 'utf8'), /run\('npm run test:process'\)/);
 });
+test('Quality Gate überspringt die Vollprüfung nur bei ausschliesslich .md-Änderungen', () => {
+  const workflow = readFileSync(join(root, '.github/workflows/anyvo-quality-gate.yml'), 'utf8');
+  // Klassifizierung: jede geänderte Datei muss auf .md enden, leere Liste zählt nicht als Doku.
+  assert(workflow.includes(`if [[ -n "$changed" ]] && ! grep -qvE '\\.md$' <<<"$changed"; then`));
+  // Commit-/Whitespace-Prüfung läuft immer (kein if vor der Klassifizierung).
+  const beforeScope = workflow.slice(0, workflow.indexOf('Classify change scope'));
+  assert(!beforeScope.includes('steps.scope.outputs.docs_only'));
+  // Alle schweren Schritte sind an docs_only != 'true' gebunden.
+  for (const name of ['Set up Node.js 22', 'Install dependencies exactly from package-lock',
+    'Offline process and package regression tests', 'TypeScript typecheck', 'ESLint', 'Complete Jest test suite']) {
+    assert(workflow.includes(`- name: ${name}\n        if: steps.scope.outputs.docs_only != 'true'\n`), name);
+  }
+  // Neuer Push auf denselben PR bricht den alten Lauf ab.
+  assert.match(workflow, /cancel-in-progress: true/);
+});
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'anyvo-snapshot-regression-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

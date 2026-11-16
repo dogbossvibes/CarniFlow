@@ -1,6 +1,9 @@
 # Repository-wide quality gate for ANYVO. No deployment, EAS token, database access,
 # native build, or Production updates. The job runs even for docs-only PRs so a
 # future required status check cannot remain pending due to path filters.
+# Docs-only changes (every changed file ends in .md) stop after the commit and
+# whitespace check to save Actions minutes on the private repository; any other
+# file (code, config, workflow, package files, docs/agent/*.json) runs the full gate.
 name: ANYVO Quality Gate
 
 on:
@@ -59,23 +62,50 @@ jobs:
             exit 1
           fi
 
+      - name: Classify change scope (docs-only fast path)
+        id: scope
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            base='HEAD^1'
+          else
+            base="$BEFORE_SHA"
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          printf 'Changed files:\n%s\n' "$changed"
+          if [[ -n "$changed" ]] && ! grep -qvE '\.md$' <<<"$changed"; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "Docs-only change: full install, typecheck, lint and tests are skipped."
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Node.js 22
+        if: steps.scope.outputs.docs_only != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           package-manager-cache: false
 
       - name: Install dependencies exactly from package-lock
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Offline process and package regression tests
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run test:process
 
       - name: TypeScript typecheck
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run typecheck
 
       - name: ESLint
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run lint
 
       - name: Complete Jest test suite
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm test -- --ci --runInBand --watch=false

@@ -16,14 +16,13 @@ import { TrackExportActions } from '@/features/tracking/components/TrackExportAc
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
 import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
@@ -42,6 +41,7 @@ import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
+import { TrackEvaluationLayout } from '@/features/tracking/components/TrackEvaluationLayout';
 import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -397,8 +397,8 @@ export default function TrackAuswertungScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <TrackEvaluationLayout contentContainerStyle={s.content} onSave={onSave} saving={saving}
+        onLogbook={() => router.push('/track/historie' as never)}>
           {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
               abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
           <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
@@ -872,14 +872,7 @@ export default function TrackAuswertungScreen() {
           {data && <CustomerTrackDiagnosisCard sessionLocalId={String(id)} detail={data} />}
 
           <View style={{ height: 24 }} />
-        </ScrollView>
-
-        {/* Footer */}
-        <View style={s.footer}>
-          <AnyvoButton label="Logbuch" variant="secondary" icon="layers-outline" onPress={() => router.push('/track/historie' as never)} style={{ flex: 1 }} />
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={onSave} loading={saving} style={{ flex: 1.4 }} />
-        </View>
-      </KeyboardAvoidingView>
+      </TrackEvaluationLayout>
 
       <MarkerDetailSheet selection={detailSel} onClose={() => setDetailSel(null)} />
 
@@ -1099,5 +1092,4 @@ const s = StyleSheet.create({
   segmentMeta:  { fontSize: 11.5, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
   smartHint:    { fontSize: 13, color: C.trackTextSec, lineHeight: 19, marginBottom: 8 },
 
-  footer:  { flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 26, borderTopWidth: 1, borderTopColor: C.trackBorder, backgroundColor: C.trackBg },
 });

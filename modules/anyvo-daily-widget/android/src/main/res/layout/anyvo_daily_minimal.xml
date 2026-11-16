@@ -1,0 +1,3 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/anyvo_daily_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="12dp" android:background="@drawable/anyvo_daily_background">
+  <TextView android:id="@+id/anyvo_daily_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/anyvo_daily_open" android:textColor="#15E6C3" android:textStyle="bold" android:textSize="15sp" android:maxLines="2" android:ellipsize="end"/>
+</LinearLayout>
