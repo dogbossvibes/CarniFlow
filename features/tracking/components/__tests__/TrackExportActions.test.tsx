@@ -3,6 +3,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { AccessibilityInfo, Alert, Switch } from 'react-native';
 import { TrackExportActions } from '../TrackExportActions';
 import i18n from '@/i18n/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetHomeZoneCacheForTests } from '@/features/home-zone/store';
+const mockPush=jest.fn();
+jest.mock('expo-router',()=>({useRouter:()=>({push:mockPush})}));
+jest.mock('@/lib/localDb/client',()=>({getLocalDb:jest.fn()}));
 jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 const mockShare=jest.fn();
 jest.mock('../../services/trackUserExportService',()=>({shareTrackUserExport:(...args:unknown[])=>mockShare(...args)}));
@@ -10,7 +15,7 @@ jest.mock('@expo/vector-icons',()=>({Ionicons:'Icon'}));
 let renderer:any;
 const mount=async()=>{await act(async()=>{renderer=TestRenderer.create(<TrackExportActions data={{notes:'private'}}/>);});};
 const press=(format:string)=>renderer.root.findAll((n:any)=>n.props.testID===`export-${format}`&&typeof n.props.onPress==='function')[0].props.onPress();
-beforeEach(()=>{mockShare.mockReset();mockShare.mockResolvedValue(undefined);jest.spyOn(Alert,'alert').mockImplementation(()=>{});jest.spyOn(AccessibilityInfo,'announceForAccessibility').mockImplementation(()=>{});});
+beforeEach(async()=>{await AsyncStorage.clear();resetHomeZoneCacheForTests();await AsyncStorage.setItem('anyvo_home_zone_hint_seen_v1','1');mockShare.mockReset();mockShare.mockResolvedValue(undefined);jest.spyOn(Alert,'alert').mockImplementation(()=>{});jest.spyOn(AccessibilityInfo,'announceForAccessibility').mockImplementation(()=>{});});
 afterEach(()=>{act(()=>renderer?.unmount());jest.restoreAllMocks();});
 it('notes are opt-in; buttons send only the selected format',async()=>{
   await mount();await act(async()=>press('pdf'));
@@ -21,7 +26,7 @@ it('notes are opt-in; buttons send only the selected format',async()=>{
 });
 it('prevents duplicate exports even before React renders the disabled state',async()=>{
   let resolve!:()=>void;mockShare.mockReturnValue(new Promise<void>(r=>{resolve=r;}));
-  await mount();act(()=>{press('pdf');press('pdf');});expect(mockShare).toHaveBeenCalledTimes(1);
+  await mount();await act(async()=>{press('pdf');press('pdf');});expect(mockShare).toHaveBeenCalledTimes(1);
   await act(async()=>resolve());
 });
 it('labels the selected export as busy, disables all formats and notes, then releases them',async()=>{
@@ -71,4 +76,48 @@ it.each(['de','gsw','en','fr','it'])('%s has translated export/report labels',as
     expect(button.props.accessibilityHint.length).toBeGreaterThan(10);
   }
   expect(renderer.root.findByType(Switch).props.accessibilityHint).toMatch(/PDF, GPX/);
+});
+// Heimzone (Issue #115)
+const zonePress=(label:string)=>renderer.root.findAll((n:any)=>n.props.accessibilityLabel===label&&typeof n.props.onPress==='function')[0].props.onPress();
+it('shows the home zone hint once before the first export without a zone',async()=>{
+  await AsyncStorage.removeItem('anyvo_home_zone_hint_seen_v1');await i18n.changeLanguage('de');
+  await mount();await act(async()=>press('gpx'));
+  expect(mockShare).not.toHaveBeenCalled();
+  expect(renderer.root.findAll((n:any)=>n.props.children==='Wohnort schützen?').length).toBeGreaterThan(0);
+  const skip=renderer.root.findAll((n:any)=>n.props.testID==='home-zone-hint-skip'&&typeof n.props.onPress==='function')[0];
+  await act(async()=>skip.props.onPress());
+  expect(mockShare).toHaveBeenCalledTimes(1);
+  expect(await AsyncStorage.getItem('anyvo_home_zone_hint_seen_v1')).toBe('1');
+  await act(async()=>press('gpx'));expect(mockShare).toHaveBeenCalledTimes(2);
+});
+it('asks before sharing a track that touches the home zone and cancels without exporting',async()=>{
+  await AsyncStorage.setItem('anyvo_home_zones_v1',JSON.stringify([{id:'h',lat:47,lng:8,radiusM:200}]));resetHomeZoneCacheForTests();
+  await i18n.changeLanguage('de');
+  const points=[47.0005,47.0030,47.0040].map((latitude,i)=>({latitude,longitude:8,point_type:'lay',timestamp:`2026-11-16T10:00:0${i}.000Z`}));
+  await act(async()=>{renderer=TestRenderer.create(<TrackExportActions data={{id:'s',dog_id:'d',points}}/>);});
+  await act(async()=>press('gpx'));
+  expect(mockShare).not.toHaveBeenCalled();
+  await act(async()=>zonePress('Abbrechen'));
+  expect(mockShare).not.toHaveBeenCalled();
+  await act(async()=>press('gpx'));await act(async()=>zonePress('Gekürzt teilen'));
+  expect(mockShare).toHaveBeenCalledTimes(1);
+});
+it('does not export when the home zone cannot be read',async()=>{
+  await AsyncStorage.setItem('anyvo_home_zones_v1','{kaputt');resetHomeZoneCacheForTests();
+  await mount();await act(async()=>press('json'));
+  expect(mockShare).not.toHaveBeenCalled();expect(Alert.alert).toHaveBeenCalledTimes(1);
+});
+it('warns that notes are shared unchanged while a home zone is active',async()=>{
+  const warning=()=>renderer.root.findAll((n:any)=>n.props.testID==='home-zone-notes-warning');
+  await i18n.changeLanguage('gsw');
+  await mount();act(()=>renderer.root.findByType(Switch).props.onValueChange(true));
+  expect(warning()).toHaveLength(0);
+  act(()=>renderer.unmount());
+  await AsyncStorage.setItem('anyvo_home_zones_v1',JSON.stringify([{id:'h',lat:47,lng:8,radiusM:200}]));resetHomeZoneCacheForTests();
+  await mount();expect(warning()).toHaveLength(0);
+  act(()=>renderer.root.findByType(Switch).props.onValueChange(true));
+  expect(warning().length).toBeGreaterThan(0);
+  expect(warning()[0].props.children).toBe('Notize werded nöd kürzt. Lueg, öb dini Adrässe oder de Ort drin staht.');
+  await act(async()=>renderer.update(<TrackExportActions data={{notes:'  '}}/>));
+  expect(warning()).toHaveLength(0);
 });

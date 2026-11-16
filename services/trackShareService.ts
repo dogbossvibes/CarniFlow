@@ -11,6 +11,15 @@ export interface TrackShare {
   trainer_user_id: string;
   shared_at: string;
   revoked_at: string | null;
+  /** Heimzone (#121): gekürzte Kopie für Trainer:innen; fehlt vor der Migration. */
+  shared_copy?: Record<string, unknown> | null;
+  shared_copy_digest?: string | null;
+}
+
+export interface TrackShareCopy { copy: Record<string, unknown>; digest: string }
+/** Spalten der Kopie existieren noch nicht (Migration nicht ausgeführt). */
+export function isShareCopyUnsupported(error: { code?: string; message?: string } | null | undefined): boolean {
+  return !!error && (error.code === 'PGRST204' || error.code === '42703') && /shared_copy/.test(error.message ?? '');
 }
 
 export interface TrackFeedback {
@@ -32,19 +41,30 @@ export async function getTrackShare(trackId: string) {
   return { data: (result.data as TrackShare[] | null) ?? [], error: result.error };
 }
 
-export async function shareTrack(trackId: string, trainerUserId: string) {
+export async function shareTrack(trackId: string, trainerUserId: string, copy: TrackShareCopy | null = null) {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) return { data: null, error: new Error('Nicht eingeloggt') };
   const result = await supabase
     .from('track_shares')
-    .insert({ track_id: trackId, owner_user_id: user.user.id, trainer_user_id: trainerUserId })
+    .insert({ track_id: trackId, owner_user_id: user.user.id, trainer_user_id: trainerUserId,
+      ...(copy ? { shared_copy: copy.copy, shared_copy_digest: copy.digest } : {}) })
     .select('*')
     .single();
   return { data: result.data as TrackShare | null, error: result.error };
 }
 
-export function revokeTrackShare(shareId: string) {
-  return supabase.from('track_shares').update({ revoked_at: new Date().toISOString() }).eq('id', shareId);
+export async function revokeTrackShare(shareId: string) {
+  const result = await supabase.from('track_shares').update({ revoked_at: new Date().toISOString() }).eq('id', shareId);
+  // Kopie nach dem Beenden entfernen (best effort; ohne Migration gibt es die Spalten nicht).
+  if (!result.error) await supabase.from('track_shares').update({ shared_copy: null, shared_copy_digest: null }).eq('id', shareId).then(() => {}, () => {});
+  return result;
+}
+
+/** Kopie einer aktiven Freigabe setzen oder entfernen (null = Originaldaten gelten wieder). */
+export function updateTrackShareCopy(shareId: string, copy: TrackShareCopy | null) {
+  return supabase.from('track_shares')
+    .update({ shared_copy: copy?.copy ?? null, shared_copy_digest: copy?.digest ?? null })
+    .eq('id', shareId).is('revoked_at', null);
 }
 
 export async function listSharedTracksForTrainer() {
@@ -62,8 +82,9 @@ export async function listSharedTracksForTrainer() {
     const display = await supabase.rpc('shared_track_display', { p_track_id: row.track_id });
     if (display.error) return { data: [], error: display.error };
     // A concurrent revocation can remove display access after the list query.
-    if (row.track && display.data?.[0]) rows.push({ ...row, track: {
-      ...row.track, dog: { name: display.data[0].dog_name }, owner_name: display.data[0].owner_name,
+    const track = row.shared_copy ? { ...row.shared_copy, id: row.track_id } : row.track;
+    if (track && display.data?.[0]) rows.push({ ...row, shared_copy: undefined, track: {
+      ...track, dog: { name: display.data[0].dog_name }, owner_name: display.data[0].owner_name,
     } });
   }
   return { data: rows, error: null };
@@ -79,11 +100,14 @@ export async function getSharedTrack(trackId: string) {
     .eq('trainer_user_id', user.user.id)
     .is('revoked_at', null)
     .maybeSingle();
-  if (result.error || !result.data?.track) return { data: null, error: result.error };
+  // Heimzone (#121): mit Kopie sind die Originaldaten für Trainer:innen nicht lesbar.
+  const copy = (result.data?.shared_copy ?? null) as Record<string, unknown> | null;
+  const track = copy ? { ...copy, id: trackId } : result.data?.track;
+  if (result.error || !result.data || !track) return { data: null, error: result.error };
   const display = await supabase.rpc('shared_track_display', { p_track_id: trackId });
   if (display.error || !display.data?.[0]) return { data: null, error: display.error };
-  return { data: { ...result.data, track: {
-    ...result.data.track, dog: { name: display.data[0].dog_name }, owner_name: display.data[0].owner_name,
+  return { data: { ...result.data, shared_copy: undefined, hasSharedCopy: !!copy, track: {
+    ...track, dog: { name: display.data[0].dog_name }, owner_name: display.data[0].owner_name,
   } }, error: null };
 }
 

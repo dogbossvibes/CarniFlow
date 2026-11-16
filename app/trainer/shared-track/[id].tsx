@@ -10,10 +10,13 @@ import { ReviewSections } from '@/features/track-sharing/ReviewSections';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addTrackFeedback, deleteTrackFeedback, getSharedTrack, listTrackFeedback, updateTrackFeedback, type TrackFeedback } from '@/services/trackShareService';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from 'react-i18next';
+import { HOME_ZONE_NS } from '@/features/home-zone/i18n';
 
 export default function SharedTrackDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t: homeZoneText } = useTranslation(HOME_ZONE_NS);
   const [track, setTrack] = useState<any | null>(null);
   const [share, setShare] = useState<any | null>(null);
   const [feedback, setFeedback] = useState<TrackFeedback[]>([]);
@@ -26,7 +29,9 @@ export default function SharedTrackDetailScreen() {
     const [{ data: shared }, { data }] = await Promise.all([getSharedTrack(String(id)), getTrackSessionById(String(id))]);
     const { data: user } = await supabase.auth.getUser();
     setUid(user.user?.id ?? null); setShare(shared);
-    setTrack(shared && data ? { ...data, dog: shared.track.dog, owner_name: shared.track.owner_name } : null);
+    // Heimzone (#121): mit gekürzter Kopie kommt alles aus der Freigabe, nicht aus den Originaltabellen.
+    const detail = shared?.hasSharedCopy ? shared.track : data;
+    setTrack(shared && detail ? { ...detail, dog: shared.track.dog, owner_name: shared.track.owner_name } : null);
     if (shared) { const result = await listTrackFeedback(shared.id); setFeedback((result.data as TrackFeedback[] | null) ?? []); }
     setLoading(false);
   })(); }, [id]);
@@ -45,6 +50,7 @@ export default function SharedTrackDetailScreen() {
       <Text style={s.eyebrow}>{track.dog?.name ?? 'Hund'} · {track.session_date ?? ''}</Text>
       <Text style={s.hero}>{track.distance_meters != null ? `${Math.round(track.distance_meters)} m` : 'Fährte'}</Text>
       {map?.hasLay && <View style={s.map}><TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={track.track_data?.segments ?? []} startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints} currentPosition={null} showUserLocation={false} follow={false} mapType="hybrid" /></View>}
+      {track.homeZoneApplied === true && <Text style={s.line} accessibilityRole="alert">{homeZoneText('trainerHidden')}</Text>}
       <ReviewSections track={track} />
       <Text style={s.section}>Trainerfeedback</Text>
       <View style={s.card}>{feedback.map(item => <View key={item.id} style={s.feedback}><View style={s.meta}><Text style={s.author}>{item.author_user_id === uid ? 'Du' : track.owner_name ?? 'Besitzer'}</Text><Text style={s.muted}>{new Date(item.created_at).toLocaleDateString()}</Text></View><Text style={s.line}>{item.body}</Text>{item.reaction && <Text style={{ fontSize: 18 }}>{item.reaction}</Text>}{item.author_user_id === uid && <View style={s.actions}><Pressable onPress={() => { setEditingId(item.id); setBody(item.body); }}><Text style={s.action}>Bearbeiten</Text></Pressable><Pressable onPress={async () => { await deleteTrackFeedback(item.id); setFeedback(prev => prev.filter(x => x.id !== item.id)); }}><Text style={s.action}>Löschen</Text></Pressable>{(['👍', '✅', '👀', '💡'] as const).map(reaction => <Pressable key={reaction} accessibilityLabel={`Reaktion ${reaction}`} onPress={async () => { await updateTrackFeedback(item.id, { reaction: item.reaction === reaction ? null : reaction }); const result = await listTrackFeedback(share.id); setFeedback((result.data as TrackFeedback[] | null) ?? []); }}><Text style={s.action}>{reaction}</Text></Pressable>)}</View>}</View>)}<TextInput value={body} onChangeText={setBody} multiline accessibilityLabel="Feedback schreiben" placeholder="Feedback schreiben…" placeholderTextColor={C.muted} style={s.input} /><Pressable onPress={send} disabled={!body.trim()} style={[s.send, !body.trim() && { opacity: .45 }]} accessibilityRole="button" accessibilityLabel="Feedback senden"><Text style={s.sendText}>{editingId ? 'Feedback aktualisieren' : 'Feedback senden'}</Text></Pressable></View>

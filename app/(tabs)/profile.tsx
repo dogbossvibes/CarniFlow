@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { HOME_ZONE_NS } from "@/features/home-zone/i18n";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
@@ -97,6 +99,7 @@ export default function ProfilScreen() {
   };
 
   const { t, locale } = useT();
+  const { t: homeZoneText } = useTranslation(HOME_ZONE_NS);
   const storeUpdateStatus = useSyncExternalStore(subscribeStoreUpdateStatus, getStoreUpdateStatus, getStoreUpdateStatus);
   const spracheLabel = NATIVE_NAME[locale];
 
@@ -758,6 +761,12 @@ export default function ProfilScreen() {
             icon="document-text-outline"
             label={t('profile.terms')}
             onPress={() => router.push('/terms')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="home-outline"
+            label={homeZoneText('profileRow')}
+            onPress={() => router.push('/home-zone' as never)}
           />
           <View style={s.trenner} />
           <EinstellungZeile
