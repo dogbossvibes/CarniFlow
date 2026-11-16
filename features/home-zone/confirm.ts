@@ -44,15 +44,16 @@ export async function confirmLocalTrackHandover(sessionLocalId: string): Promise
  * «Auswertung teilen» im Gruppentraining: gelegte Linie und Absuche gehen ungekürzt an die
  * gewählten Mitglieder. Geprüft wird genau das Paket, das das Gerät verlässt. Fehlt es (Linien
  * liegen schon auf dem Server, lokale Fährte nicht mehr lesbar), wird bei eingerichteter
- * Heimzone gefragt: lieber einmal zu viel.
+ * Heimzone gefragt: lieber einmal zu viel. `withLaidLine=false` (fremd gelegte Fährte, #146):
+ * das Paket enthält nur die Absuche, der Text nennt dann keine gelegte Linie.
  */
-export async function confirmEvaluationShare(pkg: unknown | null): Promise<boolean> {
+export async function confirmEvaluationShare(pkg: unknown | null, withLaidLine = true): Promise<boolean> {
   const hit = await touches(async () => {
     const zones = await loadHomeZones();
     if (!zones.length) return false;
     return pkg == null ? true : touchesHomeZoneDeep(pkg, zones);
   });
-  return hit ? ask('evaluationBody', 'fullConfirm') : true;
+  return hit ? ask(withLaidLine ? 'evaluationBody' : 'evaluationSearchBody', 'fullConfirm') : true;
 }
 
 /** Datei-Austausch (.anyvo-track): beliebiges Paket mit Koordinaten. */

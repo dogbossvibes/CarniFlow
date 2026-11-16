@@ -10,6 +10,7 @@ import { readEvaluationPackage } from './evaluationLocal';
 
 /**
  * «Auswertung teilen» (Stufe 4a). Standard: niemand. Auch die Leger:in nur mit Freigabe.
+ * #146: Die gelegte Linie geht nur mit, wenn die teilende Person selbst gelegt hat (laidLineShared).
  * «Meine Trainer» erscheint nur, wenn die Gruppe das Teilen ausserhalb erlaubt; dort läuft die
  * bestehende Trainer-Freigabe der Fährte.
  */
@@ -52,11 +53,12 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
       const widened = (group && !state.group) || [...picked].some(id => !state.recipientUserIds.includes(id));
       // Beim ersten Teilen das Paket aus der eigenen Fährte mitsenden; danach bleiben Linien auf dem Server.
       // Für die Heimzonen-Abfrage wird es auch beim Erweitern gelesen, dann aber nicht erneut gesendet.
-      const local = wantsShare && (!state.shared || widened) ? await readEvaluationPackage(localId) : null;
+      // Fremd gelegte Fährte: das Paket enthält keine gelegte Linie, also wird auch nur die Absuche geprüft.
+      const local = wantsShare && (!state.shared || widened) ? await readEvaluationPackage(localId, state.laidLineShared) : null;
       const pkg = !state.shared ? local : null;
       if (wantsShare && !state.shared && !pkg) { setError(t('groups.evalNoSearch')); setPhase('ready'); return; }
       // Linien gehen ungekürzt an die Gewählten: liegt ein Teil in der Heimzone, vorher fragen (Abbrechen ist Standard).
-      if (wantsShare && widened && !(await confirmEvaluationShare(local))) { setPhase('ready'); return; }
+      if (wantsShare && widened && !(await confirmEvaluationShare(local, state.laidLineShared))) { setPhase('ready'); return; }
       const next = await service.share(trackId, [...picked], group, pkg);
       setState(next); onSaved?.(next); onClose();
     } catch {
@@ -104,7 +106,7 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
                     </View>
                   </>
                 ) : null}
-                <Text style={s.hint}>{t('groups.evalPrivacy')}</Text>
+                <Text style={s.hint}>{t(state.laidLineShared ? 'groups.evalPrivacy' : 'groups.evalPrivacyNoLaid')}</Text>
               </>
             )}
           </ScrollView>

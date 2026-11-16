@@ -4,6 +4,7 @@ import { readGroupTrackMarker } from './blindSearch';
 
 // Stufe 4a: Auswertung aus der eigenen, abgesuchten Gruppenfährte bauen.
 // Enthält nur gelegte Linie, Absuchelinie und Kennzahlen; nie Notizen, Bewertung, Wetter oder Orte-Namen.
+// #146: Die gelegte Linie geht nur mit, wenn die teilende Person selbst gelegt hat; sonst bleibt `laid` leer.
 
 const MAX_LAID = 5000;
 const MAX_SEARCH = 10000;
@@ -26,14 +27,17 @@ export function thinPoints(points: EvalPoint[], max: number): EvalPoint[] {
 
 const count = (v: unknown) => finite(v) && v >= 0 ? Math.min(Math.round(v), 1_000_000) : 0;
 
-/** Rein, testbar. null, wenn die Absuche fehlt oder zu wenig Punkte hat. */
-export function buildEvaluationPackage(laidRaw: RawPoint[], payload: Record<string, unknown> | null): EvaluationPackage | null {
+/**
+ * Rein, testbar. null, wenn die Absuche fehlt oder zu wenig Punkte hat.
+ * `includeLaid=false` (fremd gelegte Fährte): die gelegte Linie kommt gar nicht erst ins Paket.
+ */
+export function buildEvaluationPackage(laidRaw: RawPoint[], payload: Record<string, unknown> | null, includeLaid = true): EvaluationPackage | null {
   const run = payload?.run as Record<string, unknown> | undefined;
   if (!run || typeof run !== 'object') return null;
-  const laid = thinPoints(laidRaw.map(toPoint).filter((p): p is EvalPoint => !!p), MAX_LAID);
+  const laid = includeLaid ? thinPoints(laidRaw.map(toPoint).filter((p): p is EvalPoint => !!p), MAX_LAID) : [];
   const search = thinPoints((Array.isArray(run.run_points) ? run.run_points as RawPoint[] : [])
     .map(toPoint).filter((p): p is EvalPoint => !!p), MAX_SEARCH);
-  if (laid.length < 2 || search.length < 2) return null;
+  if ((includeLaid && laid.length < 2) || search.length < 2) return null;
   const deviation = run.average_deviation_meters;
   return {
     version: 1, laid, search,
@@ -56,20 +60,22 @@ export async function readGroupTrackId(localId: string): Promise<string | null> 
   return readGroupTrackMarker(row?.payload_json)?.trackId ?? null;
 }
 
-export async function readEvaluationPackage(localId: string): Promise<EvaluationPackage | null> {
+/** `includeLaid` ist Pflicht: nur true, wenn die teilende Person die Fährte selbst gelegt hat (#146). */
+export async function readEvaluationPackage(localId: string, includeLaid: boolean): Promise<EvaluationPackage | null> {
   const db = await getLocalDb();
   const row = await db.getFirstAsync<{ payload_json: string | null }>(
     'select payload_json from local_training_sessions where local_id=? and deleted_at is null', localId);
   if (!row) return null;
   let payload: Record<string, unknown> | null = null;
   try { payload = JSON.parse(row.payload_json ?? 'null'); } catch { payload = null; }
-  const rows = await db.getAllAsync<{ latitude: number; longitude: number; payload_json: string | null }>(
+  // Fremd gelegt: die gelegten Punkte werden gar nicht erst gelesen.
+  const rows = includeLaid ? await db.getAllAsync<{ latitude: number; longitude: number; payload_json: string | null }>(
     "select latitude, longitude, payload_json from local_track_points where session_local_id=? and point_type='lay' order by timestamp asc, rowid asc",
-    localId);
+    localId) : [];
   const laid = rows.map(r => {
     let brk = false;
     try { brk = JSON.parse(r.payload_json ?? '{}')?.breakBefore === true; } catch { brk = false; }
     return { lat: r.latitude, lng: r.longitude, breakBefore: brk };
   });
-  return buildEvaluationPackage(laid, payload);
+  return buildEvaluationPackage(laid, payload, includeLaid);
 }

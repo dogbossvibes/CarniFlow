@@ -1,5 +1,5 @@
 -- LOCAL ONLY: local Docker/Unix socket. All fixtures roll back.
--- Verifies 20261116210000_training_group_stage4a.sql on top of baseline, stage1, 2a, 2b, 3 and contacts.
+-- Verifies 20261116210000_training_group_stage4a.sql (with 20261116233000_training_group_eval_laid_line.sql) on top of baseline, stage1, 2a, 2b, 3 and contacts.
 \set ON_ERROR_STOP on
 begin;
 do $$ begin if inet_server_addr() is not null then raise exception 'Local Unix socket required'; end if; end $$;
@@ -108,8 +108,9 @@ select pg_temp.ok('trainer lists it with names and metrics',
  (select jsonb_array_length(x)=1 and x->0->>'handlerName'='Bea' and x->0->>'dogName'='Luna' and x->0->>'layerName'='Sandra'
    and (x->0->'metrics'->>'articlesFound')::int=2 and not (x->0 ? 'search')
   from (select pg_temp.e('list','{"groupId":"10000000-0000-4000-8000-000000000001"}')->'evaluations' x) q));
-select pg_temp.ok('trainer fetches both lines',
- (select jsonb_array_length(x->'laid')=2 and jsonb_array_length(x->'search')=2 and not (x->>'mine')::boolean
+-- Seit 20261116233000 (#146): fremd gelegte Fährte, also ohne gelegte Linie.
+select pg_temp.ok('trainer fetches the search, not the line someone else laid',
+ (select jsonb_array_length(x->'laid')=0 and jsonb_array_length(x->'search')=2 and not (x->>'mine')::boolean
   from (select pg_temp.e('fetch','{"trackId":"50000000-0000-4000-8000-000000000001"}')->'evaluation' x) q));
 select pg_temp.as_user('a1111111-1111-4111-8111-111111111111');
 select pg_temp.ok('layer sees nothing without release',

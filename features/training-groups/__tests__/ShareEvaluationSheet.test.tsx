@@ -13,7 +13,8 @@ jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeArea' })
 jest.mock('@/components/ui/AnyvoButton', () => ({ AnyvoButton: 'AnyvoButton' }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 
-const base = { trackId: T, groupId: G, shareOutside: false, searched: true, shared: false, group: false, recipientUserIds: [] as string[],
+// Standardfall: fremd gelegt (Sandra hat gelegt, die teilende Person sucht ab) -> ohne gelegte Linie (#146).
+const base = { trackId: T, groupId: G, shareOutside: false, searched: true, shared: false, group: false, laidLineShared: false, recipientUserIds: [] as string[],
   candidates: [{ userId: A, displayName: 'Sandra', isTrainer: false, isLayer: true }, { userId: C, displayName: 'Carla', isTrainer: true, isLayer: false }] };
 const pkg = { version: 1, laid: [], search: [], metrics: {} };
 let tree: ReactTestRenderer;
@@ -40,7 +41,7 @@ it('erstes Teilen sendet das Paket aus der eigenen Fährte', async () => {
   const service = await open();
   act(() => { switchFor('Carla').props.onValueChange(true); });
   await act(async () => { save().props.onPress(); });
-  expect(mockRead).toHaveBeenCalledWith('local-1');
+  expect(mockRead).toHaveBeenCalledWith('local-1', false);
   expect(service.share).toHaveBeenCalledWith(T, [C], false, pkg);
 });
 
@@ -75,7 +76,7 @@ it('Heimzone: vor dem Teilen wird mit genau dem Paket gefragt; bei «Abbrechen»
   const service = await open(base, { onClose });
   act(() => { switchFor('Carla').props.onValueChange(true); });
   await act(async () => { save().props.onPress(); });
-  expect(mockConfirm).toHaveBeenCalledWith(pkg);
+  expect(mockConfirm).toHaveBeenCalledWith(pkg, false);
   expect(service.share).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
 });
@@ -85,7 +86,7 @@ it('Heimzone: wer eine bereits geteilte Auswertung auf mehr Leute ausweitet, wir
   const service = await open({ ...base, shared: true, recipientUserIds: [C] });
   act(() => { switchFor('groups.evalWholeGroup').props.onValueChange(true); });
   await act(async () => { save().props.onPress(); });
-  expect(mockConfirm).toHaveBeenCalledWith(pkg);
+  expect(mockConfirm).toHaveBeenCalledWith(pkg, false);
   expect(service.share).toHaveBeenCalledWith(T, [C], true, null);
 });
 
@@ -96,4 +97,36 @@ it('Heimzone: Einschränken oder unverändertes Speichern fragt nicht', async ()
   expect(mockConfirm).not.toHaveBeenCalled();
   expect(mockRead).not.toHaveBeenCalled();
   expect(service.share).toHaveBeenCalledWith(T, [C], false, null);
+});
+
+describe('#146: gelegte Linie nur bei selbst gelegter Fährte', () => {
+  const searchOnly = { version: 1, laid: [], search: [{ lat: 47, lng: 8 }, { lat: 47.1, lng: 8.1 }], metrics: {} };
+  const withLaid = { ...searchOnly, laid: [{ lat: 47, lng: 8 }, { lat: 47.2, lng: 8.2 }] };
+  const texts = () => JSON.stringify(tree.toJSON());
+
+  it('fremd gelegt: Paket wird ohne gelegte Linie gelesen, geprüft und gesendet; der Hinweis sagt es', async () => {
+    mockRead.mockImplementation(async (_id: string, includeLaid: boolean) => includeLaid ? withLaid : searchOnly);
+    const service = await open();
+    expect(texts()).toContain('groups.evalPrivacyNoLaid');
+    expect(texts()).not.toContain('"groups.evalPrivacy"');
+    act(() => { switchFor('groups.evalWholeGroup').props.onValueChange(true); });
+    await act(async () => { save().props.onPress(); });
+    expect(mockRead).toHaveBeenCalledTimes(1);
+    expect(mockRead).toHaveBeenCalledWith('local-1', false);
+    expect(mockConfirm).toHaveBeenCalledWith(searchOnly, false);
+    expect(service.share).toHaveBeenCalledWith(T, [], true, searchOnly);
+  });
+
+  it('selbst gelegt: Paket mit gelegter Linie, bisheriger Hinweis', async () => {
+    mockRead.mockImplementation(async (_id: string, includeLaid: boolean) => includeLaid ? withLaid : searchOnly);
+    const own = { ...base, laidLineShared: true, candidates: [base.candidates[1]] };
+    const service = await open(own);
+    expect(texts()).toContain('"groups.evalPrivacy"');
+    expect(texts()).not.toContain('groups.evalPrivacyNoLaid');
+    act(() => { switchFor('Carla').props.onValueChange(true); });
+    await act(async () => { save().props.onPress(); });
+    expect(mockRead).toHaveBeenCalledWith('local-1', true);
+    expect(mockConfirm).toHaveBeenCalledWith(withLaid, true);
+    expect(service.share).toHaveBeenCalledWith(T, [C], false, withLaid);
+  });
 });

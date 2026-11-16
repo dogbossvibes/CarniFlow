@@ -2,23 +2,27 @@ import { GroupApiError, type createGroupRpcClient } from './groupRpc';
 import { id, number, parseGroup, record, text, values, type TrainingGroup } from './groupModels';
 
 // Stufe 4a Gruppentraining: Auswertung teilen, Trainer-Sicht, Rolle Trainer:in.
-// Server: supabase/migrations/20261116210000_training_group_stage4a.sql (training_group_eval_v1).
+// Server: supabase/migrations/20261116210000_training_group_stage4a.sql (training_group_eval_v1),
+// gelegte Linie nur bei selbst gelegter Fährte: 20261116233000_training_group_eval_laid_line.sql (#146).
 type Client = ReturnType<typeof createGroupRpcClient>;
 
 export interface EvalPoint { lat: number; lng: number; breakBefore?: true }
 export interface EvalMetrics { distanceM: number; durationS: number; articlesFound: number; articlesTotal: number; deviationAvgM: number | null; breaks: number }
-/** Nur Linien und Kennzahlen. Nie Notizen, Gesundheit oder Dokumente. */
+/** Nur Linien und Kennzahlen. Nie Notizen, Gesundheit oder Dokumente. `laid` ist leer, wenn eine andere Person gelegt hat (#146). */
 export interface EvaluationPackage { version: 1; laid: EvalPoint[]; search: EvalPoint[]; metrics: EvalMetrics }
 
 export interface ShareCandidate { userId: string; displayName: string; isTrainer: boolean; isLayer: boolean }
 export interface EvaluationShareState {
   trackId: string; groupId: string; shareOutside: boolean; searched: boolean;
   shared: boolean; group: boolean; recipientUserIds: string[]; candidates: ShareCandidate[];
+  /** Die teilende Person hat selbst gelegt: nur dann geht die gelegte Linie mit (#146). Fehlt das Feld (älterer Server): nein. */
+  laidLineShared: boolean;
 }
 export interface EvaluationSummary {
   trackId: string; groupId: string; sessionId: string; handlerUserId: string; handlerName: string;
   layerUserId: string; layerName: string; dogName: string; metrics: EvalMetrics; mine: boolean; updatedAtMs: number;
 }
+/** `laid` ist leer, wenn die Fährte von einer anderen Person gelegt wurde (#146). */
 export interface EvaluationDetail extends EvaluationSummary { laid: EvalPoint[]; search: EvalPoint[] }
 
 const bool = (value: unknown): boolean => { if (typeof value !== 'boolean') throw new GroupApiError('GROUP_INVALID_RESPONSE'); return value; };
@@ -38,7 +42,7 @@ function parsePoint(value: unknown): EvalPoint {
 export function parseShareState(value: unknown): EvaluationShareState {
   const r = record(value);
   return { trackId: id(r.trackId), groupId: id(r.groupId), shareOutside: bool(r.shareOutside), searched: bool(r.searched),
-    shared: bool(r.shared), group: bool(r.group), recipientUserIds: values(r.recipientUserIds, id, 50),
+    shared: bool(r.shared), group: bool(r.group), laidLineShared: r.laidLineShared === true, recipientUserIds: values(r.recipientUserIds, id, 50),
     candidates: values(r.candidates, c => { const x = record(c);
       return { userId: id(x.userId), displayName: text(x.displayName, 60), isTrainer: bool(x.isTrainer), isLayer: bool(x.isLayer) }; }, 50) };
 }
