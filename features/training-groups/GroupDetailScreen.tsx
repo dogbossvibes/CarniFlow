@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Share, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDogs } from '@/hooks/useDogs';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,8 +19,10 @@ import { useGroupLiveShare } from '@/features/tracking-exchange/live/LiveSharePr
 import { useConnectedInviteTargets } from './useConnectedInviteTargets';
 import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, secondsUntilMidnight, useGroupServices } from './groupHub';
 import { parseSession } from '@/features/tracking-exchange/groups/groupModels';
+import type { EvaluationSummary } from '@/features/tracking-exchange/groups/evaluationService';
+import { formatEvalLine } from './evaluationFormat';
 
-type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; serverNowMs: number };
+type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; evaluations: EvaluationSummary[]; serverNowMs: number };
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,12 +55,15 @@ export default function GroupDetailScreen() {
       const list = await groups.list();
       const group = list.groups.find(g => g.groupId === groupId) ?? null;
       const manage = !!group && canManageGroup(group, services.userId);
-      const [sessions, requests] = await Promise.all([
+      const evals = services.evaluations;
+      const [sessions, requests, evaluations] = await Promise.all([
         group?.status === 'active' ? groups.sessions(groupId).then(r => r.sessions) : Promise.resolve([]),
         manage ? join.pending(groupId) : Promise.resolve([]),
+        // Stufe 4a: geteilte Auswertungen; ohne Server-Stufe 4a einfach leer.
+        group?.status === 'active' && evals ? evals.list(groupId).catch(() => [] as EvaluationSummary[]) : Promise.resolve([] as EvaluationSummary[]),
       ]);
       if (token !== generation.current) return;
-      setData({ group, sessions, requests, serverNowMs: list.serverNowMs });
+      setData({ group, sessions, requests, evaluations, serverNowMs: list.serverNowMs });
       setError(null);
     } catch (e) {
       if (token === generation.current) setError(groupErrorCode(e));
@@ -130,6 +135,11 @@ export default function GroupDetailScreen() {
       const toRole = member.isOrganizer ? 'member' : 'organizer';
       buttons.push({ text: t(member.isOrganizer ? 'groups.removeOrganizer' : 'groups.makeOrganizer'),
         onPress: () => { void run(`role-${member.userId}`, () => join.setRole(groupId, member.userId, member.membershipId, toRole)); } });
+    }
+    const evals = services.evaluations;
+    if (isOwner && evals) {
+      buttons.push({ text: t(member.isTrainer ? 'groups.removeTrainer' : 'groups.makeTrainer'),
+        onPress: () => { void run(`trainer-${member.userId}`, () => evals.setTrainer(groupId, member.userId, member.membershipId, !member.isTrainer)); } });
     }
     if (isOwner || (manage && !member.isOrganizer)) {
       buttons.push({ text: t('groups.remove'), style: 'destructive', onPress: () => confirm(t('groups.confirmRemove', { name: member.displayName }), t('groups.remove'),
@@ -282,13 +292,46 @@ export default function GroupDetailScreen() {
                       <View style={cs.avatar}><Text style={cs.avatarText}>{initial(member.displayName)}</Text></View>
                       <View style={cs.rowText}>
                         <Text style={cs.rowTitle}>{member.displayName}{member.userId === userId ? ` (${t('groups.you')})` : ''}</Text>
-                        <Text style={cs.rowSub}>{t(ROLE_TEXT[role])}</Text>
+                        <Text style={cs.rowSub}>{t(ROLE_TEXT[role])}{member.isTrainer ? ` · ${t('groups.trainer')}` : ''}</Text>
                       </View>
                       {actionable ? <Text style={cs.textButtonLabel} accessibilityElementsHidden importantForAccessibility="no">···</Text> : null}
                     </TouchableOpacity>
                   </View>
                 );
               })}
+            </AnyvoCard>
+          )}
+
+          {group?.status === 'active' && (data?.evaluations.length ?? 0) > 0 && (
+            <AnyvoCard>
+              <Text style={cs.section}>{t('groups.evaluations')}</Text>
+              {data?.evaluations.map((ev, index) => (
+                <View key={ev.trackId}>
+                  {index > 0 ? <View style={cs.divider} /> : null}
+                  <TouchableOpacity style={cs.row} accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/groups/evaluation/[id]', params: { id: ev.trackId, groupId } } as never)}>
+                    <View style={cs.rowText}>
+                      <Text style={cs.rowTitle}>{`${ev.dogName} · ${ev.handlerName}`}</Text>
+                      <Text style={cs.rowSub}>{formatEvalLine(ev.metrics, t)}</Text>
+                    </View>
+                    <Text style={cs.textButtonLabel}>{t('groups.open')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.evaluationsHint')}</Text>
+            </AnyvoCard>
+          )}
+
+          {group?.status === 'active' && isOwner && services.evaluations && (
+            <AnyvoCard>
+              <Text style={cs.section}>{t('groups.settings')}</Text>
+              <View style={[cs.row, { minHeight: 48 }]}>
+                <Text style={[cs.body, { flex: 1 }]}>{t('groups.shareOutside')}</Text>
+                <Switch value={group.shareOutside} disabled={!!busy} accessibilityLabel={t('groups.shareOutside')}
+                  trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }}
+                  onValueChange={value => { const evals = services.evaluations; if (evals) void run('share-outside', () => evals.setShareOutside(groupId, value)); }} />
+              </View>
+              <Text style={cs.hint}>{t('groups.shareOutsideHint')}</Text>
             </AnyvoCard>
           )}
 

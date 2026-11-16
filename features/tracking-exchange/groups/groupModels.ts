@@ -1,7 +1,11 @@
 import { GroupApiError } from './groupRpc';
 /** role bleibt 'owner' | 'member' (ältere App-Versionen); Organisator:in kommt als isOrganizer. */
-export interface GroupMember { membershipId: string; userId: string; displayName: string; role: 'owner' | 'member'; isOrganizer: boolean; joinedAtMs: number }
-export interface TrainingGroup { groupId: string; title: string; ownerUserId: string; status: 'active' | 'ended'; createdAtMs: number; members: GroupMember[] }
+export interface GroupMember { membershipId: string; userId: string; displayName: string; role: 'owner' | 'member'; isOrganizer: boolean;
+  /** Stufe 4a: Trainer:in der Gruppe (ohne Verwaltungsrechte). Ältere Server liefern das Feld nicht. */
+  isTrainer: boolean; joinedAtMs: number }
+export interface TrainingGroup { groupId: string; title: string; ownerUserId: string; status: 'active' | 'ended'; createdAtMs: number;
+  /** Stufe 4a: Auswertungen auch ausserhalb der Gruppe teilen. Standard aus, auch bei älteren Servern. */
+  shareOutside: boolean; members: GroupMember[] }
 export interface GroupInvitation { invitationId: string; groupId: string; groupTitle: string; inviterUserId: string;
   recipientUserId: string; status: 'pending' | 'accepted' | 'revoked' | 'expired'; expiresAtMs: number }
 export interface GroupParticipant { participationId: string; userId: string; displayName: string; dogId: string; dogName: string; colorKey: string | null }
@@ -34,11 +38,12 @@ function status(value: unknown): 'active' | 'ended' {
 export function parseGroup(value: unknown): TrainingGroup {
   const r = record(value);
   return { groupId: id(r.groupId), title: text(r.title), ownerUserId: id(r.ownerUserId), status: status(r.status),
-    createdAtMs: number(r.createdAtMs), members: values(r.members, member => {
+    createdAtMs: number(r.createdAtMs), shareOutside: r.shareOutside === true, members: values(r.members, member => {
       const m = record(member);
       if (m.role !== 'owner' && m.role !== 'member') throw new GroupApiError('GROUP_INVALID_RESPONSE');
       return { membershipId: id(m.membershipId), userId: id(m.userId), displayName: text(m.displayName, 60), role: m.role,
-        isOrganizer: m.role === 'member' && m.isOrganizer === true, joinedAtMs: number(m.joinedAtMs) };
+        isOrganizer: m.role === 'member' && m.isOrganizer === true,
+        isTrainer: m.role === 'member' && m.isTrainer === true, joinedAtMs: number(m.joinedAtMs) };
     }, 50) };
 }
 export function parseInvitation(value: unknown): GroupInvitation {
