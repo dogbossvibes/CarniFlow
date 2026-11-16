@@ -19,6 +19,8 @@ import { MultiVideoUpload } from '@/components/training/MultiVideoUpload';
 import { MetricsInput } from '@/components/training/MetricsInput';
 import { CustomExerciseSheet } from '@/components/training/CustomExerciseSheet';
 import { readPendingTrainingSave, readTrainingSaveIntent, retryTrainingSave } from '@/features/training/documentation/saveIntent';
+import { TrackLinkPicker } from '@/features/training/trackLinks/components/TrackLinkPicker';
+import { applyTrackChoice } from '@/features/training/trackLinks/apply';
 import { addTrainingFocuses } from '@/features/training/documentation/focus';
 import { ServerTrainingFocusList, useServerTrainingFocuses } from '@/components/training/ServerTrainingFocusList';
 import { TrainingFocusList } from '@/components/training/TrainingFocusList';
@@ -221,6 +223,8 @@ function DocumentForm() {
   const [ownUnitId, setOwnUnitId] = useState(initialUnitId);
   const focusIdRef = useRef(Crypto.randomUUID());
   const operationIdRef = useRef(Crypto.randomUUID());
+  // #114: gewählte Fährten dieses Trainings; null = Auswahl (noch) nicht geladen, dann wird nichts verändert.
+  const trackChoice = useRef<string[] | null>(null);
 
   useEffect(() => {
     if (!draftKey || !session?.user.id) return;
@@ -572,6 +576,9 @@ function DocumentForm() {
       Alert.alert(t('common.error'), ['TRAINING_DOCUMENT_REVIEW_REQUIRED', 'CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? t('trainingDoc.reviewSave') : t(error.code === 'LOCAL_SAVE_ERROR' ? 'trainingDoc.draftError' : 'training.saveError')); return;
     }
     setRemoteCompleted(true);
+    // #114: Verknüpfung lokal übernehmen (offline-fähig); der Abgleich läuft nachgelagert und berührt keine Fährte.
+    await applyTrackChoice(session.user.id, id ?? unitIdRef.current, trackChoice.current);
+    if (!alive.current) return;
     const focusInputs = [
       ...(nextFocus.trim() ? [{ key: 'unit', text: nextFocus.trim(), discipline: nextFocusDiscipline || disc?.label || activeDisc, exerciseName: undefined as string | undefined, exerciseKey: undefined as string | undefined }] : []),
       ...selected.filter(e => e.nextFocus?.trim()).map(e => ({ key: e.key, text: e.nextFocus!.trim(), discipline: e.discipline, exerciseName: e.name, exerciseKey: e.exerciseKey ?? e.key })),
@@ -608,6 +615,8 @@ function DocumentForm() {
     } finally {
       if (alive.current && session?.user.id) {
         const pending = await readPendingTrainingSave(session.user.id, id ?? unitIdRef.current).catch(() => null);
+        // #114: Wartet der Speicherauftrag (offline), wartet die Verknüpfung lokal mit.
+        if (pending) await applyTrackChoice(session.user.id, id ?? unitIdRef.current, trackChoice.current);
         if (alive.current) { setPendingSave(!!pending); setSaving(false); }
       }
       saveLock.current = false;
@@ -792,6 +801,10 @@ function DocumentForm() {
               </View>
             </>
           )}
+
+          {/* #114: Fährten des Tages zu diesem Training ankreuzen */}
+          {!!session?.user.id && draftReady && editLoaded && <TrackLinkPicker key={id ?? ownUnitId} ownerId={session.user.id} unitId={id ?? ownUnitId} dogId={dogId}
+            day={localDay(date)} editing={editing} disabled={saving} rememberChoice onChange={ids => { trackChoice.current = ids; }} />}
 
           {/* „Fürs nächste Mal“ (früher Schritt 3); pro Übung in den Kartendetails */}
           <Text style={s.label}>{t('trainingDoc.sessionNextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>

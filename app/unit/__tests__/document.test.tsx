@@ -75,6 +75,10 @@ jest.mock('@/services/customCategoryService', () => ({
   updateCustomCategory: (...args: unknown[]) => mockUpdateCustomCategory(...args),
 }));
 jest.mock('@/features/subscription/quotaUx', () => ({ handleQuotaBlock: () => false }));
+// #114: Die Fährten-Auswahl hat eigene Tests (features/training/trackLinks); hier bleibt sie ohne Auswahl.
+jest.mock('@/features/training/trackLinks/components/TrackLinkPicker', () => ({ TrackLinkPicker: () => null }));
+const mockApplyTrackChoice = jest.fn(async (..._args: unknown[]) => false);
+jest.mock('@/features/training/trackLinks/apply', () => ({ applyTrackChoice: (...args: unknown[]) => mockApplyTrackChoice(...args) }));
 jest.mock('@/lib/queryClient', () => ({ queryClient: { invalidateQueries: jest.fn() } }));
 jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), successHaptic: jest.fn() }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
