@@ -5,6 +5,7 @@ import { MIGRATIONS } from '@/lib/localDb/migrations';
 // denselben Antworten, die PostgREST für die Migration aus #114 liefert.
 let mockDb: DatabaseSync;
 let mockUuid = 0;
+let mockTransactions = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `00000000-0000-4000-8000-${String(++mockUuid).padStart(12, '0')}` }));
 jest.mock('@/features/tracking/storage/gpsCaptureScope', () => ({ invalidateGpsCaptures: jest.fn() }));
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
@@ -12,10 +13,9 @@ jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
   getAllAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).all(...args),
   getFirstAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).get(...args),
   runAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).run(...args),
-  withTransactionAsync: async (action: () => Promise<void>) => {
-    mockDb.exec('SAVEPOINT t');
-    try { await action(); mockDb.exec('RELEASE t'); } catch (error) { mockDb.exec('ROLLBACK TO t'); mockDb.exec('RELEASE t'); throw error; }
-  },
+  // Der Verknüpfungs-Speicher darf auf der geteilten Verbindung keine eigene Transaktion
+  // öffnen (ein zweites BEGIN würde einen offenen GPS-Punkt-Batch per ROLLBACK verwerfen).
+  withTransactionAsync: async () => { mockTransactions++; throw new Error('TRACK_LINKS_DUERFEN_KEINE_TRANSAKTION_OEFFNEN'); },
 }) }));
 
 type Row = { id: string; owner_id: string; training_unit_id: string; training_session_id: string; track_run_id: string | null };
@@ -71,7 +71,7 @@ jest.mock('@/lib/supabase', () => ({ supabase: {
 } }));
 
 import {
-  countOpenLinkOperations, forgetUnitLinks, listLinksForSession, listLinksForUnit, mergeRemoteLinks, setUnitLinks,
+  countOpenLinkOperations, forgetUnitLinks, listLinksForSession, listLinksForUnit, mergeRemoteLinks, setUnitLinks, setUnitTrackSelection,
 } from '../store';
 import { refreshSessionLinks, refreshUnitLinks, SERVER_NOT_READY, syncTrackLinks, WAITING_FOR_SERVER } from '../sync';
 
@@ -122,6 +122,20 @@ describe('lokaler Speicher', () => {
     await forgetUnitLinks('owner', 'unit-1');
     expect(all()).toEqual([]);
     expect(mockDb.prepare('select * from local_training_sessions order by local_id').all()).toEqual(before);
+  });
+});
+
+describe('geteilte SQLite-Verbindung', () => {
+  it('öffnet beim Verknüpfen, Ändern und Übernehmen des Serverstands keine eigene Transaktion', async () => {
+    const before = mockTransactions;
+    await setUnitLinks('owner', 'unit-tx', [{ sessionId: 'sess-tx-1' }, { sessionId: 'sess-tx-2' }]);
+    await setUnitTrackSelection('owner', 'unit-tx', ['sess-tx-2']);
+    await mergeRemoteLinks('owner', { unitId: 'unit-tx' }, [
+      { id: '11111111-1111-4111-8111-111111111111', training_unit_id: 'unit-tx', training_session_id: 'sess-tx-3', track_run_id: null },
+    ]);
+    expect(mockTransactions).toBe(before);
+    expect((await listLinksForUnit('owner', 'unit-tx')).map(l => l.training_session_id).sort())
+      .toEqual(['sess-tx-2', 'sess-tx-3']);
   });
 });
 
