@@ -36,8 +36,8 @@ describe('Neu in ANYVO', () => {
     ]);
     expect(deCH['updates.whatsNewTitle']).toBe('Neu in ANYVO');
     expect(deCH['updates.whatsNewGroupTraining']).toBe('Gruppentraining: Fährten für andere legen, übergeben und blind absuchen.');
-    expect(deCH['updates.whatsNewHomeZone']).toBe('Heimzone: Dein Zuhause bleibt beim Teilen und Exportieren von Fährten verborgen.');
-    expect(deCH['updates.whatsNewTrainerCopy']).toBe('Trainer sehen bei Freigaben eine gekürzte Kopie, dein Original bleibt bei dir.');
+    expect(deCH['updates.whatsNewHomeZone']).toBe('Heimzone einrichten: Dein Zuhause bleibt bei Export, Trainer-Freigabe und Live-Standort verborgen.');
+    expect(deCH['updates.whatsNewTrainerCopy']).toBe('Mit Heimzone sehen Trainer eine gekürzte Kopie, dein Original bleibt bei dir.');
     for (const locale of [deCH, gswCH, en, fr, itLocale]) {
       for (const key of release.itemKeys) expect((locale as Record<string, string>)[key]).toBeTruthy();
     }
