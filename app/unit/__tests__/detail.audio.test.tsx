@@ -40,6 +40,8 @@ jest.mock('@/components/training/HeroImage', () => ({ HeroImage: ({ children }: 
 jest.mock('@/components/training/CommentThread', () => ({ CommentThread: () => null }));
 jest.mock('@/features/ai/components/SmartFeedbackSection', () => ({ SmartFeedbackSection: () => null }));
 jest.mock('@/features/voice/components/VoiceNotesList', () => ({ VoiceNotesList: () => null }));
+jest.mock('@/features/training/trackLinks/components/LinkedTracksCard', () => ({ LinkedTracksCard: () => null }));
+jest.mock('@/features/training/trackLinks/store', () => ({ forgetUnitLinks: jest.fn(async () => {}) }));
 jest.mock('@/features/voice/components/VoiceRecorderCard', () => ({ VoiceRecorderCard: () => null }));
 jest.mock('@/features/voice/hooks/useVoiceNotes', () => ({ useVoiceNotes: () => ({ notes: [], loading: false, refresh: jest.fn() }) }));
 jest.mock('@/services/trainingUnitService', () => ({

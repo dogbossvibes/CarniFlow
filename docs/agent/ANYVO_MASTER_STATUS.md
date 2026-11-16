@@ -1,5 +1,31 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach Heimzonen-OTA und Android Build 53 – 2026-11-16 (Abend)
+
+Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus EAS
+nachkontrolliert. Ersetzt für iOS 60 die Angabe «Aktiv» im Abschnitt darunter.
+- **Aktiv:** Source `dbb9179e` (main `6b0cd88e` gemergt in `072b3b07`, plus zwei Kommentarzeilen
+  für ESLint-Altbestand), Group `dc8c8dce-2443-459a-9385-a2082c71e4fb`. Release-Karte Issue #123:
+  Heimzone (#115, PR #120) und gekürzte Kopie für Trainer-Freigaben (#121, PR #122). Testweg
+  Vorher, **Gerätetest offen** (Nutzerin hat die Veröffentlichung mit Test danach freigegeben);
+  Migration `20261116200000_track_share_home_zone_copy` von der Nutzerin per Leseabfrage bestätigt.
+- **Release-Quelle:** `release/ios60-main-6b0cd88e-20261116` (auf GitHub gesichert).
+- **Jede weitere iOS-60-OTA muss `dbb9179e` enthalten.** `main` enthält `c903fded`, `45aaa951`,
+  `0175fdc3`, `00f9b5f7`, `0ef9e943`, `072b3b07` und `dbb9179e` nicht; vor der nächsten OTA aus
+  main wieder eine Release-Quelle aus main plus `dbb9179e` bauen oder den Release-Branch nach
+  main bringen.
+- **iOS 57** (App Store 1.0.6) unverändert.
+
+**Android**
+- **Store/Production-OTA unverändert:** 1.0.5 (49), Runtime `1.0.5-gnss-v1`, Group `6b52516b`.
+- **Build 53** (1.0.8, versionCode 53, Runtime `1.0.8-sdk58-android-v1`, SDK 58): EAS
+  `df982aba-7fcb-43dd-8d9d-9652d415890b`, Commit `4aac8786`, interner Test-Track. Quelle
+  `release/android53-build-4aac8786-20261116`. Inhalt gegenüber Build 52: Startlogo auf Android
+  kleiner (`imageWidth` 150), Schriftzug nicht mehr abgeschnitten; im Emulator nach Update über
+  Play geprüft. Gruppentraining Stufe 2a/2b und Heimzone sind **nicht** enthalten. Keine
+  Android-OTA, keine Play-Produktion.
+- Build 52 (Startlogo abgeschnitten) ist durch Build 53 ersetzt; Details im Abschnitt darunter.
+
 ## Stand iOS 60 und Android Build 52 – 2026-11-16
 
 Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`), frisch aus EAS

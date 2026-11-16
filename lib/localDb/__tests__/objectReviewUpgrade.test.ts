@@ -57,7 +57,7 @@ it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without 
   const snapshots = new Map(before.map(table => [table, mockDb.prepare(`select * from ${table}`).all()]));
   const { getLocalDb } = jest.requireActual<typeof import('../client')>('../client');
   await getLocalDb();
-  expect(mockDb.prepare('select version from local_schema_migrations order by version').all().map(row => row.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  expect(mockDb.prepare('select version from local_schema_migrations order by version').all().map(row => row.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   for (const [table, rows] of snapshots) {
     const after = mockDb.prepare(`select * from ${table}`).all();
     expect(after).toHaveLength(rows.length);
@@ -66,7 +66,7 @@ it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without 
   expect(mockDb.prepare('select count(*) as n from track_object_review_cache').get()?.n).toBe(version >= 9 ? 1 : 0);
   expect(mockDb.prepare('select count(*) as n from track_object_review_outbox').get()?.n).toBe(version >= 9 ? 1 : 0);
   await getLocalDb();
-  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(12);
+  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(13);
 });
 
 it('includes correction cache and pending edits when explicitly clearing the local database', async () => {
@@ -90,7 +90,7 @@ it('includes correction cache and pending edits when explicitly clearing the loc
   for (const table of ['local_track_group_tasks', 'local_track_exchange_receipts', 'local_track_exchange', 'local_distraction_parents', 'local_track_plans', 'track_object_review_cache', 'track_object_review_outbox', 'local_track_transfer_sync', 'local_track_distractions', 'local_training_sessions', 'sync_queue']) {
     expect(mockDb.prepare(`select count(*) as n from ${table}`).get()?.n).toBe(0);
   }
-  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(12);
+  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(13);
 });
 
 // Actual existing wipe adapter + real migrated in-memory SQLite; no customer DB.

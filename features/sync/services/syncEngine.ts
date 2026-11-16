@@ -2,6 +2,7 @@ import { syncOwnTransfer } from '@/features/tracking-transfer/runtime';
 import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/syncGuard';
 import { syncObjectReviews, objectReviewQueueCounts } from '@/features/tracking/services/objectReview/service';
 import { fetchIsOnline } from '@/features/sync/services/netinfo';
+import { syncTrackLinks } from '@/features/training/trackLinks/sync';
 import { supabase } from '@/lib/supabase';
 import { useSyncStore } from '@/features/sync/store/syncStore';
 import {
@@ -203,6 +204,9 @@ export async function syncNow(): Promise<void> {
     await clearCompleted();
     // Separate append-only review outbox; never rewrite parent sessions/markers.
     await syncObjectReviews();
+    // Verknüpfungen Training ↔ Fährte (#114): eigener Speicher, erst nach den
+    // Fährten selbst, damit frisch hochgeladene Fährten sofort verknüpfbar sind.
+    await syncTrackLinks(session.user.id, { sessionVerified: true }).catch(() => {});
     st.setLastSyncAt(Date.now());
   } catch (e: any) {
     st.setLastError(e?.message ?? 'Sync-Fehler');
