@@ -12,6 +12,7 @@ import { contactStyles as cs, initial } from '@/features/contacts/contactStyles'
 import type { GroupInvitation, TrainingGroup } from '@/features/tracking-exchange/groups/groupModels';
 import type { GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import type { OwnJoinRequest } from '@/features/tracking-exchange/groups/joinService';
+import { GroupNotifyCard } from './GroupNotifyCard';
 import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, useGroupServices } from './groupHub';
 
 type State = { groups: TrainingGroup[]; invitations: GroupInvitation[]; requests: OwnJoinRequest[]; serverNowMs: number };
@@ -157,6 +158,7 @@ export default function GroupsOverviewScreen() {
               )}
               <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.createHint')}</Text>
             </AnyvoCard>
+            <GroupNotifyCard service={services.notify} />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
