@@ -28,6 +28,8 @@ import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
 import { ratingDisplay } from '@/features/training/documentation/learningLevel';
+import { LinkedTracksCard } from '@/features/training/trackLinks/components/LinkedTracksCard';
+import { forgetUnitLinks } from '@/features/training/trackLinks/store';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
@@ -138,6 +140,8 @@ export default function UnitDetailScreen() {
           if (!id) return;
           const { error } = await deleteTrainingUnit(id);
           if (error) { Alert.alert(t('common.error'), error.message); return; }
+          // #114: Der Server hat mit dem Training nur dessen Verknüpfungen entfernt; lokal nachziehen. Fährten bleiben.
+          if (unit?.owner_id) await forgetUnitLinks(unit.owner_id, id).catch(() => {});
           queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
           queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
           router.back();
@@ -284,6 +288,9 @@ export default function UnitDetailScreen() {
 
           {/* Smart Feedback (KI-Coach) — nur in der eigenen Sicht */}
           {!isReadOnly && <SmartFeedbackSection dogId={unit.dog_id} />}
+
+          {/* #114: verknüpfte Fährten, nur in der eigenen Ansicht */}
+          {!isReadOnly && !!id && !!unit.owner_id && <LinkedTracksCard ownerId={unit.owner_id} unitId={id} dogId={unit.dog_id ?? null} day={unit.session_date ?? null} />}
 
           {/* Kommentare / Nachrichten (Trainer ↔ Kunde) */}
           {id ? <CommentThread unitId={id} /> : null}

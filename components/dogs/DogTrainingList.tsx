@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { useLinkedUnitIds } from '@/features/training/trackLinks/useLinkedUnitIds';
 import type { DogTrainingItem } from './types';
 
 // Liste der letzten Trainings. Leerzustand bei fehlenden Daten.
@@ -12,6 +13,8 @@ export function DogTrainingList({
   onOpen?: (item: DogTrainingItem) => void;
 }) {
   const { t } = useT();
+  // #114: Hinweis, wenn einem Training eine Fährte zugeordnet ist.
+  const linked = useLinkedUnitIds(items.map(it => it.id).join(','));
   return (
     <View style={s.wrap}>
       {items.length === 0 ? (
@@ -28,7 +31,7 @@ export function DogTrainingList({
               <View style={s.iconWrap}><Ionicons name="paw" size={16} color={C.trackPrimary} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.disc} numberOfLines={1}>{it.discipline}</Text>
-                <Text style={s.date} numberOfLines={1}>{it.dateLabel}</Text>
+                <Text style={s.date} numberOfLines={1}>{it.dateLabel}{it.source === 'unit' && linked.has(it.id) ? ` · ${t('trackLink.badge')}` : ''}</Text>
               </View>
               {it.points != null ? (
                 <View style={s.pill}><Text style={s.pillTxt}>{t('dog.pointsShort', { points: it.points })}</Text></View>
