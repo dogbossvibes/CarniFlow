@@ -31,6 +31,7 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { signIn, signUp, signInWithGoogle, signInWithApple, isAppleAuthAvailable } from '@/services/auth';
 import { useT, type TranslationKey } from '@/i18n';
+import { MIN_PASSWORD_LENGTH, isLeakedPasswordError } from '@/features/auth/accountSecurity';
 
 type Tab = 'anmelden' | 'registrieren';
 
@@ -114,9 +115,9 @@ export default function LoginScreen() {
       if (err) { setFehler(uebersetzeFehler(err.message, t)); return; }
       router.replace('/(tabs)/home');
     } else {
-      if (passwort.length < 6) {
+      if (passwort.length < MIN_PASSWORD_LENGTH) {
         setLaden(false);
-        setFehler(t('auth.errorPasswordMin6'));
+        setFehler(t('auth.errorPasswordMin8'));
         return;
       }
       const { data, error: err } = await signUp(email.trim(), passwort, vollName.trim() || undefined);
@@ -454,7 +455,8 @@ function uebersetzeFehler(msg: string, t: (key: TranslationKey) => string): stri
   if (msg.includes('Invalid login credentials')) return t('auth.errorInvalidCredentials');
   if (msg.includes('Email not confirmed'))       return t('auth.errorEmailUnconfirmed');
   if (msg.includes('User already registered'))   return t('auth.errorAlreadyRegistered');
-  if (msg.includes('Password should be'))        return t('auth.errorPasswordMin6');
+  if (isLeakedPasswordError(msg))                return t('auth.errorPasswordLeaked');
+  if (msg.includes('Password should be'))        return t('auth.errorPasswordMin8');
   if (msg.includes('rate limit'))                return t('auth.errorRateLimit');
   if (msg.includes('network'))                   return t('auth.errorNetwork');
   return msg;
