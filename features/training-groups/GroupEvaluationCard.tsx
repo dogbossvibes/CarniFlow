@@ -40,12 +40,16 @@ export function GroupEvaluationCard({ localId, onGate, onOpenTrainerShare }: {
     const service = services.evaluations;
     if (!trackId) return;
     let alive = true;
-    setFailed(false);
     onGate('blocked');
-    if (!service) return;
-    service.state(trackId).then(next => {
-      if (!alive) return;
-      setState(next); onGate(next.shareOutside ? 'allowed' : 'blocked');
+    // Zustand erst im Ablauf zurücksetzen, nicht synchron im Effekt (react-hooks/set-state-in-effect).
+    void Promise.resolve().then(() => {
+      if (!alive) return undefined;
+      setFailed(false);
+      if (!service) return undefined;
+      return service.state(trackId).then(next => {
+        if (!alive) return;
+        setState(next); onGate(next.shareOutside ? 'allowed' : 'blocked');
+      });
     }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [trackId, services.evaluations, onGate]);
