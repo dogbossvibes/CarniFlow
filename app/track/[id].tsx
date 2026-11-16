@@ -13,7 +13,7 @@ import { TrackObjectCorrections } from '@/features/tracking/components/TrackObje
 import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
-import { confirmTrainerShare } from '@/features/home-zone/confirm';
+import { refreshTrainerShareCopies, shareTrackWithHomeZone } from '@/features/home-zone/trainerShare';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -61,7 +61,7 @@ import { formatApproxDeviationM, formatDeviationUncertaintyM } from '@/features/
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
-  revokeTrackShare, shareTrack, updateTrackFeedback,
+  revokeTrackShare, updateTrackFeedback,
   type TrackFeedback, type TrackShare,
 } from '@/services/trackShareService';
 import { supabase } from '@/lib/supabase';
@@ -297,6 +297,16 @@ export default function TrackAuswertungScreen() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   useEffect(() => { void refreshSharing(); }, [refreshSharing]);
 
+  // Heimzone (#121): Kopien bestehender Freigaben beim Öffnen an die aktuelle Zone anpassen.
+  const copiesChecked = useRef<string | null>(null);
+  useEffect(() => {
+    const own = shares.filter(share => !share.revoked_at && share.owner_user_id === currentUserId);
+    const key = own.map(share => share.id).join(',');
+    if (!data || !key || copiesChecked.current === key) return;
+    copiesChecked.current = key;
+    void refreshTrainerShareCopies(data, own);
+  }, [data, shares, currentUserId]);
+
   const openSharePicker = async () => {
     const rows = await listAcceptedTrainers(currentUserId ?? (await supabase.auth.getUser()).data.user?.id ?? '');
     setTrainers(rows);
@@ -306,9 +316,9 @@ export default function TrackAuswertungScreen() {
 
   const createShare = async (trainerId: string) => {
     if (!id) return;
-    // Heimzone (Issue #115): Trainer:innen lesen die ganze Fährte, deshalb vorher warnen.
-    if (!await confirmTrainerShare(data)) return;
-    const result = await shareTrack(String(id), trainerId);
+    // Heimzone (#115/#121): Trainer:in erhält eine gekürzte Kopie; ohne Server-Unterstützung wird gewarnt.
+    const result = await shareTrackWithHomeZone(String(id), trainerId, data);
+    if (!result) return;
     if (result.error) Alert.alert('Freigabe nicht möglich', result.error.message);
     else { setSharePickerOpen(false); setSelectedTrainer(null); await refreshSharing(); }
   };

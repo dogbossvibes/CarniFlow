@@ -50,6 +50,10 @@ const de = {
   handoverSkip: 'Nicht übergeben',
   livePaused: 'Standort pausiert: Du bist in deiner Heimzone. Dort wird keine Position gesendet.',
   notesWarning: 'Notizen werden nicht gekürzt. Prüfe, ob darin deine Adresse oder der Ort steht.',
+  trainerClippedBody: 'Trainer:in sieht die Fährte ohne den Teil in deiner Heimzone. Kennzahlen und Notizen bleiben sichtbar.',
+  trainerNoMapBody: 'Die Fährte liegt ganz in deiner Heimzone. Trainer:in sieht Auswertung und Notizen, aber keine Karte.',
+  trainerClippedConfirm: 'Gekürzt freigeben',
+  trainerHidden: 'Ein Teil dieser Fährte ist ausgeblendet. Die Kennzahlen beziehen sich auf die ganze Fährte.',
 };
 const en: typeof de = {
   title: 'Home zone',
@@ -100,6 +104,10 @@ const en: typeof de = {
   handoverSkip: 'Do not hand over',
   livePaused: 'Location paused: you are in your home zone. No position is sent there.',
   notesWarning: 'Notes are not shortened. Check whether they mention your address or the place.',
+  trainerClippedBody: 'Your trainer sees the track without the part inside your home zone. Figures and notes stay visible.',
+  trainerNoMapBody: 'The track is entirely inside your home zone. Your trainer sees the evaluation and notes, but no map.',
+  trainerClippedConfirm: 'Share shortened',
+  trainerHidden: 'Part of this track is hidden. The figures refer to the whole track.',
 };
 const fr: typeof de = {
   title: 'Zone domicile',
@@ -150,6 +158,10 @@ const fr: typeof de = {
   handoverSkip: 'Ne pas remettre',
   livePaused: 'Position en pause : tu es dans ta zone domicile. Aucune position n’y est envoyée.',
   notesWarning: 'Les notes ne sont pas raccourcies. Vérifie si ton adresse ou le lieu y figure.',
+  trainerClippedBody: 'Ton entraîneur·e voit la piste sans la partie située dans ta zone domicile. Les chiffres et les notes restent visibles.',
+  trainerNoMapBody: 'La piste se trouve entièrement dans ta zone domicile. Ton entraîneur·e voit l’analyse et les notes, mais pas de carte.',
+  trainerClippedConfirm: 'Partager la version raccourcie',
+  trainerHidden: 'Une partie de cette piste est masquée. Les chiffres concernent toute la piste.',
 };
 const it: typeof de = {
   title: 'Zona casa',
@@ -200,6 +212,10 @@ const it: typeof de = {
   handoverSkip: 'Non consegnare',
   livePaused: 'Posizione in pausa: sei nella tua zona casa. Lì non viene inviata alcuna posizione.',
   notesWarning: 'Le note non vengono accorciate. Controlla se contengono il tuo indirizzo o il luogo.',
+  trainerClippedBody: 'Il tuo istruttore vede la pista senza la parte nella tua zona casa. Dati e note restano visibili.',
+  trainerNoMapBody: 'La pista si trova interamente nella tua zona casa. Il tuo istruttore vede la valutazione e le note, ma nessuna mappa.',
+  trainerClippedConfirm: 'Condividi accorciata',
+  trainerHidden: 'Una parte di questa pista è nascosta. I dati si riferiscono a tutta la pista.',
 };
 const gsw: typeof de = {
   title: 'Heizone',
@@ -250,6 +266,10 @@ const gsw: typeof de = {
   handoverSkip: 'Nöd übergeh',
   livePaused: 'Standort pausiert: Du bisch i dinere Heizone. Det wird kei Position gschickt.',
   notesWarning: 'Notize werded nöd kürzt. Lueg, öb dini Adrässe oder de Ort drin staht.',
+  trainerClippedBody: 'Trainer:in gseht d Fährte ohni de Teil i dinere Heizone. Kennzahle und Notize bliibed sichtbar.',
+  trainerNoMapBody: 'D Fährte liit ganz i dinere Heizone. Trainer:in gseht Uuswertig und Notize, aber kei Charte.',
+  trainerClippedConfirm: 'Kürzt freigäh',
+  trainerHidden: 'En Teil vo dere Fährte isch uusblendet. D Kennzahle beziehnd sich uf di ganz Fährte.',
 };
 export type HomeZoneKey = keyof typeof de;
 export const homeZoneDe = de;
