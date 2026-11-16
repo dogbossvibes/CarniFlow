@@ -6,6 +6,8 @@ const T = '50000000-0000-4000-8000-000000000001', G = '10000000-0000-4000-8000-0
 const A = 'a1111111-1111-4111-8111-111111111111', C = 'c3333333-3333-4333-8333-333333333333';
 const mockRead = jest.fn();
 jest.mock('../evaluationLocal', () => ({ readEvaluationPackage: (...a: unknown[]) => mockRead(...a) }));
+const mockConfirm = jest.fn(async (..._a: unknown[]) => true);
+jest.mock('@/features/home-zone/confirm', () => ({ confirmEvaluationShare: (...a: unknown[]) => mockConfirm(...a) }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeArea' }));
 jest.mock('@/components/ui/AnyvoButton', () => ({ AnyvoButton: 'AnyvoButton' }));
@@ -15,7 +17,7 @@ const base = { trackId: T, groupId: G, shareOutside: false, searched: true, shar
   candidates: [{ userId: A, displayName: 'Sandra', isTrainer: false, isLayer: true }, { userId: C, displayName: 'Carla', isTrainer: true, isLayer: false }] };
 const pkg = { version: 1, laid: [], search: [], metrics: {} };
 let tree: ReactTestRenderer;
-afterEach(() => { act(() => tree.unmount()); jest.clearAllMocks(); });
+afterEach(() => { act(() => tree.unmount()); jest.clearAllMocks(); mockConfirm.mockImplementation(async () => true); });
 
 async function open(state = base, extra: Record<string, unknown> = {}) {
   const service = { state: jest.fn(async () => state), share: jest.fn(async () => ({ ...state, shared: true })) };
@@ -64,4 +66,34 @@ it('«Meine Trainer» nur, wenn die Gruppe es erlaubt', async () => {
   act(() => tree.unmount());
   await open({ ...base, shareOutside: true }, { onOpenTrainerShare: jest.fn() });
   expect(tree.root.findAll(n => n.props.label === 'groups.evalMyTrainersOpen').length).toBeGreaterThan(0);
+});
+
+it('Heimzone: vor dem Teilen wird mit genau dem Paket gefragt; bei «Abbrechen» verlässt nichts das Gerät', async () => {
+  mockRead.mockResolvedValue(pkg);
+  mockConfirm.mockResolvedValue(false);
+  const onClose = jest.fn();
+  const service = await open(base, { onClose });
+  act(() => { switchFor('Carla').props.onValueChange(true); });
+  await act(async () => { save().props.onPress(); });
+  expect(mockConfirm).toHaveBeenCalledWith(pkg);
+  expect(service.share).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+it('Heimzone: wer eine bereits geteilte Auswertung auf mehr Leute ausweitet, wird ebenfalls gefragt (Paket nicht erneut gesendet)', async () => {
+  mockRead.mockResolvedValue(pkg);
+  const service = await open({ ...base, shared: true, recipientUserIds: [C] });
+  act(() => { switchFor('groups.evalWholeGroup').props.onValueChange(true); });
+  await act(async () => { save().props.onPress(); });
+  expect(mockConfirm).toHaveBeenCalledWith(pkg);
+  expect(service.share).toHaveBeenCalledWith(T, [C], true, null);
+});
+
+it('Heimzone: Einschränken oder unverändertes Speichern fragt nicht', async () => {
+  const service = await open({ ...base, shared: true, group: true, recipientUserIds: [C] });
+  act(() => { switchFor('groups.evalWholeGroup').props.onValueChange(false); });
+  await act(async () => { save().props.onPress(); });
+  expect(mockConfirm).not.toHaveBeenCalled();
+  expect(mockRead).not.toHaveBeenCalled();
+  expect(service.share).toHaveBeenCalledWith(T, [C], false, null);
 });

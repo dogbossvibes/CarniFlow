@@ -5,6 +5,7 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import type { EvaluationShareState, GroupEvaluationService } from '@/features/tracking-exchange/groups/evaluationService';
+import { confirmEvaluationShare } from '@/features/home-zone/confirm';
 import { readEvaluationPackage } from './evaluationLocal';
 
 /**
@@ -26,10 +27,14 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
   useEffect(() => {
     if (!visible || !service) return;
     let alive = true;
-    setPhase('loading'); setError(null);
-    service.state(trackId).then(next => {
-      if (!alive) return;
-      setState(next); setPicked(new Set(next.recipientUserIds)); setGroup(next.group); setPhase('ready');
+    // Zustand erst im Ablauf zurücksetzen, nicht synchron im Effekt (react-hooks/set-state-in-effect).
+    void Promise.resolve().then(() => {
+      if (!alive) return undefined;
+      setPhase('loading'); setError(null);
+      return service.state(trackId).then(next => {
+        if (!alive) return;
+        setState(next); setPicked(new Set(next.recipientUserIds)); setGroup(next.group); setPhase('ready');
+      });
     }).catch(() => { if (alive) setPhase('failed'); });
     return () => { alive = false; };
   }, [visible, service, trackId]);
@@ -43,9 +48,15 @@ export function ShareEvaluationSheet({ visible, onClose, service, trackId, local
     setPhase('saving'); setError(null);
     try {
       const wantsShare = group || picked.size > 0;
+      // Mehr Leute als bisher (auch beim ersten Teilen): dann gilt die Heimzonen-Abfrage.
+      const widened = (group && !state.group) || [...picked].some(id => !state.recipientUserIds.includes(id));
       // Beim ersten Teilen das Paket aus der eigenen Fährte mitsenden; danach bleiben Linien auf dem Server.
-      const pkg = wantsShare && !state.shared ? await readEvaluationPackage(localId) : null;
+      // Für die Heimzonen-Abfrage wird es auch beim Erweitern gelesen, dann aber nicht erneut gesendet.
+      const local = wantsShare && (!state.shared || widened) ? await readEvaluationPackage(localId) : null;
+      const pkg = !state.shared ? local : null;
       if (wantsShare && !state.shared && !pkg) { setError(t('groups.evalNoSearch')); setPhase('ready'); return; }
+      // Linien gehen ungekürzt an die Gewählten: liegt ein Teil in der Heimzone, vorher fragen (Abbrechen ist Standard).
+      if (wantsShare && widened && !(await confirmEvaluationShare(local))) { setPhase('ready'); return; }
       const next = await service.share(trackId, [...picked], group, pkg);
       setState(next); onSaved?.(next); onClose();
     } catch {
