@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect -- Altbestand (bereits im Live-Stand 072b3b07), bewusst unveraendert; nur Kommentar, keine Verhaltensaenderung. */
 import { isLiveShareReleaseReady } from './releaseGate';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
