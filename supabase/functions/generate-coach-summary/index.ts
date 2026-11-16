@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SERVER_AI_FLAG, serverAiDisabledResponse } from '../_shared/ai-guard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,10 @@ const UNAVAILABLE = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  // KI serverseitig standardmässig aus (Produktentscheidung «keine KI», EU AI Act/Datenschutz).
+  const aiDisabled = serverAiDisabledResponse(Deno.env.get(SERVER_AI_FLAG), corsHeaders)
+  if (aiDisabled) return aiDisabled
 
   try {
     const supabase = createClient(

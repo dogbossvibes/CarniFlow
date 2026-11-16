@@ -8,6 +8,7 @@
 // Der Anthropic-Key bleibt SERVERSEITIG (niemals in der App). Die App ruft
 // die Funktion via supabase.functions.invoke('recommend') auf; fehlt der Key
 // oder die Funktion, nutzt die App ihre regelbasierten Empfehlungen.
+import { SERVER_AI_FLAG, serverAiDisabledResponse } from '../_shared/ai-guard.ts'
 
 const SYSTEM = `Du bist der Trainingscoach der Hundesport-App ANYVO.
 Gib auf Basis der Trainings- und Termindaten 1–3 sehr kurze, motivierende
@@ -22,11 +23,23 @@ Deno.serve(async (req: Request) => {
   };
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
+  // KI serverseitig standardmässig aus (Produktentscheidung «keine KI», EU AI Act/Datenschutz).
+  const aiDisabled = serverAiDisabledResponse(Deno.env.get(SERVER_AI_FLAG), cors)
+  if (aiDisabled) return aiDisabled
+
   try {
+    // Nur angemeldete Konten (verhindert Kostenmissbrauch mit dem öffentlichen App-Schlüssel).
+    const authRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, {
+      headers: { Authorization: req.headers.get('Authorization') ?? '', apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '' },
+    });
+    if (!authRes.ok) return new Response(JSON.stringify({ error: 'Nicht authentifiziert' }), { status: 401, headers: { ...cors, 'content-type': 'application/json' } });
+
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ recommendations: [] }, cors);
 
-    const { feedSummary = '', eventSummary = '' } = await req.json().catch(() => ({}));
+    const raw = await req.json().catch(() => ({}));
+    const feedSummary = String(raw?.feedSummary ?? '').slice(0, 2000);
+    const eventSummary = String(raw?.eventSummary ?? '').slice(0, 2000);
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -48,7 +61,8 @@ Deno.serve(async (req: Request) => {
     try { recommendations = JSON.parse(text); } catch { recommendations = []; }
     return json({ recommendations: recommendations.slice(0, 3) }, cors);
   } catch (e) {
-    return json({ recommendations: [], error: String(e) }, cors);
+    console.error('[recommend]', (e as Error)?.message ?? 'unbekannt');
+    return json({ recommendations: [] }, cors);
   }
 });
 
