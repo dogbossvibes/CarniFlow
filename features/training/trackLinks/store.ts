@@ -75,17 +75,19 @@ export async function setUnitLinks(ownerId: string, unitId: string, targets: rea
   const current = await listLinksForUnit(ownerId, unitId);
   const have = new Set(current.map(l => linkKey(l.training_session_id, l.track_run_id)));
   let added = 0; let removed = 0;
-  const db = await getLocalDb();
-  await db.withTransactionAsync(async () => {
-    for (const link of current) {
-      if (wanted.has(linkKey(link.training_session_id, link.track_run_id))) continue;
-      await unlinkTrack(ownerId, unitId, { sessionId: link.training_session_id, runId: link.track_run_id }); removed++;
-    }
-    for (const [key, target] of wanted) {
-      if (have.has(key)) continue;
-      await linkTrack(ownerId, unitId, target); added++;
-    }
-  });
+  // Bewusst OHNE eigene Transaktion: getLocalDb() ist die eine geteilte Verbindung, auf der
+  // auch der laufende GPS-Schreiber (localTrackRepository) seine Punkt-Batches committet.
+  // Ein zweites BEGIN auf dieser Verbindung schlägt fehl und das ROLLBACK von expo-sqlite
+  // würde den offenen GPS-Batch mit verwerfen. Jeder Schritt hier ist einzeln idempotent;
+  // ein Abbruch mittendrin wird beim nächsten Speichern bzw. Abgleich nachgezogen.
+  for (const link of current) {
+    if (wanted.has(linkKey(link.training_session_id, link.track_run_id))) continue;
+    await unlinkTrack(ownerId, unitId, { sessionId: link.training_session_id, runId: link.track_run_id }); removed++;
+  }
+  for (const [key, target] of wanted) {
+    if (have.has(key)) continue;
+    await linkTrack(ownerId, unitId, target); added++;
+  }
   return { added, removed };
 }
 
@@ -165,20 +167,20 @@ export async function mergeRemoteLinks(ownerId: string, scope: { unitId: string 
   const [column, value] = 'unitId' in scope ? ['training_unit_id', scope.unitId] : ['training_session_id', scope.sessionId];
   const key = (l: { training_unit_id: string; training_session_id: string; track_run_id: string | null }) =>
     `${l.training_unit_id}|${linkKey(l.training_session_id, l.track_run_id)}`;
-  await db.withTransactionAsync(async () => {
-    const local = await db.getAllAsync<TrackLink>(`select * from ${TABLE} where owner_id=? and ${column}=?`, ownerId, value);
-    const localKeys = new Set(local.map(key));
-    const remoteKeys = new Set(remote.map(key));
-    for (const row of local) {
-      if (row.state === 'synced' && !remoteKeys.has(key(row))) await db.runAsync(`delete from ${TABLE} where id=? and state='synced'`, row.id);
-    }
-    const ts = now();
-    for (const row of remote) {
-      if (localKeys.has(key(row))) continue;
-      await db.runAsync(
-        `insert or ignore into ${TABLE} (id, owner_id, training_unit_id, training_session_id, track_run_id, state, created_at, updated_at)
-         values (?, ?, ?, ?, ?, 'synced', ?, ?)`,
-        row.id, ownerId, row.training_unit_id, row.training_session_id, run(row.track_run_id), row.created_at ?? ts, ts);
-    }
-  });
+  // Ohne eigene Transaktion (Begründung siehe setUnitLinks): das Löschen ist auf state='synced'
+  // begrenzt und das Einfügen ist «insert or ignore»; ein Abbruch wird beim nächsten Abgleich geheilt.
+  const local = await db.getAllAsync<TrackLink>(`select * from ${TABLE} where owner_id=? and ${column}=?`, ownerId, value);
+  const localKeys = new Set(local.map(key));
+  const remoteKeys = new Set(remote.map(key));
+  for (const row of local) {
+    if (row.state === 'synced' && !remoteKeys.has(key(row))) await db.runAsync(`delete from ${TABLE} where id=? and state='synced'`, row.id);
+  }
+  const ts = now();
+  for (const row of remote) {
+    if (localKeys.has(key(row))) continue;
+    await db.runAsync(
+      `insert or ignore into ${TABLE} (id, owner_id, training_unit_id, training_session_id, track_run_id, state, created_at, updated_at)
+       values (?, ?, ?, ?, ?, 'synced', ?, ?)`,
+      row.id, ownerId, row.training_unit_id, row.training_session_id, run(row.track_run_id), row.created_at ?? ts, ts);
+  }
 }
