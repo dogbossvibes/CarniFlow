@@ -1,5 +1,55 @@
 # ANYVO Master Status
 
+## Stand Android Build 53 nach OTA #145 und #148 – 2026-11-16 (Nacht)
+
+Aktueller Production-Stand **Android Build 53** (1.0.8, versionCode 53, Runtime
+`1.0.8-sdk58-android-v1`, interner Test-Track), frisch aus EAS nachkontrolliert. Ersetzt die
+Android-Angaben in den Abschnitten darunter; iOS 60 unverändert wie dort (`60d72b82`, #137,
+Gerätetest bestanden, Karte auf Veröffentlicht).
+- **Aktiv:** Source `56c34b86` (aktive Production `0818effa` plus main `a5c3fc34`), Group
+  `b308a14e-5420-484e-bf60-1ea1c58b25dd`. Release-Karte Issue #148: Gruppentraining Stufe 4a
+  (PR #139) mit Heimzonen-Abfrage bei «Auswertung teilen» (PR #140). **Gerätetest offen.**
+- Davor am selben Abend: Karte #145, Source `0818effa`, Group `3ff4fc77-e454-4000-86a2-d372bba2cbf1`:
+  Gruppentraining Stufe 3 (PR #130) und Folgekorrekturen (PR #135). **Gerätetest offen.**
+- **Release-Quelle:** `release/android53-main-a5c3fc34-20261116`. Jede weitere OTA auf dieser
+  Runtime muss `56c34b86` enthalten.
+- **Vorgeschichte #148:** Ein erster Kandidat mit Stufe 4a wurde vor der Veröffentlichung gestoppt
+  (Review FAIL: «Auswertung teilen» sendete Koordinaten ohne Rücksicht auf die Heimzone). Korrektur
+  PR #140 (nachfragen statt kürzen, wie bei der Übergabe), Nach-Review PASS.
+- **Android-OTAs:** Es gibt kein npm-Kurzskript für Android (nur für iOS). Der Production-Wrapper
+  wird direkt mit Plattform android und Bestätigung aufgerufen; Aufruf siehe Kopf des Wrappers.
+- **Store/Production-OTA unverändert:** 1.0.5 (49), Runtime `1.0.5-gnss-v1`, Group `6b52516b`.
+  Keine Play-Produktion für Build 53.
+
+**Stufe 4a auf iOS 60:** nicht ausgeliefert. Laut Nutzerin erst nach bestandenem Android-Test als
+eigene Charge mit eigener Freigabe (Basis `60d72b82` plus main). Empfehlung MASTER: vorher
+Issue #146 entscheiden (gelegte Linie der Leger:in nur mit deren Zustimmung teilen), weil iOS 60
+nach der Store-Freigabe von 1.0.8 Kunden erreicht.
+
+**Offene Befunde als Issues:** #141 Push auf Android (FCM, neuer nativer Build), #142 «Standort
+teilen» meldet beim ersten Einschalten einen Fehler, #143 Kartenstift-Farbe, #144 Einstiege
+«Gruppentraining»/«Fährten gemeinsam» zusammenführen, #146 Zustimmung der Leger:in.
+
+## Stand iOS 60 nach OTA #137 und App-Store-Einreichung – 2026-11-16 (spät)
+
+Aktueller Production-Stand **iOS 60** (Runtime `1.0.8-sdk58-v1`), frisch aus EAS nachkontrolliert.
+Ersetzt für iOS 60 die Angabe «Aktiv» im Abschnitt darunter; Android unverändert wie dort.
+- **Aktiv:** Source `60d72b82` (aktive Production `c3fd9879` plus main `8fb4647c`, dazu zwei
+  ESLint-Kommentarzeilen für Altbestand), Group `89a9042e-6994-4228-b3d3-5000c78ca615`.
+  Release-Karte Issue #137: Folgekorrekturen Gruppentraining (PR #135). Testweg Nachher,
+  **Gerätetest offen**.
+- **Release-Quelle:** `release/ios60-main-8fb4647c-20261117` (Datum im Namen versehentlich 17.11.).
+- **Jede weitere iOS-60-OTA muss `60d72b82` enthalten.** Vor der nächsten OTA aus main wieder
+  eine Release-Quelle aus dem Live-Commit plus main bauen.
+- **App Store:** Die Nutzerin hat Build 60 (1.0.8) am 16.11.2026 in App Store Connect zur Prüfung
+  eingereicht (vom MASTER nicht nachprüfbar). Sobald 1.0.8 im Store freigegeben ist, erreicht jede
+  Production-OTA dieser Runtime alle Store-Kunden, nicht mehr nur TestFlight: Testweg entsprechend
+  streng wählen. Der eingebaute Stand von Build 60 ist von Anfang November (`3858c0ff`); der
+  aktuelle Stand kommt per OTA ab dem zweiten Start. Build 57 (1.0.6) bleibt bis zur Freigabe
+  der Kundenstand.
+- **Android Build 53:** unverändert (Group `c0de00de`, Source `47b82b3a`). Gruppentraining Stufe 3
+  und PR #135 sind dort nicht ausgeliefert; auf Wunsch der Nutzerin später als eigene Charge.
+
 ## Stand iOS 60 und Android Build 53 nach drei OTAs – 2026-11-16 (Nacht)
 
 Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt die Angaben «Aktiv» im
