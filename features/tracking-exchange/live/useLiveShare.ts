@@ -5,8 +5,11 @@ import NetInfo from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
 import { LiveShareController, type LiveShareTransport, type ShareState, type StartShare } from './liveShareController';
 import { RevocationJournal } from './revocationJournal';
+import { loadHomeZones } from '@/features/home-zone/store';
+import { insideHomeZone } from '@/features/home-zone/zones';
 
-export type LiveShareUiState = ShareState & { permissionDenied: boolean; preparing: boolean };
+/** homeZonePaused: Position liegt in der Heimzone (Issue #115) und wird nicht gesendet. */
+export type LiveShareUiState = ShareState & { permissionDenied: boolean; preparing: boolean; homeZonePaused?: boolean };
 const IDLE: LiveShareUiState = { phase: 'idle', issue: null, permissionDenied: false, preparing: false };
 
 /** Mount once in a session-scoped provider. Navigation may keep this provider
@@ -86,6 +89,11 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
       if (permission.status !== 'granted') {
         setState({ ...IDLE, permissionDenied: true }); return false;
       }
+      // Heimzone: Zonen vor dem ersten Senden lesen. Nicht lesbar = nicht starten.
+      let zones: Awaited<ReturnType<typeof loadHomeZones>>;
+      try { zones = await loadHomeZones(); }
+      catch { if (current()) setState({ ...IDLE, phase: 'error', issue: 'storage' }); return false; }
+      if (!current()) return false;
       if (!await instance.retryPending()) {
         if (current()) setState({ phase: 'revoke_pending', issue: 'connection', permissionDenied: false, preparing: false });
         return false;
@@ -101,6 +109,10 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
         if (!current() || instance.snapshot.phase !== 'sharing') return;
         const ageMs = Date.now() - fix.timestamp;
         if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 10_000 || fix.coords.accuracy == null) return;
+        // In der Heimzone (inkl. GPS-Ungenauigkeit) wird keine Position gesendet.
+        const paused = insideHomeZone({ lat: fix.coords.latitude, lng: fix.coords.longitude }, zones, fix.coords.accuracy);
+        setState(s => (s.homeZonePaused ?? false) === paused ? s : { ...s, homeZonePaused: paused });
+        if (paused) return;
         void instance.position({ latitude: fix.coords.latitude, longitude: fix.coords.longitude,
           accuracyM: fix.coords.accuracy }, performance.now() - ageMs);
       }, () => { if (current()) { releaseSource(); void instance.stop('connection'); } });

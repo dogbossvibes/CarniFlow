@@ -13,6 +13,7 @@ import { TrackObjectCorrections } from '@/features/tracking/components/TrackObje
 import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
+import { confirmTrainerShare } from '@/features/home-zone/confirm';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -305,6 +306,8 @@ export default function TrackAuswertungScreen() {
 
   const createShare = async (trainerId: string) => {
     if (!id) return;
+    // Heimzone (Issue #115): Trainer:innen lesen die ganze Fährte, deshalb vorher warnen.
+    if (!await confirmTrainerShare(data)) return;
     const result = await shareTrack(String(id), trainerId);
     if (result.error) Alert.alert('Freigabe nicht möglich', result.error.message);
     else { setSharePickerOpen(false); setSelectedTrainer(null); await refreshSharing(); }
