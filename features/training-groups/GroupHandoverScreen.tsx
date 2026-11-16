@@ -19,10 +19,16 @@ const TEXT: Record<Exclude<Phase, 'zone'>, TranslationKey> = {
   sending: 'groups.handoverSending', sent: 'groups.handoverSent', queued: 'groups.handoverQueued',
   dropped: 'groups.handoverDropped', failed: 'groups.handoverFailed',
 };
+// Eigene Fährte (Issue #150): keine Übergabe, nur die Fläche wird im Gruppentraining eingetragen.
+const TEXT_OWN: Record<Exclude<Phase, 'zone'>, TranslationKey> = {
+  sending: 'groups.ownSending', sent: 'groups.ownSent', queued: 'groups.ownQueued',
+  dropped: 'groups.ownDropped', failed: 'groups.ownFailed',
+};
 
-/** Nach dem Stoppen im Recorder: gelegte Fährte an die Hundeführerin übergeben. */
+/** Nach dem Stoppen im Recorder: gelegte Fährte an die Hundeführerin übergeben; eigene Fährte nur eintragen. */
 export default function GroupHandoverScreen() {
-  const params = useLocalSearchParams<{ trackId: string; localId: string; groupId: string; sessionId: string }>();
+  const params = useLocalSearchParams<{ trackId: string; localId: string; groupId: string; sessionId: string; own?: string }>();
+  const own = params.own === '1';
   const router = useRouter();
   const { t } = useT();
   const { t: z } = useTranslation(HOME_ZONE_NS);
@@ -47,7 +53,7 @@ export default function GroupHandoverScreen() {
       if (!confirmed.current && await localTrackNeedsHomeZoneWarning(params.localId)) { if (alive.current) setPhase('zone'); return; }
       if (!alive.current) return;
       const result = await submitHandover(tracks, userId, {
-        trackId: params.trackId, localId: params.localId, groupId: params.groupId, sessionId: params.sessionId, createdAtMs: Date.now(),
+        trackId: params.trackId, localId: params.localId, groupId: params.groupId, sessionId: params.sessionId, createdAtMs: Date.now(), ...(own ? { own: true } : {}),
       });
       if (!alive.current) return;
       setPhase(result);
@@ -55,7 +61,14 @@ export default function GroupHandoverScreen() {
     } catch {
       if (alive.current) setPhase('failed');
     }
-  }, [params.groupId, params.localId, params.sessionId, params.trackId, services, toTraining, valid]);
+  }, [own, params.groupId, params.localId, params.sessionId, params.trackId, services, toTraining, valid]);
+
+  // Eigene Fährte nicht eintragen: die Anmeldung im Gruppentraining zurückziehen (sonst bliebe sie auf
+  // «wird gelegt»). Die lokal gelegte Fährte bleibt unverändert die eigene, normale Fährte.
+  const skip = useCallback(() => {
+    if (own) void services.tracks?.cancel(params.trackId).catch(() => null);
+    toTraining();
+  }, [own, params.trackId, services.tracks, toTraining]);
 
   const started = useRef(false);
   useEffect(() => {
@@ -67,15 +80,15 @@ export default function GroupHandoverScreen() {
   return (
     <View style={cs.root}>
       <SafeAreaView edges={['top']} style={cs.flex}>
-        <ContactScreenHeader title={t('groups.layForTitle')} />
+        <ContactScreenHeader title={t(own ? 'groups.ownTrackTitle' : 'groups.layForTitle')} />
         <View style={cs.scroll}>
           <AnyvoCard>
             {phase === 'sending' ? <ActivityIndicator color={C.trackPrimary} style={{ marginBottom: 10 }} /> : null}
-            <Text style={[cs.body, phase === 'sent' && { color: C.trackPrimary }]} accessibilityRole="alert" accessibilityLiveRegion="polite">{phase === 'zone' ? `${z('fullTitle')}. ${z('handoverBody')}` : t(TEXT[phase])}</Text>
+            <Text style={[cs.body, phase === 'sent' && { color: C.trackPrimary }]} accessibilityRole="alert" accessibilityLiveRegion="polite">{phase === 'zone' ? `${z('fullTitle')}. ${z(own ? 'ownGroupBody' : 'handoverBody')}` : t((own ? TEXT_OWN : TEXT)[phase])}</Text>
             {phase === 'zone' ? (
               <View style={cs.actions}>
-                <AnyvoButton style={cs.flex} label={z('handoverSkip')} onPress={toTraining} />
-                <AnyvoButton style={cs.flex} label={z('handoverConfirm')} variant="secondary" onPress={() => { void send(true); }} />
+                <AnyvoButton style={cs.flex} label={z(own ? 'ownGroupSkip' : 'handoverSkip')} onPress={skip} />
+                <AnyvoButton style={cs.flex} label={z(own ? 'ownGroupConfirm' : 'handoverConfirm')} variant="secondary" onPress={() => { void send(true); }} />
               </View>
             ) : phase !== 'sending' && phase !== 'sent' ? (
               <View style={cs.actions}>

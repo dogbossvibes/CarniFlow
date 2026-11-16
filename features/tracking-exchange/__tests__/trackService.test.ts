@@ -1,5 +1,5 @@
 import { GroupApiError } from '../groups/groupRpc';
-import { areaCorners, createGroupTrackService, formatDuration, lyingMs, parseGroupTrack, GROUP_TRACK_HANDOVER_READY } from '../groups/trackService';
+import { areaCorners, createGroupTrackService, formatDuration, isOwnGroupTrack, lyingMs, parseGroupTrack, GROUP_TRACK_HANDOVER_READY, OWN_TRACKS_RETRY_MS } from '../groups/trackService';
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 let mockUuid = 0;
@@ -98,5 +98,53 @@ describe('Stufe 3: kantige Fläche', () => {
     const lats = new Set(corners.map(c => c.lat)), lngs = new Set(corners.map(c => c.lng));
     expect(lats.size).toBe(2); expect(lngs.size).toBe(2);
     expect(Math.max(...lats) - Math.min(...lats)).toBeCloseTo(150 / 111320, 6);
+  });
+});
+
+describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
+  const own = (over: Record<string, unknown> = {}) => raw({ handlerUserId: LAYER, blind: false, ...over });
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  it('Leger:in = Hundeführer:in ist gültig, aber nie blind', () => {
+    const track = parseGroupTrack(own({ ...lying }));
+    expect(isOwnGroupTrack(track)).toBe(true);
+    expect(isOwnGroupTrack(parseGroupTrack(raw()))).toBe(false);
+    expect(() => parseGroupTrack(own({ blind: true }))).toThrow('GROUP_INVALID_RESPONSE');
+  });
+
+  it('Liste verlangt eigene Fährten ausdrücklich und liefert sie', async () => {
+    const c = client(() => ok({ sessionId: SESSION, tracks: [raw(), own({ trackId: '50000000-0000-4000-8000-000000000002', ...lying })] }));
+    const result = await createGroupTrackService(c.client, LAYER).list(SESSION);
+    expect(c.calls).toEqual([{ endpoint: 'training_group_tracks_v1', action: 'list', request: { sessionId: SESSION, includeOwn: true } }]);
+    expect(result.ownTracks).toBe(true);
+    expect(result.tracks.map(isOwnGroupTrack)).toEqual([false, true]);
+  });
+
+  it('Server ohne die Migration: fragt ohne includeOwn nach, Liste bleibt nutzbar, kein Dauer-Doppelaufruf', async () => {
+    const c = client((_a, r) => { if ('includeOwn' in r) throw new GroupApiError('GROUP_INVALID_REQUEST'); return ok({ sessionId: SESSION, tracks: [raw()] }); });
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const service = createGroupTrackService(c.client, LAYER);
+    const first = await service.list(SESSION);
+    expect(first).toMatchObject({ ownTracks: false, tracks: [expect.objectContaining({ layerUserId: LAYER, handlerUserId: HANDLER })] });
+    expect(c.calls.map(x => x.request)).toEqual([{ sessionId: SESSION, includeOwn: true }, { sessionId: SESSION }]);
+    expect((await service.list(SESSION)).ownTracks).toBe(false);
+    expect(c.calls).toHaveLength(3);
+    // Nach der Wartezeit erneut versuchen: der Server kann inzwischen aktualisiert sein.
+    now.mockReturnValue(1_000_000 + OWN_TRACKS_RETRY_MS);
+    await service.list(SESSION);
+    expect(c.calls.slice(3).map(x => 'includeOwn' in x.request)).toEqual([true, false]);
+  });
+
+  it('andere Fehler der Liste werden nicht als «alter Server» gedeutet', async () => {
+    const c = client(() => { throw new GroupApiError('GROUP_UNAVAILABLE'); });
+    await expect(createGroupTrackService(c.client, LAYER).list(SESSION)).rejects.toThrow('GROUP_UNAVAILABLE');
+    expect(c.calls).toHaveLength(1);
+  });
+
+  it('zuteilen an die eigene Teilnahme: nie blind, gleiche Prüfung der Antwort', async () => {
+    const c = client((_a, r) => ok({ track: own({ trackId: r.trackId }) }));
+    const track = await createGroupTrackService(c.client, LAYER).assign(SESSION, PART, false);
+    expect(c.calls[0]).toMatchObject({ action: 'assign', request: { sessionId: SESSION, handlerParticipationId: PART, blind: false } });
+    expect(isOwnGroupTrack(track)).toBe(true);
   });
 });
