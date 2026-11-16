@@ -29,7 +29,7 @@ const mockServices = {
     },
     join: (...args: unknown[]) => mockJoin(...(args as [])),
   },
-  tracks: { list: async () => ({ tracks: [
+  tracks: { fetch: async () => { throw new Error('offline'); }, searched: async () => ({}), list: async () => ({ tracks: [
     track({ trackId: '1' }),
     track({ trackId: '2', layerUserId: CARL, handlerUserId: ME, handlerParticipationId: 'p-me', dogId: 'dog-a', blind: true, status: 'laying', laidAtMs: null, area: null, distanceM: null }),
     track({ trackId: '3', layerUserId: CARL, handlerUserId: BEA, handlerParticipationId: 'p-b2', dogId: 'dog-b2', status: 'searched', searchStartedAtMs: 400_000, searchedAtMs: 500_000, distanceM: null }),
@@ -48,6 +48,8 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string, params?: Record<str
 jest.mock('@/i18n/format', () => ({ formatTime: () => '23:59' }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-a', name: 'Ayla' }, { id: 'dog-z', name: 'Zora' }] }) }));
 jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), client: {} }) }));
+jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, importGroupTrack: async () => null,
+  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [] }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 
 const text = (tree: ReactTestRenderer) => tree.root.findAll(n => n.type === 'Text')
@@ -68,7 +70,7 @@ it('zeigt Status, laufende Liegezeit und nur Fläche für fremde Fährten', asyn
   expect(out).toContain('groups.statusSearched 5:00');
   expect(out).not.toContain('groups.statusRevoked');
   expect(out).toContain('CIRCLE');
-  expect(out).toContain('groups.layForSoon');
+  expect(out).not.toContain('groups.layForSoon');
 });
 
 it('zeigt Bea mit zwei Hunden unter einer Person', async () => {

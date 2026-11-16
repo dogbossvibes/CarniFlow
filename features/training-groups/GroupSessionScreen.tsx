@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, RefreshControl, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,8 +18,9 @@ import { canManageGroup, type GroupParticipant, type GroupSession, type GroupSes
 import { formatDuration, GROUP_TRACK_HANDOVER_READY, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
 import { GroupTracksMap } from './GroupTracksMap';
+import { findImportedGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
 
-type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number };
+type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[] };
 
 export function dogColor(dogId: string, colorKey: string | null): string {
   return colorKey && /^#[\da-f]{6}$/i.test(colorKey) ? colorKey : trackOverlayColor(resolveTrackOverlayColorKey(dogId, colorKey));
@@ -47,6 +48,26 @@ export default function GroupSessionScreen() {
   const [now, setNow] = useState(() => Date.now());
   const generation = useRef(0);
 
+  // Für mich gelegte Fährten sofort aufs Gerät holen (Absuche auch ohne Netz) und eine lokal
+  // abgeschlossene Absuche als «abgesucht» nachreichen. Fehler bleiben still: nächster Durchlauf.
+  const preparing = useRef(false);
+  const prepareHandlerTracks = useCallback(async (uid: string, list: GroupTrack[]) => {
+    const tracks = services.tracks;
+    if (!tracks || preparing.current) return;
+    preparing.current = true;
+    try {
+      for (const track of list) {
+        if (track.handlerUserId !== uid || (track.status !== 'lying' && track.status !== 'searching')) continue;
+        let local = await findImportedGroupTrack(uid, track.trackId);
+        if (!local) {
+          const fetched = await tracks.fetch(track.trackId).catch(() => null);
+          if (fetched) local = await importGroupTrack(uid, fetched.track, fetched.reference).catch(() => null);
+        }
+        if (local?.searched && track.status === 'searching') await tracks.searched(track.trackId).catch(() => null);
+      }
+    } finally { preparing.current = false; }
+  }, [services.tracks]);
+
   const load = useCallback(async (quiet = false) => {
     const { groups, tracks } = services;
     if (!groups || !tracks || !sessionId || !groupId) return;
@@ -63,16 +84,20 @@ export default function GroupSessionScreen() {
         try { session = (await groups.session(sessionId)).session; }
         catch (e) { if (!(e instanceof GroupApiError) || e.code !== 'GROUP_UNAVAILABLE') throw e; }
       }
+      // Ohne Netz gelegte Fährten nachreichen, bevor die Liste gelesen wird.
+      if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId);
       const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs };
+      const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;
-      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt });
+      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover });
+      if (services.userId) void prepareHandlerTracks(services.userId, trackList.tracks);
       setError(null);
     } catch (e) {
       if (token === generation.current) setError(groupErrorCode(e));
     } finally {
       if (token === generation.current) setLoading(false);
     }
-  }, [groupId, services, sessionId]);
+  }, [groupId, prepareHandlerTracks, services, sessionId]);
 
   // Abfragen nur, solange der Bildschirm sichtbar und die App im Vordergrund ist.
   useFocusEffect(useCallback(() => {
@@ -95,7 +120,7 @@ export default function GroupSessionScreen() {
   const session = data?.session ?? null;
   const serverNow = data ? data.serverNowMs + Math.max(0, now - data.verifiedAt) : 0;
   const active = !!summary && summary.status === 'active' && summary.expiresAtMs > serverNow;
-  const participants = session?.participants ?? [];
+  const participants = useMemo(() => session?.participants ?? [], [session]);
   const mine = participants.filter(p => p.userId === userId);
   const joined = mine.length > 0;
   const manage = !!group && canManageGroup(group, userId);
@@ -139,9 +164,29 @@ export default function GroupSessionScreen() {
   const assign = () => {
     const tracks = services.tracks;
     if (!tracks || !handlerParticipation) return;
-    void run('assign', () => tracks.assign(sessionId, handlerParticipation, blind), () => { setAssigning(false); setHandlerParticipation(null); setBlind(false); });
+    const layerDog = mine[0]?.dogId;
+    if (!layerDog) return;
+    const assigned: { trackId: string | null } = { trackId: null };
+    void run('assign', async () => { assigned.trackId = (await tracks.assign(sessionId, handlerParticipation, blind)).trackId; }, () => {
+      setAssigning(false); setHandlerParticipation(null); setBlind(false);
+      // Gewohnter Recorder; nach dem Stoppen geht die Fährte an die Hundeführerin.
+      if (assigned.trackId) router.push({ pathname: '/track/legen', params: { dogId: layerDog, groupTrackId: assigned.trackId, groupId, groupSessionId: sessionId } } as never);
+    });
   };
 
+  const pendingHandover = new Set(data?.pendingHandover ?? []);
+  const openable = (track: GroupTrack) => (track.layerUserId === userId || track.handlerUserId === userId)
+    && (track.status !== 'laying' || pendingHandover.has(track.trackId)) && track.status !== 'revoked';
+  const openTrack = (track: GroupTrack) => {
+    if (track.status === 'laying') {
+      void listPendingHandovers(userId ?? '').then(list => {
+        const entry = list.find(e => e.trackId === track.trackId);
+        if (entry) router.push({ pathname: '/groups/handover', params: { trackId: entry.trackId, localId: entry.localId, groupId, sessionId } } as never);
+      });
+      return;
+    }
+    router.push({ pathname: '/groups/track/[id]', params: { id: track.trackId, groupId, sessionId } } as never);
+  };
   const trackTitle = (track: GroupTrack) => {
     const handler = byParticipation.get(track.handlerParticipationId);
     const dog = handler?.dogName ?? '—';
@@ -157,7 +202,7 @@ export default function GroupSessionScreen() {
   const status = (track: GroupTrack): { text: string; color: string; bg: string } => {
     const lying = lyingMs(track, serverNow);
     const time = lying === null ? '' : formatDuration(lying);
-    if (track.status === 'laying') return { text: t('groups.statusLaying'), color: C.trackBlue, bg: 'rgba(77,163,255,0.14)' };
+    if (track.status === 'laying') return { text: t(pendingHandover.has(track.trackId) ? 'groups.handoverPending' : 'groups.statusLaying'), color: C.trackBlue, bg: 'rgba(77,163,255,0.14)' };
     if (track.status === 'lying') return { text: t('groups.statusLying', { time }), color: C.trackPrimary, bg: 'rgba(21,230,195,0.14)' };
     if (track.status === 'searching') return { text: t('groups.statusSearching', { time }), color: C.trackWarning, bg: 'rgba(255,181,71,0.14)' };
     if (track.status === 'searched') return { text: t('groups.statusSearched', { time }), color: C.trackTextSec, bg: 'rgba(255,255,255,0.08)' };
@@ -215,7 +260,8 @@ export default function GroupSessionScreen() {
                 return (
                   <View key={track.trackId}>
                     {index > 0 ? <View style={cs.divider} /> : null}
-                    <View style={cs.row}>
+                    <TouchableOpacity style={cs.row} disabled={!openable(track)} accessibilityRole={openable(track) ? 'button' : undefined}
+                      onPress={() => openTrack(track)}>
                       <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dogColor(track.dogId, byParticipation.get(track.handlerParticipationId)?.colorKey ?? null) }} />
                       <View style={cs.rowText}>
                         <Text style={cs.rowTitle}>{trackTitle(track)}</Text>
@@ -223,7 +269,7 @@ export default function GroupSessionScreen() {
                       </View>
                       <Text accessibilityLiveRegion={track.status === 'lying' ? 'none' : 'polite'}
                         style={{ fontSize: 12, fontWeight: '700', color: st.color, backgroundColor: st.bg, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', fontVariant: ['tabular-nums'] }}>{st.text}</Text>
-                    </View>
+                    </TouchableOpacity>
                     {own && active ? (
                       <View style={[cs.actions, { marginTop: 0, marginBottom: 6 }]}>
                         <TouchableOpacity style={cs.textButton} accessibilityRole="button" disabled={!!busy}

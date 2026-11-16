@@ -52,8 +52,8 @@ describe('run.tsx — Search-Recovery-State', () => {
     expect(run).toContain('initialFired: snapData.recovery?.endFired ?? false');
     expect(run).toContain('noteSearchEndFired()');
     expect(run).toContain('setSearchSegmentAnnouncements(result.state)');
-    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery,');
-    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
+    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn && !blindSearch, stepLengthM, guidanceObjects, voiceRecovery,');
+    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);');
   });
 
   it('laidObjects tragen die Marker-ID (stabile Fund-Identität)', () => {
@@ -117,7 +117,7 @@ describe('Abweichungsanzeige respektiert GNSS-Messauflösung', () => {
   it('zeigt eine ganze Näherung und färbt nach dem zentralen Off-Track-State', () => {
     const screen = strip(read('app/track/run.tsx'));
     expect(screen).toContain('formatApproxDeviationM(devShown)');
-    expect(screen).toContain('const devOff = s.offTrackState !== \'on_track\';');
+    expect(screen).toContain('const devOff = !blindSearch && s.offTrackState !== \'on_track\';');
     expect(screen).not.toContain('devShown.toFixed(1)');
   });
 });
