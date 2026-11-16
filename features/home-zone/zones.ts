@@ -39,7 +39,7 @@ export function insideHomeZone(point: LatLng, zones: readonly HomeZone[], margin
 }
 
 /** Verbindungslinie zweier Aussenpunkte, die durch eine Zone führt (lokale Ebene, reicht für Zonen bis 5 km). */
-function chordCrossesZone(a: LatLng, b: LatLng, zones: readonly HomeZone[]): boolean {
+export function chordCrossesZone(a: LatLng, b: LatLng, zones: readonly HomeZone[]): boolean {
   return zones.some(z => {
     const mLat = EARTH_M * RAD, mLng = mLat * Math.cos(z.lat * RAD);
     const ax = (a.lng - z.lng) * mLng, ay = (a.lat - z.lat) * mLat, bx = (b.lng - z.lng) * mLng, by = (b.lat - z.lat) * mLat;
