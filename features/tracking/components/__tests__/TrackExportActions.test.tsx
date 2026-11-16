@@ -107,3 +107,17 @@ it('does not export when the home zone cannot be read',async()=>{
   await mount();await act(async()=>press('json'));
   expect(mockShare).not.toHaveBeenCalled();expect(Alert.alert).toHaveBeenCalledTimes(1);
 });
+it('warns that notes are shared unchanged while a home zone is active',async()=>{
+  const warning=()=>renderer.root.findAll((n:any)=>n.props.testID==='home-zone-notes-warning');
+  await i18n.changeLanguage('gsw');
+  await mount();act(()=>renderer.root.findByType(Switch).props.onValueChange(true));
+  expect(warning()).toHaveLength(0);
+  act(()=>renderer.unmount());
+  await AsyncStorage.setItem('anyvo_home_zones_v1',JSON.stringify([{id:'h',lat:47,lng:8,radiusM:200}]));resetHomeZoneCacheForTests();
+  await mount();expect(warning()).toHaveLength(0);
+  act(()=>renderer.root.findByType(Switch).props.onValueChange(true));
+  expect(warning().length).toBeGreaterThan(0);
+  expect(warning()[0].props.children).toBe('Notize werded nöd kürzt. Lueg, öb dini Adrässe oder de Ort drin staht.');
+  await act(async()=>renderer.update(<TrackExportActions data={{notes:'  '}}/>));
+  expect(warning()).toHaveLength(0);
+});

@@ -49,6 +49,7 @@ const de = {
   handoverConfirm: 'Trotzdem übergeben',
   handoverSkip: 'Nicht übergeben',
   livePaused: 'Standort pausiert: Du bist in deiner Heimzone. Dort wird keine Position gesendet.',
+  notesWarning: 'Notizen werden nicht gekürzt. Prüfe, ob darin deine Adresse oder der Ort steht.',
 };
 const en: typeof de = {
   title: 'Home zone',
@@ -98,6 +99,7 @@ const en: typeof de = {
   handoverConfirm: 'Hand over anyway',
   handoverSkip: 'Do not hand over',
   livePaused: 'Location paused: you are in your home zone. No position is sent there.',
+  notesWarning: 'Notes are not shortened. Check whether they mention your address or the place.',
 };
 const fr: typeof de = {
   title: 'Zone domicile',
@@ -147,6 +149,7 @@ const fr: typeof de = {
   handoverConfirm: 'Remettre quand même',
   handoverSkip: 'Ne pas remettre',
   livePaused: 'Position en pause : tu es dans ta zone domicile. Aucune position n’y est envoyée.',
+  notesWarning: 'Les notes ne sont pas raccourcies. Vérifie si ton adresse ou le lieu y figure.',
 };
 const it: typeof de = {
   title: 'Zona casa',
@@ -196,7 +199,58 @@ const it: typeof de = {
   handoverConfirm: 'Consegna comunque',
   handoverSkip: 'Non consegnare',
   livePaused: 'Posizione in pausa: sei nella tua zona casa. Lì non viene inviata alcuna posizione.',
+  notesWarning: 'Le note non vengono accorciate. Controlla se contengono il tuo indirizzo o il luogo.',
+};
+const gsw: typeof de = {
+  title: 'Heizone',
+  intro: 'I teilte und exportierte Fährte fählt alles, wo i de Zone liit. Dini eigeti Aasicht bliibt vollständig.',
+  deviceOnly: 'D Zone wird nume uf dem Grät gspeicheret. Uf emene andere Grät richtisch si neu ii.',
+  mapLabel: 'Charte. Tipp uf d Charte, zum d Mitti vo de Zone setze.',
+  mapHint: 'Tipp uf d Charte oder nimm din aktuelle Standort.',
+  useLocation: 'Aktuelle Standort neh',
+  locationDenied: 'Ohni Standortfreigab chasch d Mitti uf de Charte aatippe.',
+  locationFailed: 'Standort nöd verfüegbar. Tipp d Mitti uf de Charte aa.',
+  radius: 'Radius',
+  radiusOption: '{{m}} m',
+  save: 'Zone speichere',
+  saved: 'Zone gspeicheret.',
+  saveFailed: 'D Zone het nöd chöne gspeicheret werde.',
+  zones: 'Dini Zone',
+  zone: 'Zone {{n}} · {{m}} m',
+  none: 'No kei Zone iigrichtet.',
+  remove: 'Zone {{n}} entferne',
+  removeTitle: 'Zone entferne?',
+  removeBody: 'Neui Export enthalted de Bereich denn wieder.',
+  removeConfirm: 'Entferne',
+  cancel: 'Abbräche',
+  max: 'Du chasch bis zu {{n}} Zone iirichte.',
+  profileRow: 'Heizone',
+  rowOn: 'Aa · {{n}}',
+  rowOff: 'Us',
+  rowHint: 'Öffnet d Iistellige vo de Heizone',
+  hintTitle: 'Wohnort schütze?',
+  hintBody: 'Mit ere Heizone fählt de Bereich um dis Dihei i allem, wo du exportiersch.',
+  hintSetup: 'Heizone iirichte',
+  hintSkip: 'Ohni Zone teile',
+  previewTitle: 'Das wird teilt',
+  previewMap: 'Skizze: De grau gstrichlet Teil liit i de Heizone und wird nöd teilt.',
+  previewPartTitle: 'En Teil liit i de Heizone',
+  previewPart: 'Öppe {{m}} m und {{markers}} Markierige werded nöd teilt. Dis Original bliibt unveränderet.',
+  previewAllTitle: 'D Fährte liit ganz i de Heizone',
+  previewAll: 'Teilt wird nume d Uuswertig ohni Charte und ohni Koordinate. Dis Original bliibt unveränderet.',
+  previewAllGpx: 'E GPX-Datei ohni Koordinate isch leer. Wähl de Bricht oder d Fährtedate.',
+  shareClipped: 'Kürzt teile',
+  shareWithoutMap: 'Ohni Charte teile',
+  storageFailed: 'D Heizone het nöd chöne gläse werde. Zur Sicherheit isch nüt teilt worde.',
+  fullTitle: 'Fährte berüehrt dini Heizone',
+  trainerBody: 'Trainer:inne mit Freigab gsehnd di ganz Fährte, au de Teil i dinere Heizone.',
+  handoverBody: 'Bi enere Übergab wird di ganz Fährte gschickt, au de Teil i dinere Heizone. Kürzt liess si sich nöd absueche.',
+  fullConfirm: 'Trotzdem teile',
+  handoverConfirm: 'Trotzdem übergeh',
+  handoverSkip: 'Nöd übergeh',
+  livePaused: 'Standort pausiert: Du bisch i dinere Heizone. Det wird kei Position gschickt.',
+  notesWarning: 'Notize werded nöd kürzt. Lueg, öb dini Adrässe oder de Ort drin staht.',
 };
 export type HomeZoneKey = keyof typeof de;
 export const homeZoneDe = de;
-registerGroupResources(HOME_ZONE_NS, { de, en, fr, it });
+registerGroupResources(HOME_ZONE_NS, { de, gsw, en, fr, it });

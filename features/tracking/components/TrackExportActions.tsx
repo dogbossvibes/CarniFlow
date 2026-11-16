@@ -28,6 +28,9 @@ export function TrackExportActions({ data }: { data: unknown }) {
   const { t: z } = useTranslation(HOME_ZONE_NS); const router = useRouter(); const zones = useHomeZones();
   const [hintFor,setHintFor]=useState<UserExportFormat | null>(null);
   const [preview,setPreview]=useState<(HomeZonePreviewData & { format: UserExportFormat }) | null>(null);
+  const rawNotes=(data as { notes?: unknown } | null)?.notes;
+  /** Notizen werden nie gekürzt: bei aktiver Heimzone darauf hinweisen. */
+  const notesShared=includeNotes&&typeof rawNotes==='string'&&rawNotes.trim().length>0;
   const release=()=>{busyRef.current=false;if(mounted.current)setActiveFormat(null);};
   /** Vor dem Export: einmaliger Hinweis ohne Zone, Vorschau, wenn die Fährte eine Zone berührt. */
   async function request(format: UserExportFormat, confirmed=false) {
@@ -41,7 +44,7 @@ export function TrackExportActions({ data }: { data: unknown }) {
         } else {
           const original=buildTrackUserExport(data,new Date().toISOString(),false);
           const { data: clipped, effect }=applyHomeZones(original,current);
-          if(clipped!==original){ release(); if(mounted.current)setPreview({ format, original, clipped, effect, zones: current, emptyFile: format==='gpx'&&effect.allRemoved }); return; }
+          if(clipped!==original){ release(); if(mounted.current)setPreview({ format, original, clipped, effect, zones: current, emptyFile: format==='gpx'&&effect.allRemoved, notesShared }); return; }
         }
       } catch { release(); if(mounted.current)Alert.alert(t('track.export.title'),z('storageFailed')); return; }
     }
@@ -71,6 +74,10 @@ export function TrackExportActions({ data }: { data: unknown }) {
         accessibilityLabel={t('track.export.notes')} accessibilityHint={t('track.export.notesFormats')}
         accessibilityState={{ checked:includeNotes, disabled:busy }} />
     </View>
+    {notesShared&&!!zones?.length&&<View style={s.zoneHead} accessibilityRole="alert">
+      <Ionicons name="warning-outline" size={18} color={C.trackWarning} accessible={false} />
+      <Text testID="home-zone-notes-warning" style={[s.notesWarning,s.copy]}>{z('notesWarning')}</Text>
+    </View>}
     {hintFor&&<View style={s.zoneHint} accessibilityRole="alert">
       <View style={s.zoneHead}><Ionicons name="shield-checkmark-outline" size={20} color={C.trackPrimary} accessible={false} /><Text style={s.rowTitle}>{z('hintTitle')}</Text></View>
       <Text style={s.hint}>{z('hintBody')}</Text>
@@ -117,6 +124,7 @@ const s=StyleSheet.create({
   pressed:{backgroundColor:C.trackCardAlt},
   rowTitle:{fontSize:15,lineHeight:22,fontWeight:'600',color:C.trackText},
   format:{fontWeight:'400',color:C.trackTextSec},
+  notesWarning:{fontSize:14,lineHeight:21,color:C.trackText},
   zoneRow:{minHeight:56,borderTopWidth:1},
   zoneHint:{padding:14,gap:10,borderRadius:16,borderWidth:1,borderColor:C.trackPrimary},
   zoneHead:{flexDirection:'row',alignItems:'center',gap:8},

@@ -8,7 +8,7 @@ import type { ExportPoint, TrackUserExport } from '@/features/tracking/utils/tra
 import type { HomeZone, HomeZoneEffect } from './zones';
 import { HOME_ZONE_NS } from './i18n';
 
-export interface HomeZonePreviewData { original: TrackUserExport; clipped: TrackUserExport; effect: HomeZoneEffect; zones: readonly HomeZone[]; emptyFile: boolean }
+export interface HomeZonePreviewData { original: TrackUserExport; clipped: TrackUserExport; effect: HomeZoneEffect; zones: readonly HomeZone[]; emptyFile: boolean; notesShared?: boolean }
 const W = 320, H = 200, PAD = 16;
 
 function Sketch({ original, clipped, zones }: HomeZonePreviewData) {
@@ -54,6 +54,7 @@ export function HomeZonePreview({ data, onConfirm, onCancel }: { data: HomeZoneP
                 <Text style={s.body}>{data.effect.allRemoved ? t(data.emptyFile ? 'previewAllGpx' : 'previewAll')
                   : t('previewPart', { m: data.effect.removedMeters, markers: data.effect.removedMarkers })}</Text>
               </View>
+              {data.notesShared && !data.emptyFile ? <Text style={s.body} accessibilityRole="alert">{t('notesWarning')}</Text> : null}
               {!data.emptyFile ? <AnyvoButton label={t(data.effect.allRemoved ? 'shareWithoutMap' : 'shareClipped')} onPress={onConfirm} /> : null}
               <AnyvoButton label={t('cancel')} variant="secondary" onPress={onCancel} />
             </ScrollView>
