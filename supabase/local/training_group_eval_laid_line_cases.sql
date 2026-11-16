@@ -131,8 +131,10 @@ select pg_temp.fails('extra fields are still rejected','GROUP_INVALID_REQUEST',
  $q$select pg_temp.share_pkg((select v||'{"notes":"x"}' from qa_ev))$q$);
 
 -- ── Selbst gelegt (Leger:in = Hundeführer:in, wie bei #150): Linie bleibt ──
--- Die Zuweisung an sich selbst erlaubt erst #150; hier wird die Fährte direkt so gesetzt.
+-- Die Zuweisung an sich selbst erlaubt erst #150 (PR #151 hebt auch die Tabellenregel auf). Hier wird die
+-- Regel nur in dieser Transaktion aufgehoben (wird zurückgerollt) und die Fährte direkt so gesetzt.
 reset role;
+alter table public.training_private_tracks drop constraint if exists training_private_tracks_people_check;
 update public.training_private_tracks set layer_id=handler_id where id='50000000-0000-4000-8000-000000000001';
 set local role authenticated;
 select pg_temp.as_user('b2222222-2222-4222-8222-222222222222');
