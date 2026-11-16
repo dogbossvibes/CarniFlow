@@ -1,5 +1,22 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #123 und Android Build 53 – 2026-11-16 (Abend)
+
+**Erledigt:** iOS-60-OTA #123 live (Heimzone, gekürzte Kopie für Trainer-Freigaben; Stand
+`dbb9179e`). Android Build 53 gebaut, im internen Test-Track, Startlogo im Emulator geprüft.
+Release-Quellen `release/ios60-main-6b0cd88e-20261116` und
+`release/android53-build-4aac8786-20261116` auf GitHub gesichert.
+
+**Offen:**
+- **Gerätetest #123** auf Build 60: Heimzone anlegen, Fährte teilen/exportieren, Trainer-Freigabe,
+  bestehende Fährten und Freigaben vollständig sichtbar; danach Karte auf Veröffentlicht.
+- **Gerätetest #108** auf Build 60 weiterhin offen.
+- **Android Build 53** auf einem echten Gerät prüfen (Startlogo, Sammelmarker, Begrüssungston).
+  Freigabe für Kunden (Play-Produktion) ist nicht erteilt.
+- **main hinter Production:** zusätzlich zu den unten genannten Commits fehlen die Build-53-Änderung
+  (`4aac8786`) und die zwei Kommentarzeilen aus `dbb9179e`.
+- Übrige offene Punkte unverändert, siehe Abschnitt darunter.
+
 ## Stand nach OTA #118 und Android Build 52 – 2026-11-16
 
 **Erledigt:** iOS-60-OTAs #90, #102, #103, #106, #108, #118 live (Stand `072b3b07`). Karten #44–#106
