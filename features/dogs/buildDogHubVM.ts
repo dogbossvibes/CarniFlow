@@ -3,6 +3,7 @@ import type { FeedItem } from '@/services/trainingFeed';
 import type { DogHubExtras } from '@/services/dogHub';
 import { dogToIdentity, type DogAiTip, type DogDocument, type DogHubVM, type DogGoal, type DogHealth, type DogTrainer, type DogTrainingItem } from '@/components/dogs/types';
 import { categoryLabel, fileTypeOf } from '@/features/dogs/documentCategories';
+import { parseDay } from '@/features/dogs/dateInput';
 
 // Dynamische Quellen (KI-Coach, Trainer) — im Route-Wrapper geladen und hier reingereicht.
 export interface DogHubDynamic { aiTip?: DogAiTip | null; todayRecommendation?: string | null; trainer?: DogTrainer | null }
@@ -43,7 +44,7 @@ function pointsOf(it: FeedItem): number | null {
 export function buildDogHubVM(dog: Dog, feed: FeedItem[], extras?: DogHubExtras, dynamic?: DogHubDynamic): DogHubVM {
   const identity = dogToIdentity(dog);
   const weekAgo = Date.now() - 7 * DAY;
-  const inWeek = (it: FeedItem) => new Date(it.session_date).getTime() >= weekAgo;
+  const inWeek = (it: FeedItem) => parseDay(it.session_date).getTime() >= weekAgo;
 
   const trainingsThisWeek = feed.filter(inWeek).length;
   const last = feed[0] ?? null;

@@ -20,3 +20,22 @@ export function fromISODate(iso: string | null | undefined): Date | null {
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return Number.isNaN(d.getTime()) ? null : d;
 }
+
+/**
+ * Lokaler Kalendertag (JJJJ-MM-TT) zu einem Zeitstempel oder Datum. Ein reines Datum
+ * bleibt unverändert; ein ISO-Zeitstempel wird in lokaler Zeit gelesen (nicht `slice(0, 10)`,
+ * das wäre UTC und verschiebt Zeiten zwischen 0 und 1/2 Uhr Schweizer Zeit auf den Vortag).
+ * Ungültige Werte: null.
+ */
+export function localDayKey(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value.trim();
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : toISODate(d);
+}
+
+/** Reines Datum (JJJJ-MM-TT) als lokales Datum lesen; sonst wie `new Date(value)`. Nie UTC-Mitternacht. */
+export function parseDay(value: string): Date {
+  // Nur ein reines Datum lokal lesen; ein voller Zeitstempel bleibt ein Zeitpunkt.
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? (fromISODate(value) ?? new Date(value)) : new Date(value);
+}

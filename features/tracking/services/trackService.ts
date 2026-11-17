@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
+import { toISODate } from '@/features/dogs/dateInput';
 
 // Ergebnis-Typ: nie stille Fehler — error wird zurückgegeben UND geloggt.
 export interface Result<T> { data: T | null; error: string | null; }
@@ -51,7 +52,7 @@ export async function createTrackSession(ownerId: string, input: NewTrackSession
         training_type:      'privat',
         status:             'active',
         title:              'Fährte',
-        session_date:       new Date().toISOString().slice(0, 10),
+        session_date:       toISODate(new Date()),
         started_at:         new Date().toISOString(),
         surface_types:      input.surfaceTypes,
         terrain_conditions: input.terrainConditions,

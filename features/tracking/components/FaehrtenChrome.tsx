@@ -8,6 +8,7 @@ import type { Dog } from '@/types';
 import { dogVisual } from '@/features/tracking/utils/dogVisual';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useT } from '@/i18n';
+import { parseDay } from '@/features/dogs/dateInput';
 
 // ── geteilte Bausteine für den Fährten-Bereich ──
 // Port von design_handoff_faehrten/chrome.jsx + overviews.jsx, an unsere
@@ -18,7 +19,7 @@ import { useT } from '@/i18n';
 const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 export function relDate(iso: string | null | undefined): string {
   if (!iso) return '—';
-  const d = new Date(iso);
+  const d = parseDay(iso);
   const today = new Date();
   const diff = Math.round((+new Date(today.toDateString()) - +new Date(d.toDateString())) / 86400000);
   if (diff === 0) return 'Heute';

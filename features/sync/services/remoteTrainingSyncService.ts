@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadImage, uploadVideo, uploadAudio } from '@/services/mediaService';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker, LocalMediaFile } from '@/features/sync/types/sync';
+import { localDayKey } from '@/features/dogs/dateInput';
 
 export interface RemoteResult<T> { data: T | null; error: string | null }
 function fail<T>(scope: string, e: unknown): RemoteResult<T> {
@@ -31,7 +32,7 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
       // rating = allgemeines 1–5-Rating (Check-Constraint). Der Fährten-Score (0–100)
       // gehört NICHT hierher, sondern in track_data.score (s. u.) → sonst PGRST 23514.
       title: local.title ?? 'Fährte', notes: local.notes, rating: validSessionRating(local.score),
-      session_date: (local.started_at ?? local.created_at).slice(0, 10),
+      session_date: localDayKey(local.started_at ?? local.created_at) ?? (local.started_at ?? local.created_at).slice(0, 10),
       started_at: local.started_at, ended_at: local.ended_at, duration_seconds: local.duration_seconds,
       laying_duration_seconds: local.duration_seconds,
       location_name: local.location_name, latitude: local.latitude, longitude: local.longitude,
