@@ -18,6 +18,7 @@ import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, type HomeWid
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
 import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
+import { toISODate } from "@/features/dogs/dateInput";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
 import { AiCoachCard } from "@/features/ai/components/AiCoachCard";
@@ -50,7 +51,7 @@ function berechneSerie(sessions: { session_date: string }[]): string {
   for (let i = 0; i < 365; i++) {
     const d = new Date(heute);
     d.setDate(heute.getDate() - i);
-    const key = d.toISOString().split("T")[0];
+    const key = toISODate(d);
     if (tage.has(key)) serie++;
     else if (i > 0) break;
   }
@@ -70,7 +71,7 @@ function hatEinheitAnTag(
   const heuteIdx = heutigenWochentag();
   const d = new Date(heute);
   d.setDate(heute.getDate() - (heuteIdx - offset));
-  const key = d.toISOString().split("T")[0];
+  const key = toISODate(d);
   return sessions.some((s) => s.session_date === key);
 }
 

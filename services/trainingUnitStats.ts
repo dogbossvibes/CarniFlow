@@ -1,5 +1,6 @@
 import type { TrainingUnit } from '@/types/trainingUnit';
 import { disciplineColor } from '@/constants/disciplines';
+import { fromISODate, toISODate } from '@/features/dogs/dateInput';
 
 export interface WeekBucket { label: string; count: number }
 export interface DisciplineStat { discipline: string; count: number; color: string }
@@ -26,8 +27,10 @@ function startOfWeek(d: Date): Date {
   return x;
 }
 
+// Lokaler Kalendertag (JJJJ-MM-TT). Nicht toISOString(): das rechnet in UTC und
+// verschiebt Tage zwischen 0 und 1/2 Uhr Schweizer Zeit auf den Vortag.
 function ymd(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return toISODate(d);
 }
 
 export function computeUnitStats(units: TrainingUnit[]): UnitStats {
@@ -46,7 +49,8 @@ export function computeUnitStats(units: TrainingUnit[]): UnitStats {
     const wsTime = ws.getTime();
     const weTime = wsTime + 7 * 86400000;
     const count = units.filter(u => {
-      const t = startOfWeek(new Date(u.session_date)).getTime();
+      // session_date ist ein reines Datum → lokal parsen (new Date('JJJJ-MM-TT') wäre UTC).
+      const t = startOfWeek(fromISODate(u.session_date) ?? new Date(u.session_date)).getTime();
       return t >= wsTime && t < weTime;
     }).length;
     weekly.push({ label: `${ws.getDate()}.${ws.getMonth() + 1}`, count });
