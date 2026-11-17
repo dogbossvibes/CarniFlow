@@ -59,6 +59,8 @@ const de = {
   trainerNoMapBody: 'Die Fährte liegt ganz in deiner Heimzone. Trainer:in sieht Auswertung und Notizen, aber keine Karte.',
   trainerClippedConfirm: 'Gekürzt freigeben',
   trainerHidden: 'Ein Teil dieser Fährte ist ausgeblendet. Die Kennzahlen beziehen sich auf die ganze Fährte.',
+  trainerNoLaidLine: 'Ohne gelegte Linie: Eine andere Person hat diese Fährte gelegt. Geteilt sind Absuche und Kennzahlen.',
+  foreignLaidUnavailable: 'Diese Fährte hat eine andere Person gelegt. Sie kann im Moment nicht mit Trainer:innen geteilt werden, weil die gelegte Linie dabei nicht weggelassen werden kann. Bitte später erneut versuchen.',
 };
 const en: typeof de = {
   title: 'Home zone',
@@ -118,6 +120,8 @@ const en: typeof de = {
   trainerNoMapBody: 'The track is entirely inside your home zone. Your trainer sees the evaluation and notes, but no map.',
   trainerClippedConfirm: 'Share shortened',
   trainerHidden: 'Part of this track is hidden. The figures refer to the whole track.',
+  trainerNoLaidLine: 'No laid line: someone else laid this track. Shared are the search and key figures.',
+  foreignLaidUnavailable: 'Someone else laid this track. It cannot be shared with trainers right now because the laid line cannot be left out. Please try again later.',
 };
 const fr: typeof de = {
   title: 'Zone domicile',
@@ -177,6 +181,8 @@ const fr: typeof de = {
   trainerNoMapBody: 'La piste se trouve entièrement dans ta zone domicile. Ton entraîneur·e voit l’analyse et les notes, mais pas de carte.',
   trainerClippedConfirm: 'Partager la version raccourcie',
   trainerHidden: 'Une partie de cette piste est masquée. Les chiffres concernent toute la piste.',
+  trainerNoLaidLine: "Sans ligne posée : une autre personne a posé cette piste. Sont partagés la recherche et les chiffres clés.",
+  foreignLaidUnavailable: "Une autre personne a posé cette piste. Elle ne peut pas être partagée avec des entraîneurs pour le moment, car la ligne posée ne peut pas être retirée. Réessaie plus tard.",
 };
 const it: typeof de = {
   title: 'Zona casa',
@@ -236,6 +242,8 @@ const it: typeof de = {
   trainerNoMapBody: 'La pista si trova interamente nella tua zona casa. Il tuo istruttore vede la valutazione e le note, ma nessuna mappa.',
   trainerClippedConfirm: 'Condividi accorciata',
   trainerHidden: 'Una parte di questa pista è nascosta. I dati si riferiscono a tutta la pista.',
+  trainerNoLaidLine: 'Senza linea posata: un’altra persona ha posato questa pista. Sono condivisi la ricerca e i dati chiave.',
+  foreignLaidUnavailable: 'Questa pista è stata posata da un’altra persona. Al momento non può essere condivisa con gli istruttori, perché la linea posata non può essere esclusa. Riprova più tardi.',
 };
 const gsw: typeof de = {
   title: 'Heizone',
@@ -295,6 +303,8 @@ const gsw: typeof de = {
   trainerNoMapBody: 'D Fährte liit ganz i dinere Heizone. Trainer:in gseht Uuswertig und Notize, aber kei Charte.',
   trainerClippedConfirm: 'Kürzt freigäh',
   trainerHidden: 'En Teil vo dere Fährte isch uusblendet. D Kennzahle beziehnd sich uf di ganz Fährte.',
+  trainerNoLaidLine: 'Ohni gleiti Linie: E anderi Person het die Fährte gleit. Teilt sind Absuechi und Kennzahle.',
+  foreignLaidUnavailable: 'Die Fährte het e anderi Person gleit. Si cha im Momänt nöd mit Trainer:inne teilt wärde, will di gleiti Linie debi nöd wäggla wärde cha. Bitte spöter nomol probiere.',
 };
 export type HomeZoneKey = keyof typeof de;
 export const homeZoneDe = de;

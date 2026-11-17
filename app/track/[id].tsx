@@ -16,6 +16,8 @@ import { TrackExportActions } from '@/features/tracking/components/TrackExportAc
 import { LinkedTrainingsCard } from '@/features/training/trackLinks/components/LinkedTrainingsCard';
 import { refreshTrainerShareCopies, shareTrackWithHomeZone } from '@/features/home-zone/trainerShare';
 import { GroupEvaluationCard, type OutsideShareGate } from '@/features/training-groups/GroupEvaluationCard';
+import { carryForeignLaidMarker, isForeignLaidGroupTrack, readForeignLaidMarker, searchOnlyDetail } from '@/features/training-groups/foreignLaidLine';
+import { backfillForeignLaidMarker } from '@/features/training-groups/foreignLaidSync';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -172,6 +174,14 @@ export default function TrackAuswertungScreen() {
       const localDisplay = d && !localOnly && userId && d.owner_id === userId
         ? await getLocalTrackDetail(id, userId, { ownedOnly: true }).catch(() => null) : null;
       if (!alive || loadEpoch !== authGeneration.current) return;
+      // Übernommene Gruppenfährte: Die Server-Zeile trägt die Markierung evtl. (noch) nicht, die lokale Kopie schon.
+      // Ohne sie gingen Export und Trainer-Freigabe mit der gelegten Linie der Leger:in hinaus.
+      if (d && localDisplay && !isForeignLaidGroupTrack(d)) {
+        const marked = carryForeignLaidMarker(d, localDisplay);
+        const marker = marked !== d ? readForeignLaidMarker(marked) : null;
+        if (marker && userId) void backfillForeignLaidMarker(id, userId, marker);
+        d = marked;
+      }
       if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
         try {
           const receipt = parseTransferReceipt(d.track_data.trackTransferReceipt);
@@ -272,6 +282,9 @@ export default function TrackAuswertungScreen() {
   // Stufe 4a: Gruppenfährten nur ausserhalb der Gruppe teilen, wenn die Gruppe es erlaubt.
   const isOwnTrack = !!data && !!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id;
   const [outsideGate, setOutsideGate] = useState<OutsideShareGate>('pending');
+  // Übernommene Gruppenfährte, die eine andere Person gelegt hat: Trainer-Freigabe und Export ohne gelegte Linie,
+  // «Fährten gemeinsam» wird nicht angeboten (foreignLaidLine.ts).
+  const foreignLaid = isOwnTrack && isForeignLaidGroupTrack(data);
   const [selectedTrainer, setSelectedTrainer] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>[number] | null>(null);
   const segmentAnalysis = useMemo(() => analyzeTrackSegments({
     segments: coerceTrackSegments(data?.track_data?.segments),
@@ -448,7 +461,7 @@ export default function TrackAuswertungScreen() {
           {data.owner_id === authenticatedSession?.user.id && <DistractionEntry parentId={String(id)} />}
           {/* #114: verknüpfte Trainings, nur für die Besitzerin; keine Koordinaten, nicht Teil von Teilen/Export. */}
           {!!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id && <LinkedTrainingsCard ownerId={authenticatedSession.user.id} sessionId={String(id)} />}
-          {data.status === 'completed' && <ExchangeEntry sourceId={String(id)} />}
+          {data.status === 'completed' && !foreignLaid && <ExchangeEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && !!authenticatedSession?.user.id && data.owner_id === authenticatedSession.user.id && (
             <GroupEvaluationCard localId={String(id)} onGate={setOutsideGate} onOpenTrainerShare={() => { void openSharePicker(); }} />
@@ -471,6 +484,7 @@ export default function TrackAuswertungScreen() {
                   </Pressable>
                 </View>
               ))}
+              {foreignLaid && outsideGate !== 'blocked' && <Text style={s.shareHint}>{t('groups.foreignShareHint')}</Text>}
               {!shares.some(share => !share.revoked_at) && outsideGate === 'blocked' && (
                 <Text style={s.shareHint}>{t('groups.evalOutsideBlocked')}</Text>
               )}
@@ -862,7 +876,8 @@ export default function TrackAuswertungScreen() {
           </View>
 
           <View style={{ height: 18 }} />
-          <TrackExportActions data={{ ...data, notes, objectReview: reviewed }} />
+          <TrackExportActions data={foreignLaid ? searchOnlyDetail({ ...data, notes, objectReview: reviewed }) : { ...data, notes, objectReview: reviewed }}
+            extraHint={foreignLaid ? t('groups.foreignExportHint') : undefined} />
           <SmartFeedbackSection dogId={data.dog_id} />
 
           {shares.some(share => !share.revoked_at) && (
@@ -917,7 +932,8 @@ export default function TrackAuswertungScreen() {
             ) : selectedTrainer ? (
               <View style={{ gap: 12 }}>
                 <Text style={s.shareHint}>Trainer: {selectedTrainer.counterpartName ?? 'Trainer'}</Text>
-                <Text style={s.shareHint}>Geteilt werden die bereits gespeicherten Fährtendaten: Verlauf, Suchspur, Marker, Analyse, Wetter und Notizen.</Text>
+                {/* Fremd gelegte Gruppenfährte: Verlauf und Marker der Leger:in gehen nicht mit (foreignLaidLine.ts). */}
+                <Text style={s.shareHint}>{foreignLaid ? t('groups.foreignShareHint') : 'Geteilt werden die bereits gespeicherten Fährtendaten: Verlauf, Suchspur, Marker, Analyse, Wetter und Notizen.'}</Text>
                 <Pressable style={s.shareButton} onPress={() => createShare(selectedTrainer.counterpartId)}><Text style={s.shareButtonText}>Fährte teilen</Text></Pressable>
                 <Pressable onPress={() => setSelectedTrainer(null)}><Text style={s.shareAction}>Anderen Trainer auswählen</Text></Pressable>
               </View>

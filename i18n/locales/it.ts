@@ -2781,6 +2781,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "groups.evalLegend": "Tratteggiata = posata · continua = cercata",
   "groups.evalLegendSearchOnly": "Continua = cercata",
   "groups.evalNoLaidLine": "Senza linea posata: viene condivisa solo se chi conduce ha posato la pista.",
+  "groups.foreignShareHint": "Questa pista è stata posata da un’altra persona. Gli istruttori vedono la ricerca e i dati chiave, non la linea posata.",
+  "groups.foreignExportHint": "Questa pista è stata posata da un’altra persona. L’esportazione contiene la ricerca e i dati chiave, non la linea posata.",
   "groups.evalLength": "Lunghezza",
   "groups.evalDuration": "Durata",
   "groups.evalArticlesLabel": "Oggetti",

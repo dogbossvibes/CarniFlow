@@ -51,6 +51,7 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 53,
       "runtimeVersion": "1.0.8-sdk58-android-v1",
       "config": {

@@ -2789,6 +2789,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "groups.evalLegend": "Gstrichlet = gleit · durezoge = abgsuecht",
   "groups.evalLegendSearchOnly": "Durezoge = abgsuecht",
   "groups.evalNoLaidLine": "Ohni gleiti Linie: Si wird nur teilt, wenn d’Hundefüehrerin d’Fährte sälber gleit het.",
+  "groups.foreignShareHint": "Die Fährte het e anderi Person gleit. Trainer:inne gsehnd Absuechi und Kennzahle, nöd di gleiti Linie.",
+  "groups.foreignExportHint": "Die Fährte het e anderi Person gleit. De Export enthaltet Absuechi und Kennzahle, nöd di gleiti Linie.",
   "groups.evalLength": "Längi",
   "groups.evalDuration": "Duur",
   "groups.evalArticlesLabel": "Gegeständ",

@@ -10,3 +10,14 @@ it('exports actual owner data only and never leaks search, notes or dog identity
 it('checks cloud ownership and incomplete/foreign data before reference projection',async()=>{await expect(readExchangeSource(ids.parent,'other',()=>{})).rejects.toThrow('NOT_FOUND');});
 it('preserves BW and Abriss directions and explicit gaps from persisted metadata',async()=>{mockRemote.mockResolvedValue({data:{id:ids.parent,owner_id:'owner',status:'completed',type:'track',points:[{latitude:47,longitude:8},{latitude:47.001,longitude:8},{latitude:48,longitude:9,timestamp:'2026-10-14T12:00:30Z'}],markers:[{id:'m',marker_type:'winkel',angle_kind:'abriss',latitude:47.001,longitude:8,distance_from_start:111}],track_data:{manualAngleGeometry:[{markerKey:'abriss:47.0010000:8.0000000:111.0',manualMarkerType:'abriss',geometryDirection:'rechts',geometrySharpness:'unresolved'}],layContinuity:{version:1,breakBeforeTimestamps:['2026-10-14T12:00:30Z']}}}});const r=await readExchangeSource(ids.parent,'owner',()=>{});expect(r.points[2].breakBefore).toBe(true);expect(r.markers[0].geometryDirection).toBe('rechts');});
 it('rejects borrowed local copy and never falls back to cloud on wrong local owner',async()=>{mockLocal.mockResolvedValue({user_id:'other',local_id:ids.parent,type:'track',status:'completed'});await expect(readExchangeSource(ids.parent,'owner',()=>{})).rejects.toThrow();expect(mockRemote).not.toHaveBeenCalled();});
+
+it('#146 Folge: eine übernommene, fremd gelegte Gruppenfährte wird nicht über «Fährten gemeinsam» weitergegeben',async()=>{
+ const groupTrack={version:1,trackId:'50000000-0000-4000-8000-000000000001',blind:false};
+ mockLocal.mockResolvedValue({user_id:'owner',local_id:ids.parent,type:'track',status:'completed',deleted_at:null,payload_json:JSON.stringify({groupTrack})});
+ mockPoints.mockResolvedValue([]);mockMarkers.mockResolvedValue([]);
+ await expect(readExchangeSource(ids.parent,'owner',()=>{})).rejects.toThrow('UNAVAILABLE');
+ expect(mockRemote).not.toHaveBeenCalled();
+ mockLocal.mockResolvedValue(null);
+ mockRemote.mockResolvedValue({data:{id:ids.parent,owner_id:'owner',status:'completed',type:'track',points:[{latitude:47,longitude:8},{latitude:47.001,longitude:8}],markers:[],track_data:{groupTrack}},error:null});
+ await expect(readExchangeSource(ids.parent,'owner',()=>{})).rejects.toThrow('UNAVAILABLE');
+});

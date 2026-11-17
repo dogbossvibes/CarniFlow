@@ -2781,6 +2781,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "groups.evalLegend": "Dashed = laid · solid = searched",
   "groups.evalLegendSearchOnly": "Solid = searched",
   "groups.evalNoLaidLine": "No laid line: it is only shared when the handler laid the track themselves.",
+  "groups.foreignShareHint": "Someone else laid this track. Trainers see the search and key figures, not the laid line.",
+  "groups.foreignExportHint": "Someone else laid this track. The export contains the search and key figures, not the laid line.",
   "groups.evalLength": "Length",
   "groups.evalDuration": "Duration",
   "groups.evalArticlesLabel": "Articles",
