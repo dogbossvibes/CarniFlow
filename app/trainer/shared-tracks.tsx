@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { listSharedTracksForTrainer } from '@/services/trackShareService';
+import { parseDay } from '@/features/dogs/dateInput';
 
 export default function SharedTracksScreen() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function SharedTracksScreen() {
         const track = row.track ?? {};
         return <Pressable key={row.id} style={s.card} onPress={() => router.push({ pathname: '/trainer/shared-track/[id]', params: { id: track.id ?? row.track_id } } as never)} accessibilityRole="button">
           <View style={s.cardIcon}><Ionicons name="trail-sign-outline" size={21} color={C.accent} /></View>
-          <View style={{ flex: 1 }}><Text style={s.cardTitle}>{track.dog?.name ?? 'Fährte'}</Text><Text style={s.cardSub}>{track.session_date ?? track.created_at ? new Date(track.session_date ?? track.created_at).toLocaleDateString() : 'Datum unbekannt'} · {track.distance_meters != null ? `${Math.round(track.distance_meters)} m` : 'Distanz unbekannt'}</Text></View>
+          <View style={{ flex: 1 }}><Text style={s.cardTitle}>{track.dog?.name ?? 'Fährte'}</Text><Text style={s.cardSub}>{track.session_date ?? track.created_at ? parseDay(track.session_date ?? track.created_at).toLocaleDateString() : 'Datum unbekannt'} · {track.distance_meters != null ? `${Math.round(track.distance_meters)} m` : 'Distanz unbekannt'}</Text></View>
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </Pressable>;
       })}

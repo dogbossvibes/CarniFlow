@@ -1,4 +1,5 @@
 import type { LocalTrainingSession } from '@/features/sync/types/sync';
+import { localDayKey } from '@/features/dogs/dateInput';
 
 // Reine, testbare Zusammenführung von Remote- (Supabase) und lokalen (SQLite)
 // Fährten für den Verlauf. Local-first: eine lokal gespeicherte Fährte ist auch
@@ -52,7 +53,7 @@ export function localSessionToHistoryRow(l: LocalTrainingSession): TrackHistoryR
     id:                 l.local_id,
     dog_id:             l.dog_id,
     status:             l.status,
-    session_date:       time ? time.slice(0, 10) : null,
+    session_date:       localDayKey(time),
     created_at:         l.created_at ?? null,
     started_at:         l.started_at ?? null,
     surface_types:      parseArr(l.surface_types),

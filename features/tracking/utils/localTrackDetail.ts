@@ -1,5 +1,6 @@
 import { readContinuityPoint } from './trackContinuity';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
+import { localDayKey } from '@/features/dogs/dateInput';
 
 // Reine, testbare Zusammensetzung des Detail-/Auswertungs-Datensatzes aus lokalen
 // (SQLite) Quellen — Fallback für eine noch nicht synchronisierte Fährte, damit der
@@ -92,7 +93,7 @@ export function buildLocalTrackDetail(
     owner_id:           local.user_id,
     ...(payload.trackTransferReceipt ? { lying_time_minutes: payload.trackTransferLyingTimeMinutes ?? null } : {}),
     dog:                null,   // Hundename lokal nicht vorhanden → Screen fällt auf 'Fährte' zurück
-    session_date:       time ? time.slice(0, 10) : null,
+    session_date:       localDayKey(time),
     created_at:         local.created_at ?? null,
     notes:              local.notes ?? null,
     surface_types:      parseArr(local.surface_types),

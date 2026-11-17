@@ -46,12 +46,12 @@ export function computeUnitStats(units: TrainingUnit[]): UnitStats {
   for (let i = 7; i >= 0; i--) {
     const ws = new Date(thisWeekStart);
     ws.setDate(ws.getDate() - i * 7);
-    const wsTime = ws.getTime();
-    const weTime = wsTime + 7 * 86400000;
+    // Woche über den lokalen Wochenstart vergleichen, nicht über 7 × 24 h: in der Woche der
+    // Zeitumstellung ist eine Woche 167 bzw. 169 Stunden lang.
+    const wsKey = toISODate(ws);
     const count = units.filter(u => {
       // session_date ist ein reines Datum → lokal parsen (new Date('JJJJ-MM-TT') wäre UTC).
-      const t = startOfWeek(fromISODate(u.session_date) ?? new Date(u.session_date)).getTime();
-      return t >= wsTime && t < weTime;
+      return toISODate(startOfWeek(fromISODate(u.session_date) ?? new Date(u.session_date))) === wsKey;
     }).length;
     weekly.push({ label: `${ws.getDate()}.${ws.getMonth() + 1}`, count });
   }

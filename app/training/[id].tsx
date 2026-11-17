@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
 import { DateField } from '@/components/ui/DateField';
-import { toISODate } from '@/features/dogs/dateInput';
+import { parseDay, toISODate } from '@/features/dogs/dateInput';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import {
@@ -153,7 +153,7 @@ export default function TrainingDetailScreen() {
     setDauer(snapToStep(d.duration_minutes ?? 20));
     setTrainingsTyp(d.training_type);
     setTrainerName(d.trainer_name ?? '');
-    setDatum(d.session_date ? new Date(d.session_date) : null);
+    setDatum(d.session_date ? parseDay(d.session_date) : null);
     setPerformance(d.rating ?? 0);
     setKategorie(d.category);
     setVideoUrl(d.video_url ?? null);

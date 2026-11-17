@@ -23,6 +23,7 @@ import {
   itemDiscipline, itemDogName, itemHasMedia, itemNotePreview,
   type JournalPeriod, type JournalGroup,
 } from '@/features/training/journal';
+import { parseDay } from '@/features/dogs/dateInput';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const discIcon = (label: string): IconName => (DISCIPLINES.find(d => d.label === label)?.icon as IconName) ?? 'paw';
@@ -490,7 +491,7 @@ function JournalCard({
   const media = itemHasMedia(item);
   const durationMin = item.duration_sec != null ? Math.round(item.duration_sec / 60) : null;
   const distance = item.distance_meters != null ? `${Math.round(item.distance_meters)} m` : null;
-  const time = new Date(item.session_date).toLocaleDateString(localeTag, { day: '2-digit', month: 'short' });
+  const time = parseDay(item.session_date).toLocaleDateString(localeTag, { day: '2-digit', month: 'short' });
 
   const meta = [dogName || null, durationMin != null ? minutesLabel(durationMin) : null, distance, time].filter(Boolean).join(' · ');
   const a11y = `${discipline}. ${meta}${item.rating != null ? `. ${pointsLabel(item.rating)}` : ''}${media ? `. ${mediaLabel}` : ''}`;

@@ -11,6 +11,7 @@ import { C } from '@/constants/colors';
 import type { ParentReference } from './parentReference';
 import type { useDistractions } from './useDistractions';
 import './i18n';
+import { parseDay } from '@/features/dogs/dateInput';
 
 export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistractions>; dogId?: string }) {
  const { t } = useTranslation('distractions'), router = useRouter(), { dogs } = useDogs();
@@ -44,7 +45,7 @@ export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistr
   {failed && <Text accessibilityRole="alert" style={s.text}>{t('failure')}</Text>}
   {!loading && !filtered.length && <Text style={s.text}>{t('emptyMain')}</Text>}
   {!loading && filtered.slice(0,limit).map(row => {
-   const date = row.session_date && Number.isFinite(Date.parse(row.session_date)) ? new Date(row.session_date).toLocaleDateString() : t('unknownDate');
+   const date = row.session_date && Number.isFinite(Date.parse(row.session_date)) ? parseDay(row.session_date).toLocaleDateString() : t('unknownDate');
    const name = dogs.find(dog => dog.id === row.dog_id)?.name ?? t('dogFallback');
    const summary = `${name} · ${date} · ${typeof row.distance_meters === 'number' && Number.isFinite(row.distance_meters) ? Math.round(row.distance_meters) + ' m' : t('unknownDistance')}`;
    const preview = cached.find(ref => ref.id === row.id);
@@ -56,6 +57,7 @@ export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistr
    </Pressable>;
   })}
   {filtered.length > limit && action(t('more'), () => setLimit(n => n + 20))}
+  {/* eslint-disable-next-line react-hooks/refs -- Altfehler, unveraendert seit main */}
   {action(t('refresh'), () => { void load(); })}
  </ScrollView></SafeAreaView>;
 }
