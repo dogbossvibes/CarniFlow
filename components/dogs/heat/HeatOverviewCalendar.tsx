@@ -7,6 +7,7 @@ import { fromISODate, toISODate } from '@/features/dogs/dateInput';
 import { buildHeatCalendarDays, getMonthGrid } from '@/features/dogs/heatCalendar';
 import { fmtDate, predictHeat, type HeatCycle, type HeatObservation, type HeatPhase } from '@/features/dogs/heatCycles';
 import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { toWeekRows } from '@/lib/calendarGrid';
 
 const labels = {
   de: ['Kalender', 'Vorheriger Monat', 'Nächster Monat', 'Erfasste Läufigkeit', 'Geschätzter Beginn', 'Beobachtung', 'Keine Einträge an diesem Tag', 'Zum geschätzten Beginn'],
@@ -48,10 +49,10 @@ export function HeatOverviewCalendar({ cycles, phases, observations, onOpenCycle
       <Text accessibilityLiveRegion="polite" style={[s.title, s.month]}>{month.toLocaleDateString(intl, { month: 'long', year: 'numeric' })}</Text>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={next} style={s.arrow} onPress={() => move(1)}><Text style={s.title}>›</Text></TouchableOpacity>
     </View>
-    <View style={s.grid}>
-      {Array.from({ length: 7 }, (_, i) => <Text key={`weekday-${i}`} style={s.weekday}>{new Date(2026, 0, 5 + i).toLocaleDateString(intl, { weekday: 'short' })}</Text>)}
-      {grid.map((key, index) => {
-        if (!key) return <View key={`blank-${index}`} style={s.cell} />;
+    <View>
+      <View style={s.week}>{Array.from({ length: 7 }, (_, i) => <Text key={`weekday-${i}`} style={s.weekday}>{new Date(2026, 0, 5 + i).toLocaleDateString(intl, { weekday: 'short' })}</Text>)}</View>
+      {toWeekRows(grid).map((week, weekIndex) => <View key={`week-${weekIndex}`} style={s.week}>{week.map((key, index) => {
+        if (!key) return <View key={`blank-${weekIndex}-${index}`} style={s.cell} />;
         const day = byKey.get(key)!;
         const estimated = key === prediction?.nextDate;
         const label = [fmtDate(key), key === today ? copy.today : null, day.cycle ? recorded : null, estimated ? expected : null, day.observations.length ? `${day.observations.length} ${copy.observations}` : null].filter(Boolean).join(' · ');
@@ -59,7 +60,7 @@ export function HeatOverviewCalendar({ cycles, phases, observations, onOpenCycle
           <Text style={[s.number, key === today && s.today]}>{day.day}</Text>
           <Text style={s.marker}>{day.cycle ? '●' : estimated ? '○' : ' '}{day.observations.length ? ' ·' : ''}</Text>
         </TouchableOpacity>;
-      })}
+      })}</View>)}
     </View>
     <View style={s.legend}><Text style={s.caption}>● {recorded}</Text><Text style={s.caption}>○ {expected}</Text><Text style={s.caption}>· {observation}</Text></View>
     <View style={s.legend}>
@@ -82,8 +83,8 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center' }, month: { flex: 1, textAlign: 'center' },
   title: { color: C.trackText, fontSize: 17, fontWeight: '700' },
   arrow: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' }, weekday: { width: '14.285714%', textAlign: 'center', color: C.trackTextSec, fontSize: 12, paddingVertical: 8 },
-  cell: { width: '14.285714%', minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, borderWidth: 1, borderColor: 'transparent', borderRadius: 8 },
+  week: { flexDirection: 'row' }, weekday: { flex: 1, textAlign: 'center', color: C.trackTextSec, fontSize: 12, paddingVertical: 8 },
+  cell: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, borderWidth: 1, borderColor: 'transparent', borderRadius: 8 },
   number: { color: C.trackText, fontSize: 15 }, marker: { color: C.trackPrimary, fontSize: 11 },
   today: { fontWeight: '900', textDecorationLine: 'underline' }, recorded: { backgroundColor: 'rgba(39,216,178,0.15)' },
   estimated: { borderColor: C.trackTextSec, borderStyle: 'dashed' }, selected: { borderColor: C.trackPrimary, borderWidth: 2 },
