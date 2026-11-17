@@ -85,6 +85,8 @@ export function runLay(input: LayRunInput): LayRunResult {
     ptBuffer,
     flushPoints: async () => { ptBuffer.current = []; },
     commitMarker: async marker => { markers.push({ marker, at: clock }); },
+    // Nachträgliche Spitz-Hochstufung (T-211): wie im Store nur normal → spitz desselben Markers.
+    upgradeAngleKind: (markerId, kind) => { const hit = markers.find(m => m.marker.id === markerId); if (hit) hit.marker = { ...hit.marker, angleKind: kind }; },
     onAngleRef: { current: undefined },
     recordingRef: { current: true },
     qaRef: { current: false },

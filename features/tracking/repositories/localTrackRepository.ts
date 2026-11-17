@@ -88,6 +88,17 @@ export async function createLocalTrackMarker(sessionLocalId: string, m: NewTrack
   return id;
 }
 
+/**
+ * Stuft EINEN lokal gespeicherten Winkel-Marker von normal auf spitz hoch (T-211).
+ * Eng begrenzt: nur die genannte Zeile, nur Winkel, nur wenn dort noch genau die
+ * erwartete normale Richtung steht. Alles andere an der Zeile bleibt unverändert.
+ */
+export async function upgradeLocalTrackMarkerAngleKind(localId: string, from: 'links' | 'rechts', to: 'spitz_links' | 'spitz_rechts'): Promise<void> {
+  if (to !== `spitz_${from}`) throw new Error('upgradeLocalTrackMarkerAngleKind: Richtung darf nicht wechseln');
+  const db = await getLocalDb();
+  await db.runAsync(`update local_track_markers set angle_kind=? where local_id=? and marker_type='winkel' and angle_kind=?`, to, localId, from);
+}
+
 export async function getTrackPointsBySession(sessionLocalId: string): Promise<LocalTrackPoint[]> {
   const db = await getLocalDb();
   return db.getAllAsync<LocalTrackPoint>(`select * from local_track_points where session_local_id=? order by timestamp asc`, sessionLocalId);
