@@ -1,3 +1,4 @@
+import { toISODate } from '@/features/dogs/dateInput';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import type { TrainingUnit, TrainingExercise, AudioFile } from '@/types/trainingUnit';
@@ -128,7 +129,9 @@ export async function createTrainingUnit(
     .insert({
       owner_id:     ownerId,
       dog_id:       dogId,
-      session_date: new Date().toISOString().split('T')[0],
+      // Lokaler Kalendertag, nicht UTC: sonst landet eine Einheit zwischen
+      // 0 und 1/2 Uhr (CH) auf dem Vortag.
+      session_date: toISODate(new Date()),
       started_at:   new Date().toISOString(),
       status:       'active',
     })
