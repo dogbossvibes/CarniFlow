@@ -49,7 +49,8 @@ export default function SharedTrackDetailScreen() {
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <Text style={s.eyebrow}>{track.dog?.name ?? 'Hund'} · {track.session_date ?? ''}</Text>
       <Text style={s.hero}>{track.distance_meters != null ? `${Math.round(track.distance_meters)} m` : 'Fährte'}</Text>
-      {map?.hasLay && <View style={s.map}><TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={track.track_data?.segments ?? []} startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints} currentPosition={null} showUserLocation={false} follow={false} mapType="hybrid" /></View>}
+      {(map?.hasLay || map?.hasRun) && <View style={s.map}><TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={track.track_data?.segments ?? []} startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints} currentPosition={null} showUserLocation={false} follow={false} mapType="hybrid" /></View>}
+      {track.laidLineWithheld === true && <Text style={s.line}>{homeZoneText('trainerNoLaidLine')}</Text>}
       {track.homeZoneApplied === true && <Text style={s.line} accessibilityRole="alert">{homeZoneText('trainerHidden')}</Text>}
       <ReviewSections track={track} />
       <Text style={s.section}>Trainerfeedback</Text>

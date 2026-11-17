@@ -111,6 +111,8 @@ export function buildLocalTrackDetail(
     score:              payload.score ?? run?.score ?? local.score ?? null,
     track_data:         {
       ...(Object.hasOwn(payload, 'trackTransferReceipt') ? { trackTransferReceipt: payload.trackTransferReceipt } : {}),
+      // Übernommene Gruppenfährte (fremd gelegt): Teilen und Export lassen die gelegte Linie weg (foreignLaidLine.ts).
+      ...(payload.groupTrack ? { groupTrack: payload.groupTrack } : {}),
       ...(payload.manualAngleGeometry ? { manualAngleGeometry: payload.manualAngleGeometry } : {}),
       ...(payload.segments ? { segments: payload.segments } : {}),
       ...(payload.layContinuity ? { layContinuity: payload.layContinuity } : {}),

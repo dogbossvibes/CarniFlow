@@ -98,3 +98,64 @@ describe('Kopien bestehender Freigaben beim Öffnen', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
+
+describe('Fremd gelegte Gruppenfährte (#146 Folge): Trainer:in erhält nur Absuche und Kennzahlen', () => {
+  const groupTrack = { version: 1, trackId: '50000000-0000-4000-8000-000000000001', blind: false };
+  const run = { run_id: 'r', duration_seconds: 600, articles_found: 2, total_objects: 3,
+    run_points: [{ lat: 48.5001, lng: 9.5001, t: 0 }, { lat: 48.5009, lng: 9.5014, t: 5 }] };
+  // Gelegte Linie bei 48.0 / 8, weit weg von der Heimzone; Absuche bei 48.5 / 9.5.
+  const foreign = { ...far, markers: [{ id: 'm', marker_type: 'gegenstand', latitude: 48.0002, longitude: 8 }], runs: [{ id: 'r', ...run }], track_data: { groupTrack, run } };
+  const LAID = /48\.00|"longitude":8/;
+
+  it('ohne Heimzone: Freigabe ohne Rückfrage, aber immer mit Kopie ohne gelegte Linie', async () => {
+    mockZones.mockResolvedValue([]);
+    expect(await shareTrackWithHomeZone('t', 'tr', foreign)).toMatchObject({ error: null });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    const copy = mockShare.mock.calls[0][2];
+    expect(copy.digest).toMatch(/^digest:/);
+    expect(copy.copy.points).toEqual([]);
+    expect(copy.copy.markers).toEqual([]);
+    expect(copy.copy.laidLineWithheld).toBe(true);
+    expect(copy.copy.runs[0].run_points).toHaveLength(2);
+    expect(JSON.stringify(copy.copy)).not.toMatch(LAID);
+  });
+
+  it('Heimzone berührt die Absuche: Rückfrage, Kopie zusätzlich gekürzt', async () => {
+    mockZones.mockResolvedValue([{ id: 'home', lat: 48.5001, lng: 9.5001, radiusM: 50 }]);
+    expect(await shareTrackWithHomeZone('t', 'tr', foreign)).toMatchObject({ error: null });
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    const copy = mockShare.mock.calls[0][2].copy;
+    expect(copy.homeZoneApplied).toBe(true);
+    expect(copy.runs[0].run_points).toHaveLength(1);
+    expect(JSON.stringify(copy)).not.toMatch(LAID);
+  });
+
+  it('Server kennt die Kopie nicht: es wird NICHT ungekürzt freigegeben', async () => {
+    mockZones.mockResolvedValue([]);
+    mockShare.mockResolvedValueOnce({ data: null, error: { code: 'PGRST204', message: 'shared_copy' } });
+    expect(await shareTrackWithHomeZone('t', 'tr', foreign)).toBeNull();
+    expect(mockShare).toHaveBeenCalledTimes(1);
+    expect(mockShare.mock.calls[0][2]).toBeDefined();
+    expect((Alert.alert as jest.Mock).mock.calls[0][1]).toMatch(/Someone else laid this track/);
+  });
+
+  it('Zonen nicht lesbar: es wird nicht freigegeben', async () => {
+    mockZones.mockRejectedValue(new Error('storage'));
+    expect(await shareTrackWithHomeZone('t', 'tr', foreign)).toBeNull();
+    expect(mockShare).not.toHaveBeenCalled();
+  });
+
+  it('bestehende Freigabe ohne Kopie erhält beim Öffnen die Kopie ohne gelegte Linie', async () => {
+    mockZones.mockResolvedValue([]);
+    await refreshTrainerShareCopies(foreign, [share({ shared_copy_digest: null })] as never);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const [id, copy] = mockUpdate.mock.calls[0];
+    expect(id).toBe('s1');
+    expect(copy.copy.points).toEqual([]);
+    expect(JSON.stringify(copy.copy)).not.toMatch(LAID);
+    // Stabil: beim nächsten Öffnen mit gleichem Stand wird nichts erneut geschrieben.
+    mockUpdate.mockClear();
+    await refreshTrainerShareCopies(foreign, [share({ shared_copy_digest: copy.digest })] as never);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
