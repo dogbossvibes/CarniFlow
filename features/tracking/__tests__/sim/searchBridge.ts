@@ -93,7 +93,9 @@ export const searchBridge: {
   motionAvailable: boolean;
   /** Hat der Recorder Hintergrund-Ortung angefordert? (iOS: Positionen auch bei gesperrtem Bildschirm) */
   backgroundAllowed: boolean;
+  /** Läuft der Android-Wachhalter der Absuche (T-209, Vordergrund-Dienst)? */
+  keepaliveActive: boolean;
   speech: FakeSpeech;
   /** Was die App tatsächlich in SQLite geschrieben hätte (übersteht einen App-Abbruch). */
   sqlite: SqliteRow[];
-} = { feedFix: null, feedMotion: null, motionAvailable: true, backgroundAllowed: false, speech: new FakeSpeech(), sqlite: [] };
+} = { feedFix: null, feedMotion: null, motionAvailable: true, backgroundAllowed: false, keepaliveActive: false, speech: new FakeSpeech(), sqlite: [] };

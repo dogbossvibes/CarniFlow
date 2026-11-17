@@ -9,10 +9,10 @@ import { EXAM_TRACKS, expectedKindFor, SHAPE_TRACKS, singleCornerTrack } from '.
 import { classifyAnnouncement, clearLayCache, PRACTICE_TRACK, runSearchScenario, type SearchOutcome, type SearchScenario } from './searchScenario';
 import { DOGS } from './searchTruth';
 
-export type LayGroupName = 'winkel' | 'geraet' | 'varianten' | 'pruefung';
+export type LayGroupName = 'winkel' | 'geraet' | 'varianten' | 'pruefung' | 'androidlegen';
 export type SearchGroupName = 'suche' | 'suchvarianten' | 'formen' | 'unterbrechungen' | 'ablauf' | 'android' | 'ifh';
 export type GroupName = LayGroupName | SearchGroupName;
-export const LAY_GROUPS: LayGroupName[] = ['winkel', 'geraet', 'varianten', 'pruefung'];
+export const LAY_GROUPS: LayGroupName[] = ['winkel', 'geraet', 'varianten', 'pruefung', 'androidlegen'];
 export const SEARCH_GROUPS: SearchGroupName[] = ['suche', 'suchvarianten', 'formen', 'unterbrechungen', 'ablauf', 'android', 'ifh'];
 /** Gruppen, die NICHT in FAEHRTEN_SIM=full laufen (zu langsam) — nur ausdrücklich, z. B. FAEHRTEN_SIM=ifh. */
 export const OPT_IN_GROUPS: GroupName[] = ['ifh'];
@@ -39,6 +39,8 @@ export interface Cell {
 export interface SearchCell {
   table: string; row: string; col: string;
   runs: number; startLocked: number; endReached: number;
+  /** Abgang: Summe der Sekunden bis zur Erkennung; «Suche gestartet» ganz gesprochen; «Gegenstand erkannt» ganz gesprochen. */
+  startLockAfterSumS?: number; startSpoken?: number; objectDetectedSpoken?: number; autoDetected?: number;
   indicated: number; foundIndicated: number; analysisContactIndicated: number;
   notIndicated: number; foundNotIndicated: number;
   layObjectErrSumM: number; layObjectN: number;
@@ -106,6 +108,29 @@ export function buildGroup(group: LayGroupName, seeds: number, examTracks?: stri
         for (const seed of seedList)
           cases.push({ table: `Varianten — ${ENV_LABEL[env]}, Mittelklasse-Handy, 40-m-Schenkel`, row: label, col: name,
             scenario: { ...BASE, env, ...patch, track: singleCornerTrack(signed(turn, seed), 40), seed } });
+  } else if (group === 'androidlegen') {
+    // Android legt mit Bildschirm an live (Sekundentakt) und mit Bildschirm aus in 30-s-Paketen (deferredUpdatesInterval).
+    const android = { ...BASE, platform: 'android' } as const;
+    const modes: [string, Partial<Scenario>][] = [['Bildschirm an (live)', {}], ['Bildschirm aus (30-s-Pakete)', { delivery: ANDROID_BATCH_30S }]];
+    for (const [mode, patch] of modes) for (const device of ['dual', 'single'] as DeviceClass[])
+      for (const turn of SWEEP_TURNS) for (const leg of [20, 40]) for (const seed of seedList)
+        cases.push({ table: `Android Legen: Winkel × Schenkellänge — ${DEVICE_LABEL[device]}, offenes Feld, ${mode}`, row: angleLabel(turn), col: `${leg} m`,
+          scenario: { ...android, device, ...patch, track: singleCornerTrack(signed(turn, seed), leg), seed } });
+    const variants: [string, Partial<Scenario>][] = [
+      ['In der Hand, Bildschirm an', {}],
+      ['In der Hand, Bildschirm aus', { delivery: ANDROID_BATCH_30S }],
+      ['Hosentasche, Bildschirm aus', { carry: 'pocket', delivery: ANDROID_BATCH_30S }],
+      ['Feldrand, Bildschirm aus', { env: 'edge', delivery: ANDROID_BATCH_30S }],
+      ['Lichter Wald, Bildschirm aus', { env: 'forest', delivery: ANDROID_BATCH_30S }],
+      ['Schwaches Handy, Bildschirm aus', { device: 'weak', delivery: ANDROID_BATCH_30S }],
+      ['Ohne Bewegungssensor, Bildschirm aus', { motion: false, delivery: ANDROID_BATCH_30S }],
+    ];
+    for (const [label, patch] of variants) for (const [turn, name] of [[90, 'rechter Winkel'], [135, 'Spitzwinkel 45°']] as const) for (const seed of seedList)
+      cases.push({ table: 'Android Legen: Varianten — Mittelklasse-Handy, 40-m-Schenkel', row: label, col: name,
+        scenario: { ...android, ...patch, track: singleCornerTrack(signed(turn, seed), 40), seed } });
+    for (const [mode, patch] of modes) for (const seed of seedList.slice(0, Math.max(1, Math.ceil(seeds / 3))))
+      cases.push({ table: 'Android Legen: ganze Prüfungsfährte IGP-1 — Mittelklasse-Handy, offenes Feld', row: 'IGP-1', col: mode,
+        scenario: { ...android, ...patch, track: EXAM_TRACKS['IGP-1'], seed } });
   } else {
     const names = examTracks ?? ['IGP-1', 'IGP-2', 'IGP-3'];
     const combos: [DeviceClass, Environment][] = [['dual', 'open'], ['single', 'open'], ['single', 'edge'], ['single', 'forest']];
@@ -199,12 +224,19 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
   } else if (group === 'android') {
     const variants: [string, Partial<SearchScenario>][] = [
       // Die Absuche nutzt auf Android das GPS direkt im Sekundentakt (keine Bündelung, T-207-Befund).
+      // Bildschirm aus: seit T-209 hält ein Vordergrund-Dienst die Ortung wach (Annahme: Bewegungssensor fällt aus).
       ['Android, Bildschirm an', {}],
       ['Android, Bildschirm 20 s aus', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 20 }] }],
       ['Android, Bildschirm 60 s aus', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
+      ['Android, Bildschirm 60 s aus, OHNE Wachhalter (alter Stand)', { androidKeepalive: false, interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
+      ['Android, ganze Absuche Bildschirm aus, Hosentasche', { searchCarry: 'pocket', interruptions: [{ kind: 'lock', atFrac: 0.03, durationS: Infinity }] }],
       ['Android, Hosentasche (Bildschirm an)', { searchCarry: 'pocket' }],
+      ['Android, Gegenstand angetippt (2 s nach Ankunft)', { manualTap: { tapAfterS: 2 } }],
+      ['Android, Hund verliert die Fährte 1× (10 m seitlich)', { losses: [{ atM: 55, offsetM: 10, lengthM: 12 }] }],
+      ['Android, App beendet, nach 30 s fortgesetzt', { interruptions: [{ kind: 'kill', atFrac: 0.45, durationS: 30 }] }],
       ['Android, Spitzwinkel-Folge', { track: SHAPE_TRACKS['Spitzwinkel-Folge'] }],
       ['Android, Kreuzung', { track: SHAPE_TRACKS.Kreuzung }],
+      ['Android, eifriger, schneller Hund', { dog: DOGS.eifrig }],
     ];
     for (const [label, patch] of variants) for (const [device, name] of [['dual', 'Neueres Handy'], ['single', 'Mittelklasse']] as const) for (const seed of seedList)
       cases.push({ table: 'Absuche — Android (ruhiger Sporthund, offenes Feld)', row: label, col: name,
@@ -233,7 +265,7 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
 }
 
 export function emptySearchCell(table: string, row: string, col: string): SearchCell {
-  return { table, row, col, runs: 0, startLocked: 0, endReached: 0, indicated: 0, foundIndicated: 0, analysisContactIndicated: 0,
+  return { table, row, col, runs: 0, startLocked: 0, endReached: 0, startLockAfterSumS: 0, startSpoken: 0, objectDetectedSpoken: 0, autoDetected: 0, indicated: 0, foundIndicated: 0, analysisContactIndicated: 0,
     notIndicated: 0, foundNotIndicated: 0, layObjectErrSumM: 0, layObjectN: 0, appDeviationSumM: 0, dogDeviationSumM: 0,
     handlerDeviationSumM: 0, recorderScoreSum: 0, analysisScoreSum: 0, analysisScoreN: 0, deviationEvents: 0, breaks: 0,
     voiceFeatures: 0, voiceOnTime: 0, voiceShort: 0, voiceLate: 0, voiceMissing: 0, voiceEarly: 0,
@@ -248,7 +280,11 @@ export function emptySearchCell(table: string, row: string, col: string): Search
 export function addSearchOutcome(cell: SearchCell, o: SearchOutcome): void {
   const s = o.score;
   cell.runs++;
-  if (s.startLocked) cell.startLocked++;
+  if (s.startLocked) { cell.startLocked++; cell.startLockAfterSumS = (cell.startLockAfterSumS ?? 0) + (o.search.startLockedAfterS ?? 0); }
+  const fullySpoken = (test: (key: string) => boolean) => o.search.spoken.filter(e => e.key != null && test(e.key) && !e.stopped && e.endMs != null).length;
+  if (fullySpoken(k => k === 'search-started') > 0) cell.startSpoken = (cell.startSpoken ?? 0) + 1;
+  cell.objectDetectedSpoken = (cell.objectDetectedSpoken ?? 0) + fullySpoken(k => k.startsWith('auto_dwell:'));
+  cell.autoDetected = (cell.autoDetected ?? 0) + o.search.result.autoDwellObjectIds.length;
   if (s.progressPct >= 90) cell.endReached++;
   for (const obj of s.objects) {
     cell.layObjectErrSumM += obj.layErrM; cell.layObjectN++;
@@ -344,6 +380,9 @@ export function renderReport(results: GroupResult[]): string {
         c => `${num(c.recorderScoreSum / c.runs, 0)} · ${c.analysisScoreN ? num(c.analysisScoreSum / c.analysisScoreN, 0) : '–'} · ${num(c.deviationEvents / c.runs)} · ${num(c.breaks / c.runs)}`), '');
       out.push(renderTable(cells, 'Abgang erkannt · Fährtenende erreicht (≥ 90 % Fortschritt) · Lagefehler der Gegenstände beim Legen (m)',
         c => `${pct(c.startLocked, c.runs)} · ${pct(c.endReached, c.runs)} · ${c.layObjectN ? num(c.layObjectErrSumM / c.layObjectN) : '–'}`), '');
+      if (cells.some(c => c.startSpoken != null))
+        out.push(renderTable(cells, 'Start: «Suche gestartet» ganz gesprochen · Abgang erkannt nach (s) · «Gegenstand erkannt» gesprochen je automatischem Fund',
+          c => `${pct(c.startSpoken ?? 0, c.runs)} · ${c.startLocked ? num((c.startLockAfterSumS ?? 0) / c.startLocked, 0) : '–'} · ${pct(c.objectDetectedSpoken ?? 0, c.autoDetected ?? 0)}`), '');
       if (cells.some(c => c.voiceFeatures != null)) {
         out.push('**Führung (T-205):** gemessen am WAHREN Hund. «Rechtzeitig» = der Hund ist bei Sprechbeginn 3–15 m vor dem Punkt, «knapp» = 0–3 m, «zu spät» = schon vorbei, «zu früh» = mehr als 15 m. Die Pfote ist die Hundeposition der App.', '');
         out.push(renderTable(cells, 'Ansage je Winkel/Gegenstand: rechtzeitig · knapp · zu spät · fehlt · zu früh',

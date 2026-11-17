@@ -25,6 +25,8 @@ export interface SearchScenario {
   /** Trageweise beim Legen und bei der Absuche. */
   layCarry?: CarryMode; searchCarry?: CarryMode;
   searchDelivery?: DeliverySpec;
+  /** Nur Android: false = ohne Wachhalter (Stand vor T-209). */
+  androidKeepalive?: boolean;
   searchMotion?: boolean;
   dog: DogSpec;
   handler?: Partial<HandlerSpec>;
@@ -46,7 +48,7 @@ export interface SearchScenario {
 }
 
 /**
- * Unterbrechung der Absuche. `atFrac` = Zeitpunkt als Anteil der Suchdauer.
+ * Unterbrechung der Absuche. `atFrac` = Zeitpunkt als Anteil der Suchdauer; `durationS: Infinity` = bis zum Schluss.
  * - lock: Bildschirm gesperrt. Positionen kommen nur, wenn der Recorder Hintergrund-Ortung
  *   anfordert (seit T-206 ja); sonst liefert iOS in dieser Zeit keine.
  * - call: Anruf; App im Hintergrund wie lock, laufende Ansage bricht ab.
@@ -144,14 +146,14 @@ export async function runSearchScenario(s: SearchScenario): Promise<SearchOutcom
   const actions: SearchAction[] = [];
   const backgroundWindows: { fromMs: number; toMs: number }[] = [];
   for (const i of s.interruptions ?? []) {
-    const from = t0 + Math.round(i.atFrac * truth.durationS * 1000), to = from + i.durationS * 1000;
+    const from = t0 + Math.round(i.atFrac * truth.durationS * 1000), to = Number.isFinite(i.durationS) ? from + i.durationS * 1000 : Number.MAX_SAFE_INTEGER;
     if (i.kind === 'lock' || i.kind === 'call') backgroundWindows.push({ fromMs: from, toMs: to });
     if (i.kind === 'call') actions.push({ atMs: from, kind: 'interruptSpeech' });
     if (i.kind === 'pause') actions.push({ atMs: from, kind: 'pause' }, { atMs: to, kind: 'unpause' });
     if (i.kind === 'kill') actions.push({ atMs: from, kind: 'kill' }, { atMs: to, kind: 'restart' });   // Runner verwirft alles dazwischen
   }
   if (s.manualTap) for (const a of truth.articles) if (a.pickupStartTS != null) actions.push({ atMs: t0 + Math.round((a.pickupStartTS + s.manualTap.tapAfterS) * 1000), kind: 'markObject' });
-  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0, backgroundWindows, platform: s.platform });
+  const search = await runSearch({ lay: lay.run, fixes, motion, motionAvailable: s.searchMotion !== false, handlerDistanceM: appDistance, actions, startMs: t0, backgroundWindows, platform: s.platform, androidKeepalive: s.androidKeepalive });
   return { scenario: s, lay, truth, search, score: scoreSearch(lay, truth, search, !!s.manualTap) };
 }
 
