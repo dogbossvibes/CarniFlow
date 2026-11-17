@@ -2826,6 +2826,8 @@ export const deCH = {
   "groups.evalLegend": "Gestrichelt = gelegt · durchgezogen = abgesucht",
   "groups.evalLegendSearchOnly": "Durchgezogen = abgesucht",
   "groups.evalNoLaidLine": "Ohne gelegte Linie: Sie wird nur geteilt, wenn die Hundeführerin die Fährte selbst gelegt hat.",
+  "groups.foreignShareHint": "Diese Fährte hat eine andere Person gelegt. Trainer:innen sehen Absuche und Kennzahlen, nicht die gelegte Linie.",
+  "groups.foreignExportHint": "Diese Fährte hat eine andere Person gelegt. Der Export enthält Absuche und Kennzahlen, nicht die gelegte Linie.",
   "groups.evalLength": "Länge",
   "groups.evalDuration": "Dauer",
   "groups.evalArticlesLabel": "Gegenstände",

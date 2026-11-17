@@ -2801,6 +2801,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "groups.evalLegend": "Pointillé = posée · trait plein = recherchée",
   "groups.evalLegendSearchOnly": "Trait plein = recherchée",
   "groups.evalNoLaidLine": "Sans ligne posée : elle n’est partagée que si le conducteur a posé la piste lui-même.",
+  "groups.foreignShareHint": "Une autre personne a posé cette piste. Les entraîneurs voient la recherche et les chiffres clés, pas la ligne posée.",
+  "groups.foreignExportHint": "Une autre personne a posé cette piste. L’export contient la recherche et les chiffres clés, pas la ligne posée.",
   "groups.evalLength": "Longueur",
   "groups.evalDuration": "Durée",
   "groups.evalArticlesLabel": "Objets",
