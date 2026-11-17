@@ -12,10 +12,10 @@ jest.mock('../../groups/groupRpc', () => ({ createSupabaseGroupClient: () => ({ 
 jest.mock('../liveShareTransport', () => ({ createLiveShareTransport: () => ({}) }));
 jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../useLiveShare', () => ({ useLiveShare: () => ({
-  state: { phase: mockPhase, preparing: false }, start: mockStart, stop: mockStop, retryPending: mockRetry,
+  state: { phase: mockPhase, preparing: false }, start: mockStart, startResult: mockStartResult, stop: mockStop, retryPending: mockRetry,
 }) }));
 let mockUser: string | null = 'A', mockPhase: ShareState['phase'] = 'idle';
-const mockStart = jest.fn(), mockStop = jest.fn(), mockRetry = jest.fn();
+const mockStart = jest.fn(), mockStartResult = jest.fn(), mockStop = jest.fn(), mockRetry = jest.fn();
 let api: ReturnType<typeof useGroupLiveShare>, tree: ReactTestRenderer;
 function Capture() { api = useGroupLiveShare(); return <TextInput testID="outside-groups-input" />; }
 const input: StartShare = { userId: 'A', sessionId: 'session', shareId: 'share', dogId: 'dog', durationMs: 60000, recipientIds: ['B'] };
@@ -63,4 +63,12 @@ it('makes retry available without a selected group or active sender', async () =
 
 it('blocks starts before permissions, transport and recipients when release gates are pending', async () => {
  mockReleaseReady = false; mount(); await act(async () => { expect(await api.startNamed(input, ['Bea'])).toBe(false); }); expect(mockStart).not.toHaveBeenCalled(); expect(api.recipientNames).toEqual([]);
+});
+
+it('#142: reicht den Grund «Berechtigung verweigert» durch und zeigt keine Empfängernamen', async () => {
+  mockStartResult.mockResolvedValueOnce('permission_denied').mockResolvedValueOnce('started'); mount();
+  await act(async () => { expect(await api.startNamedResult(input, ['Bea'])).toBe('permission_denied'); });
+  expect(api.recipientNames).toEqual([]);
+  await act(async () => { expect(await api.startNamedResult(input, ['Bea'])).toBe('started'); }); mockPhase = 'sharing'; rerender();
+  expect(api.recipientNames).toEqual(['Bea']); expect(mockStart).not.toHaveBeenCalled();
 });

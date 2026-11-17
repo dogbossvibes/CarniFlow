@@ -277,8 +277,11 @@ export default function GroupSessionScreen() {
     const recipients = [...new Set(others.map(p => p.userId))];
     if (!userId || !dogId || !recipients.length) return;
     const names = recipients.map(uid => memberName(uid));
-    void live.startNamed({ shareId: Crypto.randomUUID(), userId, sessionId, dogId, recipientIds: recipients, durationMs: 2 * 60 * 60 * 1000 }, names)
-      .then(ok => { if (!ok) Alert.alert(t('groups.shareLocation'), t('groups.shareFailed')); });
+    void live.startNamedResult({ shareId: Crypto.randomUUID(), userId, sessionId, dogId, recipientIds: recipients, durationMs: 2 * 60 * 60 * 1000 }, names)
+      .then(result => {
+        if (result === 'started') return;
+        Alert.alert(t('groups.shareLocation'), t(result === 'permission_denied' ? 'groups.sharePermissionDenied' : 'groups.shareFailed'));
+      });
   };
 
   const choiceRow = (p: GroupParticipant, label: string) => {

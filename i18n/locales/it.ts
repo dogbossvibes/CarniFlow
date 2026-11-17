@@ -2805,6 +2805,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "groups.wsLeave": "Uscire termina subito tutte le condivisioni. Le piste già consegnate restano a chi conduce.",
   "groups.understood": "Capito",
   "groups.shareFailed": "La condivisione della posizione non è riuscita. Controlla l’accesso alla posizione.",
+  "groups.sharePermissionDenied": "ANYVO non può usare la tua posizione. Consenti l’accesso alla posizione nelle impostazioni del dispositivo, poi riattiva «Condividi posizione».",
   "groups.notifyTitle": "Notifiche",
   "groups.notifyJoin": "Richieste di adesione",
   "groups.notifyReady": "Una pista per me è pronta",

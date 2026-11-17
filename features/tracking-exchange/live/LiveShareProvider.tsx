@@ -10,7 +10,7 @@ import { C } from '@/constants/colors';
 import { createSupabaseGroupClient } from '../groups/groupRpc';
 import { createLiveShareTransport } from './liveShareTransport';
 import { RevocationJournal } from './revocationJournal';
-import { useLiveShare } from './useLiveShare';
+import { useLiveShare, type LiveShareStartResult } from './useLiveShare';
 import type { StartShare } from './liveShareController';
 import './integrationI18n';
 
@@ -18,6 +18,8 @@ type ContextValue = ReturnType<typeof useLiveShare> & {
   client: ReturnType<typeof createSupabaseGroupClient>;
   recipientNames: readonly string[];
   startNamed(input: StartShare, names: readonly string[]): Promise<boolean>;
+  /** Wie startNamed, nennt aber den Grund (z. B. verweigerte Standortberechtigung). */
+  startNamedResult(input: StartShare, names: readonly string[]): Promise<LiveShareStartResult>;
 };
 const Context = createContext<ContextValue | null>(null);
 
@@ -40,24 +42,28 @@ function AccountProvider({ userId, children }: { userId: string | null; children
     nameGeneration.current++; namedPreparing.current = false;
     return live.stop();
   };
-  const startNamed = async (input: StartShare, names: readonly string[]) => {
-    if (!isLiveShareReleaseReady()) return false;
+  const startNamedResult = async (input: StartShare, names: readonly string[],
+    run: (input: StartShare) => Promise<LiveShareStartResult> = live.startResult): Promise<LiveShareStartResult> => {
+    if (!isLiveShareReleaseReady()) return 'failed';
     if (input.userId !== userId || namedPreparing.current || live.state.preparing || live.state.phase === 'sharing'
-      || live.state.phase === 'starting' || live.state.phase === 'revoke_pending') return false;
+      || live.state.phase === 'starting' || live.state.phase === 'revoke_pending') return 'failed';
     namedPreparing.current = true;
     const token = ++nameGeneration.current;
     setNames([...names]);
     try {
-      const started = await live.start(input);
-      if (!started && active.current && token === nameGeneration.current) setNames([]);
-      return started;
+      const result = await run(input);
+      if (result !== 'started' && active.current && token === nameGeneration.current) setNames([]);
+      return result;
     } catch {
       if (active.current && token === nameGeneration.current) setNames([]);
-      return false;
+      return 'failed';
     } finally { if (token === nameGeneration.current) namedPreparing.current = false; }
   };
+  const startNamed = async (input: StartShare, names: readonly string[]) =>
+    await startNamedResult(input, names, async i => await live.start(i) ? 'started' : 'failed') === 'started';
   const visibleNames = ['sharing', 'starting', 'revoke_pending'].includes(live.state.phase) ? recipientNames : [];
-  return <Context.Provider value={{ ...live, stop: stopNamed, client, recipientNames: visibleNames, startNamed }}>
+  return <Context.Provider value={{ ...live, stop: stopNamed, client, recipientNames: visibleNames, startNamed,
+    startNamedResult: (input, names) => startNamedResult(input, names) }}>
     <View style={styles.container}>{children}<LiveShareStatusBar /></View>
   </Context.Provider>;
 }
