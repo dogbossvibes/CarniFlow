@@ -1,5 +1,5 @@
 import { isLiveShareReleaseReady } from './releaseGate';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
@@ -22,7 +22,17 @@ export const PERMISSION_RESUME_TIMEOUT_MS = 3_000;
  */
 export function useLiveShare(userId: string | null, transport: LiveShareTransport, journal: RevocationJournal) {
   const [state, setState] = useState<LiveShareUiState>(IDLE);
-  const owner = useRef(userId); owner.current = userId;
+  // Wechselt Konto, Transport oder Journal, beginnt die Anzeige neu bei IDLE. Das geschieht
+  // beim Rendern (nicht im Effekt), damit kein Zustand des alten Kontos sichtbar wird.
+  const [scope, setScope] = useState({ userId, transport, journal });
+  if (scope.userId !== userId || scope.transport !== transport || scope.journal !== journal) {
+    setScope({ userId, transport, journal });
+    setState(IDLE);
+  }
+  // Layout-Effekt: läuft vor dem Aufräumen des alten Controllers, der damit schon das neue
+  // Konto sieht und nichts mehr für das alte widerruft oder sendet.
+  const owner = useRef(userId);
+  useLayoutEffect(() => { owner.current = userId; }, [userId]);
   const controller = useRef<LiveShareController | null>(null);
   const source = useRef<Location.LocationSubscription | null>(null);
   const generation = useRef(0);
@@ -44,7 +54,6 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
   }, [releaseSource]);
 
   useEffect(() => {
-    setState(IDLE);
     const instance = new LiveShareController(transport, journal, () => owner.current,
       () => performance.now(), next => {
         if (controller.current !== instance) return;

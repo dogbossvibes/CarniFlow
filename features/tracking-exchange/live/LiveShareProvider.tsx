@@ -22,6 +22,7 @@ type ContextValue = ReturnType<typeof useLiveShare> & {
   startNamedResult(input: StartShare, names: readonly string[]): Promise<LiveShareStartResult>;
 };
 const Context = createContext<ContextValue | null>(null);
+const monotonicNow = () => performance.now();
 
 export function LiveShareProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -32,7 +33,7 @@ export function LiveShareProvider({ children }: { children: ReactNode }) {
 function AccountProvider({ userId, children }: { userId: string | null; children: ReactNode }) {
   const [client] = useState(createSupabaseGroupClient);
   const [journal] = useState(() => new RevocationJournal(AsyncStorage));
-  const transport = useMemo(() => createLiveShareTransport(client.call, () => performance.now()), [client]);
+  const transport = useMemo(() => createLiveShareTransport(client.call, monotonicNow), [client]);
   const live = useLiveShare(userId, transport, journal);
   const [recipientNames, setNames] = useState<readonly string[]>([]);
   const active = useRef(true);

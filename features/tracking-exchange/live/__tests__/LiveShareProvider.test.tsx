@@ -17,7 +17,12 @@ jest.mock('../useLiveShare', () => ({ useLiveShare: () => ({
 let mockUser: string | null = 'A', mockPhase: ShareState['phase'] = 'idle';
 const mockStart = jest.fn(), mockStartResult = jest.fn(), mockStop = jest.fn(), mockRetry = jest.fn();
 let api: ReturnType<typeof useGroupLiveShare>, tree: ReactTestRenderer;
-function Capture() { api = useGroupLiveShare(); return <TextInput testID="outside-groups-input" />; }
+const capture = (value: ReturnType<typeof useGroupLiveShare>) => { api = value; };
+function Capture() {
+  const value = useGroupLiveShare();
+  React.useLayoutEffect(() => { capture(value); });
+  return <TextInput testID="outside-groups-input" />;
+}
 const input: StartShare = { userId: 'A', sessionId: 'session', shareId: 'share', dogId: 'dog', durationMs: 60000, recipientIds: ['B'] };
 function deferred<T>() { let resolve!: (value: T) => void; return { promise: new Promise<T>(r => { resolve = r; }), resolve: (v: T) => resolve(v) }; }
 function mount() { act(() => { tree = Renderer.create(<LiveShareProvider><Capture /></LiveShareProvider>); }); }

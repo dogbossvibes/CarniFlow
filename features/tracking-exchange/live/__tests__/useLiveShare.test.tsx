@@ -19,7 +19,12 @@ const input = { userId: user, sessionId: '20000000-0000-4000-8000-000000000001',
 const transport = { start: jest.fn(), publish: jest.fn(), revoke: jest.fn() };
 let journal: RevocationJournal, api: ReturnType<typeof useLiveShare>, tree: ReactTestRenderer;
 let appState: (state: AppStateStatus) => void, fix: Location.LocationCallback, remove: jest.Mock;
-function Harness({ uid = user }: { uid?: string }) { api = useLiveShare(uid, transport, journal); return null; }
+const capture = (value: ReturnType<typeof useLiveShare>) => { api = value; };
+function Harness({ uid = user }: { uid?: string }) {
+  const value = useLiveShare(uid, transport, journal);
+  React.useLayoutEffect(() => { capture(value); });
+  return null;
+}
 beforeEach(() => {
   mockReleaseReady = true;
   jest.useFakeTimers(); jest.setSystemTime(1_000_000); jest.clearAllMocks();
@@ -235,4 +240,13 @@ describe('#142: erstes Einschalten mit Berechtigungsdialog', () => {
     expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
     expect(transport.start).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).not.toHaveBeenCalled();
   });
+});
+
+it('setzt die Anzeige beim Kontowechsel zurück und widerruft nichts für das alte Konto', async () => {
+  jest.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue({ status: 'denied' } as Location.LocationPermissionResponse);
+  jest.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValue({ status: 'denied' } as Location.LocationPermissionResponse);
+  await mount(); await start(); expect(api.state.permissionDenied).toBe(true);
+  await act(async () => { tree.update(<Harness uid={other} />); });
+  expect(api.state).toEqual({ phase: 'idle', issue: null, permissionDenied: false, preparing: false });
+  expect(transport.revoke).not.toHaveBeenCalled();
 });
