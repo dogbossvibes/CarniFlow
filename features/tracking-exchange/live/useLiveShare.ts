@@ -1,5 +1,5 @@
 import { isLiveShareReleaseReady } from './releaseGate';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
@@ -11,6 +11,10 @@ import { insideHomeZone } from '@/features/home-zone/zones';
 /** homeZonePaused: Position liegt in der Heimzone (Issue #115) und wird nicht gesendet. */
 export type LiveShareUiState = ShareState & { permissionDenied: boolean; preparing: boolean; homeZonePaused?: boolean };
 const IDLE: LiveShareUiState = { phase: 'idle', issue: null, permissionDenied: false, preparing: false };
+/** permission_denied: Standortzugriff verweigert; failed: jeder andere Grund (auch Abbruch). */
+export type LiveShareStartResult = 'started' | 'permission_denied' | 'failed';
+/** So lange darf die App nach dem Berechtigungsdialog brauchen, um wieder aktiv zu sein (#142). */
+export const PERMISSION_RESUME_TIMEOUT_MS = 3_000;
 
 /** Mount once in a session-scoped provider. Navigation may keep this provider
  * mounted; app background/unmount always ends sending. Only its own foreground
@@ -18,23 +22,38 @@ const IDLE: LiveShareUiState = { phase: 'idle', issue: null, permissionDenied: f
  */
 export function useLiveShare(userId: string | null, transport: LiveShareTransport, journal: RevocationJournal) {
   const [state, setState] = useState<LiveShareUiState>(IDLE);
-  const owner = useRef(userId); owner.current = userId;
+  // Wechselt Konto, Transport oder Journal, beginnt die Anzeige neu bei IDLE. Das geschieht
+  // beim Rendern (nicht im Effekt), damit kein Zustand des alten Kontos sichtbar wird.
+  const [scope, setScope] = useState({ userId, transport, journal });
+  if (scope.userId !== userId || scope.transport !== transport || scope.journal !== journal) {
+    setScope({ userId, transport, journal });
+    setState(IDLE);
+  }
+  // Layout-Effekt: läuft vor dem Aufräumen des alten Controllers, der damit schon das neue
+  // Konto sieht und nichts mehr für das alte widerruft oder sendet.
+  const owner = useRef(userId);
+  useLayoutEffect(() => { owner.current = userId; }, [userId]);
   const controller = useRef<LiveShareController | null>(null);
   const source = useRef<Location.LocationSubscription | null>(null);
   const generation = useRef(0);
   const preparing = useRef(false);
   const online = useRef<boolean | null>(null);
+  // #142: Der Systemdialog für die Standortberechtigung legt die App auf Android kurz in den
+  // Hintergrund. Solange er offen ist, wird noch nichts gesendet; dieser Wechsel bricht den
+  // Start deshalb nicht ab. Danach muss die App wieder aktiv sein, sonst startet nichts.
+  const permissionPrompt = useRef(false);
+  const resumed = useRef<((active: boolean) => void) | null>(null);
   const releaseSource = useCallback(() => {
     const current = source.current; source.current = null; current?.remove();
   }, []);
   const stop = useCallback((issue: ShareState['issue'] = null) => {
     generation.current++; preparing.current = false; releaseSource();
+    resumed.current?.(false);
     setState(s => ({ ...s, preparing: false }));
     return controller.current?.stop(issue) ?? Promise.resolve();
   }, [releaseSource]);
 
   useEffect(() => {
-    setState(IDLE);
     const instance = new LiveShareController(transport, journal, () => owner.current,
       () => performance.now(), next => {
         if (controller.current !== instance) return;
@@ -46,8 +65,12 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
     const listener = AppState.addEventListener('change', next => {
       // Permission UI may temporarily be inactive before a grant exists.
       if (next === 'background' || (next === 'inactive' && instance.snapshot.phase === 'sharing')) {
+        if (permissionPrompt.current) return; // nur der Berechtigungsdialog, es läuft noch kein Teilen
         void stop();
-      } else if (next === 'active' && userId) void instance.retryPending();
+      } else if (next === 'active') {
+        if (userId) void instance.retryPending();
+        resumed.current?.(true);
+      }
     });
     const network = NetInfo.addEventListener(status => {
       if (status.isConnected === false || status.isInternetReachable === false) {
@@ -60,14 +83,14 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
     const timer = setInterval(() => instance.tick(), 1000);
     const cleanup = () => {
       listener.remove(); network(); clearInterval(timer);
-      generation.current++; preparing.current = false;
+      generation.current++; preparing.current = false; resumed.current?.(false);
       if (controller.current === instance) controller.current = null;
       releaseSource(); instance.dispose();
     };
     return cleanup;
   }, [userId, transport, journal, releaseSource, stop]);
 
-  const start = useCallback(async (input: StartShare): Promise<boolean> => {
+  const attempt = useCallback(async (input: StartShare, denied: () => void): Promise<boolean> => {
     if (!isLiveShareReleaseReady()) return false;
     const instance = controller.current;
     if (!instance || preparing.current || input.userId !== owner.current || AppState.currentState !== 'active') return false;
@@ -84,11 +107,27 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
     try {
       let permission = await Location.getForegroundPermissionsAsync();
       if (!current()) return false;
-      if (permission.status !== 'granted') permission = await Location.requestForegroundPermissionsAsync();
-      if (!current()) return false;
       if (permission.status !== 'granted') {
-        setState({ ...IDLE, permissionDenied: true }); return false;
+        // Gleicher Versuch, gleiches Konto, nicht gestoppt; der App-Zustand zählt erst nach dem Dialog.
+        const sameAttempt = () => token === generation.current && controller.current === instance
+          && input.userId === owner.current;
+        permissionPrompt.current = true;
+        try {
+          permission = await Location.requestForegroundPermissionsAsync();
+          if (!sameAttempt()) return false;
+          if (permission.status !== 'granted') {
+            denied(); setState({ ...IDLE, permissionDenied: true }); return false;
+          }
+          // Die Antwort kann vor der Rückkehr in den Vordergrund eintreffen: kurz darauf warten.
+          // Bleibt die App im Hintergrund, startet das Teilen nicht.
+          if (AppState.currentState !== 'active' && !await new Promise<boolean>(resolve => {
+            const done = (active: boolean) => { clearTimeout(timer); resumed.current = null; resolve(active); };
+            const timer = setTimeout(() => done(false), PERMISSION_RESUME_TIMEOUT_MS);
+            resumed.current = done;
+          })) return false;
+        } finally { permissionPrompt.current = false; }
       }
+      if (!current()) return false;
       // Heimzone: Zonen vor dem ersten Senden lesen. Nicht lesbar = nicht starten.
       let zones: Awaited<ReturnType<typeof loadHomeZones>>;
       try { zones = await loadHomeZones(); }
@@ -133,6 +172,14 @@ export function useLiveShare(userId: string | null, transport: LiveShareTranspor
       }
     }
   }, [releaseSource]);
+  /** Wie start, nennt aber den Grund, damit die Oberfläche eine zutreffende Meldung zeigen kann. */
+  const startResult = useCallback(async (input: StartShare): Promise<LiveShareStartResult> => {
+    let permissionDenied = false;
+    const started = await attempt(input, () => { permissionDenied = true; });
+    return started ? 'started' : permissionDenied ? 'permission_denied' : 'failed';
+  }, [attempt]);
+  const start = useCallback(async (input: StartShare): Promise<boolean> =>
+    await startResult(input) === 'started', [startResult]);
 
-  return { state, start, stop, retryPending: () => controller.current?.retryPending() ?? Promise.resolve(false) };
+  return { state, start, startResult, stop, retryPending: () => controller.current?.retryPending() ?? Promise.resolve(false) };
 }

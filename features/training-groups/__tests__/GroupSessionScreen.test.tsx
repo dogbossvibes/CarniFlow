@@ -1,5 +1,6 @@
 import React from 'react';
 import renderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import { Alert, Switch } from 'react-native';
 import Screen from '../GroupSessionScreen';
 
 const ME = 'a1111111-1111-4111-8111-111111111111', BEA = 'b2222222-2222-4222-8222-222222222222', CARL = 'c3333333-3333-4333-8333-333333333333';
@@ -53,7 +54,8 @@ jest.mock('expo-crypto', () => ({ randomUUID: () => 'x' }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string, params?: Record<string, unknown>) => params ? `${key} ${Object.values(params).join(' ')}` : key }) }));
 jest.mock('@/i18n/format', () => ({ formatTime: () => '23:59' }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-a', name: 'Ayla' }, { id: 'dog-z', name: 'Zora' }] }) }));
-jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), client: {}, state: { phase: 'idle' } }) }));
+const mockStartNamedResult = jest.fn(async (): Promise<string> => 'started');
+jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), startNamedResult: mockStartNamedResult, client: {}, state: { phase: 'idle' } }) }));
 jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: (...args: unknown[]) => { mockLiveArgs.push(args); return { positions: [] }; } }));
 jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, findLocalGroupTrack: async () => null, importGroupTrack: async () => null,
   flushPendingHandovers: async () => {}, listPendingHandovers: async () => [] }));
@@ -132,4 +134,29 @@ it('fragt Live-Positionen nur ab, solange der Bildschirm sichtbar ist', async ()
   await act(async () => { tree.update(<Screen />); });
   expect(mockLiveArgs.length).toBeGreaterThan(0);
   expect(mockLiveArgs.every(a => a[0] === null && a[1] === null)).toBe(true);
+});
+
+describe('#142: Schalter «Standort teilen» im Blatt «Wer sieht was»', () => {
+  async function switchOn(result: string) {
+    mockStartNamedResult.mockResolvedValueOnce(result);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await act(async () => { tree = renderer.create(<Screen />); });
+    act(() => { tree.root.find(n => n.props.label === 'groups.whoSeesWhat' && typeof n.props.onPress === 'function').props.onPress(); });
+    await act(async () => { tree.root.findByType(Switch).props.onValueChange(true); });
+    return alert;
+  }
+  it('gelungener Start zeigt keine Meldung und teilt höchstens 2 Stunden', async () => {
+    const alert = await switchOn('started');
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockStartNamedResult).toHaveBeenCalledWith(expect.objectContaining({ durationMs: 2 * 60 * 60 * 1000 }), expect.any(Array));
+  });
+  it('verweigerte Berechtigung zeigt die zutreffende Meldung, Schalter bleibt aus', async () => {
+    const alert = await switchOn('permission_denied');
+    expect(alert).toHaveBeenCalledWith('groups.shareLocation', 'groups.sharePermissionDenied');
+    expect(tree.root.findByType(Switch).props.value).toBe(false);
+  });
+  it('anderer Fehler zeigt weiterhin die allgemeine Meldung', async () => {
+    const alert = await switchOn('failed');
+    expect(alert).toHaveBeenCalledWith('groups.shareLocation', 'groups.shareFailed');
+  });
 });

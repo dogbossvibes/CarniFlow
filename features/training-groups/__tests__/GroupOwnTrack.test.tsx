@@ -57,7 +57,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string, params?: Record<str
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => `zone.${key}` }) }));
 jest.mock('@/i18n/format', () => ({ formatTime: () => '23:59' }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-a', name: 'Ayla' }, { id: 'dog-z', name: 'Zora' }] }) }));
-jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), client: {}, state: { phase: 'idle' } }) }));
+jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), startNamedResult: jest.fn(async () => 'started'), client: {}, state: { phase: 'idle' } }) }));
 jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: () => ({ positions: [] }) }));
 jest.mock('@/features/home-zone/confirm', () => ({ localTrackNeedsHomeZoneWarning: async () => mockZone }));
 jest.mock('@/features/home-zone/i18n', () => ({ HOME_ZONE_NS: 'homeZone' }));
