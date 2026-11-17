@@ -2,7 +2,7 @@ import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { AppState, type AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
-import { useLiveShare } from '../useLiveShare';
+import { useLiveShare, PERMISSION_RESUME_TIMEOUT_MS, type LiveShareStartResult } from '../useLiveShare';
 import { RevocationJournal } from '../revocationJournal';
 let mockReleaseReady = true;
 jest.mock('../releaseGate', () => ({ isLiveShareReleaseReady: () => mockReleaseReady }));
@@ -19,7 +19,12 @@ const input = { userId: user, sessionId: '20000000-0000-4000-8000-000000000001',
 const transport = { start: jest.fn(), publish: jest.fn(), revoke: jest.fn() };
 let journal: RevocationJournal, api: ReturnType<typeof useLiveShare>, tree: ReactTestRenderer;
 let appState: (state: AppStateStatus) => void, fix: Location.LocationCallback, remove: jest.Mock;
-function Harness({ uid = user }: { uid?: string }) { api = useLiveShare(uid, transport, journal); return null; }
+const capture = (value: ReturnType<typeof useLiveShare>) => { api = value; };
+function Harness({ uid = user }: { uid?: string }) {
+  const value = useLiveShare(uid, transport, journal);
+  React.useLayoutEffect(() => { capture(value); });
+  return null;
+}
 beforeEach(() => {
   mockReleaseReady = true;
   jest.useFakeTimers(); jest.setSystemTime(1_000_000); jest.clearAllMocks();
@@ -129,3 +134,119 @@ it('reports ACTIVE denial without starting GPS and still acknowledges the safe r
 });
 
 it('blocks the direct hook start before permissions and GPS while release is pending', async () => { mockReleaseReady=false; await mount(); await start(); expect(Location.getForegroundPermissionsAsync).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).not.toHaveBeenCalled(); expect(transport.start).not.toHaveBeenCalled(); });
+
+describe('#142: erstes Einschalten mit Berechtigungsdialog', () => {
+  const setAppState = (value: AppStateStatus) => Object.defineProperty(AppState, 'currentState', { configurable: true, value });
+  const response = (status: string) => ({ status } as Location.LocationPermissionResponse);
+  let answer: (value: Location.LocationPermissionResponse) => void, pending: Promise<LiveShareStartResult>;
+  /** Berechtigung fehlt noch: der Systemdialog erscheint und legt die App wie auf Android in den Hintergrund. */
+  async function openDialog(dialogState: AppStateStatus = 'background') {
+    jest.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(response('undetermined'));
+    jest.mocked(Location.requestForegroundPermissionsAsync).mockReturnValue(new Promise(r => { answer = r; }));
+    await mount();
+    await act(async () => { pending = api.startResult(input); });
+    await act(async () => { setAppState(dialogState); appState(dialogState); });
+  }
+  async function returnToApp() { await act(async () => { setAppState('active'); appState('active'); }); }
+
+  it('Dialog → erlaubt → Teilen läuft beim ersten Versuch (Android: Dialog meldet background)', async () => {
+    await openDialog();
+    expect(api.state.preparing).toBe(true);
+    // Android liefert die Antwort, bevor die App wieder als aktiv gemeldet wird.
+    await act(async () => { answer(response('granted')); });
+    expect(transport.start).not.toHaveBeenCalled();
+    await returnToApp();
+    let result!: LiveShareStartResult;
+    await act(async () => { result = await pending; });
+    expect(result).toBe('started');
+    expect(api.state.phase).toBe('sharing'); expect(api.state.permissionDenied).toBe(false);
+    expect(Location.watchPositionAsync).toHaveBeenCalledTimes(1);
+    await act(async () => { emit(); }); expect(transport.publish).toHaveBeenCalledTimes(1);
+  });
+  it('Dialog → erlaubt → Teilen läuft, wenn die App schon vor der Antwort wieder aktiv ist', async () => {
+    await openDialog(); await returnToApp();
+    let result!: LiveShareStartResult;
+    await act(async () => { answer(response('granted')); result = await pending; });
+    expect(result).toBe('started'); expect(api.state.phase).toBe('sharing');
+  });
+  it('iOS: Dialog meldet inactive → erlaubt → Teilen läuft', async () => {
+    await openDialog('inactive');
+    await act(async () => { answer(response('granted')); });
+    await returnToApp();
+    let result!: LiveShareStartResult;
+    await act(async () => { result = await pending; });
+    expect(result).toBe('started'); expect(api.state.phase).toBe('sharing');
+  });
+  it('Dialog → verweigert → eigener Grund, Schalter bleibt aus, nichts wird gesendet', async () => {
+    await openDialog();
+    await act(async () => { answer(response('denied')); });
+    await returnToApp();
+    let result!: LiveShareStartResult;
+    await act(async () => { result = await pending; });
+    expect(result).toBe('permission_denied');
+    expect(api.state.permissionDenied).toBe(true); expect(api.state.phase).toBe('idle'); expect(api.state.preparing).toBe(false);
+    expect(transport.start).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).not.toHaveBeenCalled();
+  });
+  it('start() meldet eine verweigerte Berechtigung weiterhin als false', async () => {
+    jest.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(response('denied'));
+    jest.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValue(response('denied'));
+    await mount(); let ok = true;
+    await act(async () => { ok = await api.start(input); });
+    expect(ok).toBe(false); expect(api.state.permissionDenied).toBe(true);
+  });
+  it('erlaubt, aber die App bleibt im Hintergrund → Teilen startet nicht', async () => {
+    await openDialog();
+    await act(async () => { answer(response('granted')); });
+    await act(async () => { jest.advanceTimersByTime(PERMISSION_RESUME_TIMEOUT_MS); });
+    let result!: LiveShareStartResult;
+    await act(async () => { result = await pending; });
+    expect(result).toBe('failed');
+    expect(transport.start).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).not.toHaveBeenCalled();
+    expect(api.state.phase).not.toBe('sharing'); expect(api.state.preparing).toBe(false);
+    // Spätere Rückkehr startet nichts nach; ein neuer Versuch ist möglich.
+    await returnToApp();
+    expect(transport.start).not.toHaveBeenCalled();
+    await start(); expect(api.state.phase).toBe('sharing');
+  });
+  it('Stopp während des Dialogs bricht den Start ab', async () => {
+    await openDialog();
+    await act(async () => { await api.stop(); });
+    await act(async () => { answer(response('granted')); });
+    await returnToApp();
+    let result!: LiveShareStartResult;
+    await act(async () => { result = await pending; });
+    expect(result).toBe('failed'); expect(transport.start).not.toHaveBeenCalled();
+  });
+  it('nach dem ersten Einschalten endet das Teilen weiterhin, wenn die App wirklich in den Hintergrund geht', async () => {
+    await openDialog();
+    await act(async () => { answer(response('granted')); });
+    await returnToApp();
+    await act(async () => { await pending; });
+    expect(api.state.phase).toBe('sharing');
+    await act(async () => { setAppState('background'); appState('background'); });
+    expect(remove).toHaveBeenCalledTimes(1); expect(api.state.phase).not.toBe('sharing');
+    expect(transport.revoke).toHaveBeenCalledTimes(1);
+    await returnToApp(); await act(async () => { emit(); });
+    expect(transport.publish).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).toHaveBeenCalledTimes(1);
+  });
+  it('Hintergrund während der Vorbereitung ohne Dialog bricht den Start weiterhin ab', async () => {
+    let resolve!: (value: Location.LocationPermissionResponse) => void;
+    jest.mocked(Location.getForegroundPermissionsAsync).mockReturnValue(new Promise(r => { resolve = r; }));
+    await mount(); let attempt!: Promise<boolean>;
+    await act(async () => { attempt = api.start(input); });
+    await act(async () => { setAppState('background'); appState('background'); });
+    await returnToApp();
+    await act(async () => { resolve(response('granted')); await attempt; });
+    expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    expect(transport.start).not.toHaveBeenCalled(); expect(Location.watchPositionAsync).not.toHaveBeenCalled();
+  });
+});
+
+it('setzt die Anzeige beim Kontowechsel zurück und widerruft nichts für das alte Konto', async () => {
+  jest.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue({ status: 'denied' } as Location.LocationPermissionResponse);
+  jest.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValue({ status: 'denied' } as Location.LocationPermissionResponse);
+  await mount(); await start(); expect(api.state.permissionDenied).toBe(true);
+  await act(async () => { tree.update(<Harness uid={other} />); });
+  expect(api.state).toEqual({ phase: 'idle', issue: null, permissionDenied: false, preparing: false });
+  expect(transport.revoke).not.toHaveBeenCalled();
+});
