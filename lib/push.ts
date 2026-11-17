@@ -14,6 +14,13 @@ Notifications.setNotificationHandler({
   }),
 });
 
+async function ensureAndroidChannel() {
+  await Notifications.setNotificationChannelAsync('default', {
+    // eslint-disable-next-line import/namespace -- vorbestehend seit main d505250f; Logik bewusst unverändert
+    name: 'Standard', importance: Notifications.AndroidImportance.DEFAULT,
+  });
+}
+
 // Registriert den Expo-Push-Token am Profil. Best-effort (Simulator/abgelehnte
 // Berechtigung → still ok). Remote-Push braucht einen Dev-/Production-Build
 // (in Expo Go auf iOS nicht zuverlässig).
@@ -22,19 +29,15 @@ Notifications.setNotificationHandler({
 export async function registerForPush(userId: string, opts?: { prompt?: boolean }) {
   try {
     if (!Device.isDevice) return;
+    // Android 13+: Ohne bestehenden Benachrichtigungskanal erscheint die Systemabfrage
+    // nicht. Deshalb den Kanal VOR der Berechtigungsanfrage anlegen (idempotent).
+    if (Platform.OS === 'android') await ensureAndroidChannel();
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;
     if (status !== 'granted' && opts?.prompt !== false) {
       status = (await Notifications.requestPermissionsAsync()).status;
     }
     if (status !== 'granted') return;
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        // eslint-disable-next-line import/namespace -- vorbestehend seit main d505250f; Logik bewusst unverändert
-        name: 'Standard', importance: Notifications.AndroidImportance.DEFAULT,
-      });
-    }
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??
