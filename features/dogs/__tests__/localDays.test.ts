@@ -1,3 +1,4 @@
+import { relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { localDayKey, parseDay } from '@/features/dogs/dateInput';
 import { dayStreak } from '@/features/tracking/utils/trackScore';
 import { computeUnitStats } from '@/services/trainingUnitStats';
@@ -62,4 +63,13 @@ describe('Wochenstatistik über die Zeitumstellung', () => {
     expect(stats.weekly.reduce((a, w) => a + w.count, 0)).toBe(1);
   });
   it('day() Hilfe ist konsistent', () => { expect(day(new Date(2026, 0, 2))).toBe('2026-01-02'); });
+});
+
+describe('relDate (Fährten-Liste)', () => {
+  afterEach(() => jest.useRealTimers());
+  it('zeigt ein reines Datum von heute als «Heute», unabhängig von der Zeitzone', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 10, 18, 0, 30));
+    expect(relDate('2026-11-18')).toBe('Heute');
+    expect(relDate('2026-11-17')).toBe('Gestern');
+  });
 });
