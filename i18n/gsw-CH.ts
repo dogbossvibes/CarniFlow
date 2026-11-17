@@ -2814,6 +2814,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "groups.wsLeave": "Verlah beändet alli Freigabe sofort. Scho übergeheni Fährte bliibed bi de Hundefüehrerin.",
   "groups.understood": "Verstande",
   "groups.shareFailed": "Standort teile het nöd klappt. Bitte de Standortzuegriff prüefe.",
+  "groups.sharePermissionDenied": "ANYVO dörf din Standort nöd bruche. Erlaub de Standortzuegriff i de Iistellige vo dim Grät und schalt «Standort teile» denn wieder ii.",
   "groups.notifyTitle": "Mitteilige",
   "groups.notifyJoin": "Biitrittsaafroge",
   "groups.notifyReady": "Fährte für mich liit",

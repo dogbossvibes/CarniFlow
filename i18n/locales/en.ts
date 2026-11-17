@@ -2806,6 +2806,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "groups.wsLeave": "Leaving ends all shares immediately. Tracks already handed over stay with the handler.",
   "groups.understood": "Got it",
   "groups.shareFailed": "Location sharing didn’t work. Please check location access.",
+  "groups.sharePermissionDenied": "ANYVO isn’t allowed to use your location. Allow location access in your device settings, then turn “Share location” on again.",
   "groups.notifyTitle": "Notifications",
   "groups.notifyJoin": "Join requests",
   "groups.notifyReady": "A track for me is ready",

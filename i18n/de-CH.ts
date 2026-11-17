@@ -2852,6 +2852,7 @@ export const deCH = {
   "groups.wsLeave": "Verlassen beendet alle Freigaben sofort. Bereits übergebene Fährten bleiben bei der Hundeführerin.",
   "groups.understood": "Verstanden",
   "groups.shareFailed": "Standort teilen hat nicht geklappt. Bitte den Standortzugriff prüfen.",
+  "groups.sharePermissionDenied": "ANYVO darf deinen Standort nicht verwenden. Erlaube den Standortzugriff in den Einstellungen deines Geräts und schalte «Standort teilen» danach wieder ein.",
   "groups.notifyTitle": "Mitteilungen",
   "groups.notifyJoin": "Beitrittsanfragen",
   "groups.notifyReady": "Fährte für mich liegt",

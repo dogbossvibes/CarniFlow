@@ -2827,6 +2827,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "groups.wsLeave": "Quitter met fin à tous les partages. Les pistes déjà transmises restent chez le conducteur.",
   "groups.understood": "Compris",
   "groups.shareFailed": "Le partage de position n’a pas fonctionné. Vérifie l’accès à la position.",
+  "groups.sharePermissionDenied": "ANYVO n’a pas le droit d’utiliser ta position. Autorise l’accès à la position dans les réglages de ton appareil, puis réactive « Partager la position ».",
   "groups.notifyTitle": "Notifications",
   "groups.notifyJoin": "Demandes d’adhésion",
   "groups.notifyReady": "Une piste pour moi est posée",
