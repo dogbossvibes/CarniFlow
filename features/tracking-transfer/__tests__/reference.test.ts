@@ -168,3 +168,9 @@ it.each(['coordinates','distance'] as const)('preserves legacy direction in V1 w
  f.session.payload_json=JSON.stringify({...JSON.parse(f.session.payload_json!),manualAngleGeometry:[geometry]});
  expect(projectTrackTransferSource(f.session,f.points,f.markers).manualAngleGeometry?.markers[0]).toEqual(geometry);
 });
+
+it('#146 Folge: eine übernommene, fremd gelegte Gruppenfährte ist keine Quelle für die Übergabe', () => {
+  const f = fixture();
+  f.session.payload_json = JSON.stringify({ ...JSON.parse(f.session.payload_json!), groupTrack: { version: 1, trackId: '50000000-0000-4000-8000-000000000001', blind: false } });
+  expect(() => projectTrackTransferSource(f.session, f.points, f.markers)).toThrow('SOURCE_UNAVAILABLE');
+});

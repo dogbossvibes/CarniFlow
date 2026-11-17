@@ -1,3 +1,4 @@
+import { isForeignLaidGroupTrack } from '@/features/training-groups/foreignLaidLine';
 import { attachSpecialGeometry, isSpecialAngle, readSpecialGeometry, specialAngleKey } from '@/features/tracking/utils/specialAngleGeometry';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
 import { parseTrackTransferReference, TransferReferenceError, TRANSFER_LIMITS } from './reference';
@@ -50,7 +51,9 @@ function projectSegment(v: unknown, dogId: string, sessionId: string) {
 export function projectTrackTransferSource(session: LocalTrainingSession, points: LocalTrackPoint[], markers: LocalTrackMarker[]) {
   const payload = json(session.payload_json);
   if (session.type !== 'track' || session.status !== 'completed' || session.deleted_at || !session.dog_id
-    || payload.trackLifecycleStatus || payload.trackTransferReceipt) throw new TransferSourceError('SOURCE_UNAVAILABLE');
+    || payload.trackLifecycleStatus || payload.trackTransferReceipt
+    // Übernommene Gruppenfährte (fremd gelegt): die Linie einer anderen Leger:in wird nicht weitergegeben.
+    || isForeignLaidGroupTrack(payload)) throw new TransferSourceError('SOURCE_UNAVAILABLE');
   const start = timestamp(session.started_at), end = timestamp(session.ended_at);
   const projectedPoints = points.map(p => {
     if (p.session_local_id !== session.local_id || p.point_type !== 'lay') throw new TransferReferenceError('SOURCE_INCOMPLETE');

@@ -19,7 +19,8 @@ const EXPORT_ROWS = [
   { format: 'json', icon: 'code-slash-outline' },
 ] as const;
 
-export function TrackExportActions({ data }: { data: unknown }) {
+/** extraHint: zusätzlicher Hinweis unter dem Datenschutztext (z. B. fremd gelegte Gruppenfährte ohne gelegte Linie). */
+export function TrackExportActions({ data, extraHint }: { data: unknown; extraHint?: string }) {
   const { t }=useT(); const [activeFormat,setActiveFormat]=useState<UserExportFormat | null>(null); const busyRef=useRef(false);
   const busy=activeFormat!==null;
   const [includeNotes,setIncludeNotes]=useState(false);
@@ -65,6 +66,7 @@ export function TrackExportActions({ data }: { data: unknown }) {
   return <View style={s.card}>
     <Text accessibilityRole="header" style={s.title}>{t('track.export.title')}</Text>
     <Text style={s.hint}>{t('track.export.privacy')}</Text>
+    {extraHint ? <Text style={s.hint}>{extraHint}</Text> : null}
     <View style={s.options}>
       <View style={s.copy}>
         <Text style={s.optionTitle}>{t('track.export.notes')}</Text>

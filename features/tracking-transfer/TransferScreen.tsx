@@ -67,7 +67,7 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
     const turn = ++generation.current;
     setPreview(null); setLists({ incoming: [], outgoing: [] }); setOwned([]); setNextOwned(null);
     const db = await getLocalDb();
-    const rows = await db.getAllAsync<SourceRow>("select local_id,dog_id,title,ended_at from local_training_sessions where user_id=? and type='track' and status='completed' and deleted_at is null and ended_at is not null and json_type(case when json_valid(payload_json) then payload_json else '{}' end, '$.trackTransferReceipt') is null order by ended_at desc limit 100", userId);
+    const rows = await db.getAllAsync<SourceRow>("select local_id,dog_id,title,ended_at from local_training_sessions where user_id=? and type='track' and status='completed' and deleted_at is null and ended_at is not null and json_type(case when json_valid(payload_json) then payload_json else '{}' end, '$.trackTransferReceipt') is null and json_type(case when json_valid(payload_json) then payload_json else '{}' end, '$.groupTrack') is null order by ended_at desc limit 100", userId);
     if (!alive.current || turn !== generation.current) return;
     setSources(rows);
     const next = await service.list(); if (!alive.current || turn !== generation.current) return;
