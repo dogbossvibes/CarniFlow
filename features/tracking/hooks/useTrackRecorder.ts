@@ -48,7 +48,7 @@ import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepo
 import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildLocalTrackSessionInput, type LocalTrackSessionMeta } from '@/features/tracking/utils/localTrackSession';
 import { nowIso } from '@/lib/localDb/ids';
-import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
+import { createLocalTrackPointsBatch, createLocalTrackMarker, upgradeLocalTrackMarkerAngleKind } from '@/features/tracking/repositories/localTrackRepository';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import { TRACK_LOCATION_TASK, setTrackFixHandler, startBackgroundUpdates, stopBackgroundUpdates } from '@/features/tracking/native/backgroundLocationTask';
 import { beginBackgroundLayDiagnostics, endBackgroundLayDiagnostics, recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
@@ -196,6 +196,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // sein SQLite-Insert kann aber noch laufen. Finish wartet nur auf diese
   // lokalen Writes, bevor QA-Snapshot und Session-Finalisierung gespeichert werden.
   const markerWritesRef = useRef(createMarkerWriteBarrier());
+  // Store-Marker-ID → lokale DB-ID (nach abgeschlossenem Insert); für die Spitz-Hochstufung (T-211).
+  const markerDbIdsRef = useRef(new Map<string, Promise<string | null>>());
   /** QA v2.1: Motion-Evidenz je bewertetem Kandidaten, LIVE mitgeschnitten. */
   // Keep evidence by apex timestamp beyond the bounded Motion sample ring.
   /** Verhindert Doppel-Einträge: je apexIndex genau ein Mitschnitt. */
@@ -392,19 +394,41 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // Capture the QA index before async marker writes can cross a section boundary.
     const qaApexIndex = qa?.apexIndex == null ? null : qa.apexIndex + completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0);
     if (markerSessionId) {
+      let resolveDbId: (id: string | null) => void = () => {};
+      if (marker.type === 'winkel') markerDbIdsRef.current.set(marker.id, new Promise<string | null>(resolve => { resolveDbId = resolve; }));
       const localWrite = (async () => {
         try {
           await localSessionCreationRef.current;
           const dbId = await createLocalTrackMarker(markerSessionId, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null, sourceMarkerId: marker.id, recordedAtMs: marker.t, geometryDirection: marker.geometryDirection, geometrySharpness: marker.geometrySharpness, geometrySource: marker.geometrySource });
+          resolveDbId(dbId);
           if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qaApexIndex, qaContext);
           return true;
-        } catch (e) { console.warn('[trackRecorder] marker', e); return false; }
+        } catch (e) { resolveDbId(null); console.warn('[trackRecorder] marker', e); return false; }
       })();
       markerWritesRef.current.track(localWrite);
       await localWrite;
     }
     if (s.currentSessionId && s.currentSessionId !== markerSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store, qaNoteMarker, completedDetectorSectionsRef, refreshManualGeometry]);
+
+  // T-211: bereits gemeldeten normalen Auto-Winkel auf spitz hochstufen — Store sofort,
+  // lokale Zeile nach ihrem Insert. Läuft über dieselbe Schreibsperre wie die Inserts,
+  // damit das Speichern am Ende darauf wartet. Schlägt die DB-Änderung fehl, bleibt der
+  // Marker als normaler Winkel gespeichert (bisheriges Verhalten), die Fährte bleibt gültig.
+  const upgradeAngleKind = useCallback((markerId: string, kind: AngleKind) => {
+    if (kind !== 'spitz_links' && kind !== 'spitz_rechts') return;
+    if (!store.getState().upgradeAngleKind(markerId, kind)) return;
+    refreshManualGeometry();
+    const dbIdPromise = markerDbIdsRef.current.get(markerId);
+    if (!dbIdPromise) return;
+    markerWritesRef.current.track((async () => {
+      try {
+        const dbId = await dbIdPromise;
+        if (dbId) await upgradeLocalTrackMarkerAngleKind(dbId, kind === 'spitz_links' ? 'links' : 'rechts', kind);
+      } catch (e) { console.warn('[trackRecorder] marker upgrade', e); }
+      return true;
+    })());
+  }, [store, refreshManualGeometry]);
 
   // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
   // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
@@ -436,9 +460,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Hintergrund-Task und Lifecycle.
   // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   const processor = useMemo(() => createLayProcessor(laySession, {
-    store, localSessionId, ptBuffer, flushPoints: async () => { await flushPoints(); }, commitMarker, onAngleRef, recordingRef, qaRef,
+    store, localSessionId, ptBuffer, flushPoints: async () => { await flushPoints(); }, commitMarker, upgradeAngleKind, onAngleRef, recordingRef, qaRef,
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
-  }), [laySession, store, flushPoints, commitMarker]);
+  }), [laySession, store, flushPoints, commitMarker, upgradeAngleKind]);
   const qaRel = processor.qaRel;
   const processFixWithQaAccess = useCallback((loc: Location.LocationObject, delivery?: import('@/features/tracking/engine/layProcessingSession').QaFixDelivery) => {
     // Local check also covers suspended JS timers after a background lease expiry.
@@ -612,6 +636,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaReferenceRef.current = [];
     qaReferenceTruncatedRef.current = false;
     markerWritesRef.current = createMarkerWriteBarrier();
+    markerDbIdsRef.current = new Map();
     qaMotionCaptureRef.current.clear();
     startupMovementRef.current = { samples: [], confirmationTSec: null, confirmationSource: null,
       confirmationConfidence: null, fallbackUsed: false, truncated: false };
