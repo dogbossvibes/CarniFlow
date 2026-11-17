@@ -1,5 +1,21 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #154, #155, #156 – 2026-11-17
+
+**Erledigt:** Android-OTA #154 (#153, #147), iOS-60-OTA #155 (Stufe 4a, #140, #153, #147) und
+OTA #156 (eigene Fährte im Gruppentraining, PR #151) auf beiden Plattformen live. Gerätetests der
+Nutzerin erledigt für #145, #148, #154, #155, #156; alle Karten auf Veröffentlicht. PRs #147, #149,
+#151, #153 gemergt. Issue #146 mit Variante B abgeschlossen.
+
+**Offen:**
+- **App Store:** Antwort von Apple auf Build 60 (1.0.8) abwarten; Freigabe ist automatisch.
+- **Android vor weiteren Kunden-Auslieferungen:** #141 (FCM, neuer nativer Build), #142.
+- **Entscheid offen:** Weitergabe der gelegten Linie der Leger:in über «Mit Trainer teilen», Export
+  und «Fährten gemeinsam».
+- **PR #152** von der Nutzerin schliessen lassen (Variante A, überholt).
+- **#144** Einstiege zusammenführen (Mockup zuerst).
+- Übrige offene Punkte unverändert, siehe Abschnitte darunter.
+
 ## Stand nach Android-OTA #145 und #148 – 2026-11-16 (Nacht)
 
 **Erledigt:** Android Build 53: OTA #145 (Gruppentraining Stufe 3, PR #135) und OTA #148

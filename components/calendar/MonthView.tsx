@@ -5,6 +5,7 @@ import { DogEventCard } from '@/components/calendar/DogEventCard';
 import { eventsOnDay, localDayKey } from '@/hooks/useTrainingCalendar';
 import { useT } from '@/i18n';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
+import { toWeekRows } from '@/lib/calendarGrid';
 
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -42,9 +43,11 @@ export function MonthView({ events, onEventPress }: { events: CalendarEvent[]; o
 
       <View style={s.wdRow}>{WD.map(d => <Text key={d} style={s.wd}>{d}</Text>)}</View>
 
-      <View style={s.grid}>
-        {cells.map((n, i) => {
-          if (n == null) return <View key={`b${i}`} style={s.cell} />;
+      <View>
+        {toWeekRows(cells).map((week, wi) => (
+        <View key={`w${wi}`} style={s.week}>
+        {week.map((n, i) => {
+          if (n == null) return <View key={`b${wi}-${i}`} style={s.cell} />;
           const key = localDayKey(new Date(cursor.y, cursor.m, n).toISOString());
           const dayEvents = eventsOnDay(events, key);
           const aktiv = key === selected;
@@ -58,6 +61,8 @@ export function MonthView({ events, onEventPress }: { events: CalendarEvent[]; o
             </TouchableOpacity>
           );
         })}
+        </View>
+        ))}
       </View>
 
       <View style={{ gap: 10, marginTop: 4 }}>
@@ -75,8 +80,8 @@ const s = StyleSheet.create({
   navLabel: { fontSize: 15, color: C.white, fontWeight: '800' },
   wdRow:    { flexDirection: 'row' },
   wd:       { flex: 1, textAlign: 'center', fontSize: 10, color: C.muted, fontWeight: '700' },
-  grid:     { flexDirection: 'row', flexWrap: 'wrap' },
-  cell:     { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 10 },
+  week:     { flexDirection: 'row' },
+  cell:     { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 10 },
   cellActive:{ backgroundColor: 'rgba(0,245,212,0.12)', borderWidth: 1, borderColor: '#00F5D4' },
   num:      { fontSize: 14, color: C.white, fontWeight: '600' },
   numActive:{ color: '#00F5D4' },
