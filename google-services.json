@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "335061461683",
+    "project_id": "anyvo-1b1c7",
+    "storage_bucket": "anyvo-1b1c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335061461683:android:50c606f5d1d15918be9ec6",
+        "android_client_info": {
+          "package_name": "com.anyvo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkaZR7rLh0qIrld3RPfkFVxtYnuqEKHM4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
