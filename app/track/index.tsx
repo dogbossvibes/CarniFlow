@@ -170,11 +170,13 @@ export default function TrackOverviewScreen() {
   const sketchObjects = useMemo(() => (scopedHero?.markers ?? []).filter(m => m.type === 'gegenstand').map(m => ({ lat: m.lat!, lng: m.lng! })), [scopedHero]);
 
   const startHref = (effectiveDogId ? `/track/legen?dogId=${effectiveDogId}` : '/track/legen') as never;
-  const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
-    { icon: 'play',          label: t('track.lay'), go: () => router.push(startHref), primary: true },
-    { icon: 'stats-chart',   label: 'Auswertung',   go: () => router.push((last ? `/track/${last.id}` : startHref) as never) },
-    { icon: 'layers',        label: 'Logbuch',      go: () => router.push('/track/historie' as never) },
-    { icon: 'sparkles',      label: 'Insights',     go: () => router.push('/analyse/insights' as never) },
+  type OverviewAction = { icon: IconName; label: string; go: () => void };
+  // Eine Hauptaktion; «Logbuch» steht nur einmal (Verlauf-Link unten),
+  // «Auswertung» nur, wenn es eine letzte Fährte gibt (vorher führte sie ohne Fährte ins Legen).
+  const primaryAction: OverviewAction = { icon: 'play', label: t('track.lay'), go: () => router.push(startHref) };
+  const secondaryActions: OverviewAction[] = [
+    ...(last ? [{ icon: 'stats-chart' as IconName, label: 'Auswertung', go: () => router.push(`/track/${last.id}` as never) }] : []),
+    { icon: 'sparkles', label: 'Insights', go: () => router.push('/analyse/insights' as never) },
   ];
 
   // NEWBIE hat 1 Fährte/Kalendermonat (serverautoritative Quota, siehe
@@ -196,7 +198,7 @@ export default function TrackOverviewScreen() {
           {loading ? (
             <View style={s.mapEmpty}><ActivityIndicator color={C.trackPrimary} /></View>
           ) : !last ? (
-            <View style={s.mapEmpty}>
+            <View style={[s.mapEmpty, s.mapEmptyCompact]}>
               <Ionicons name="git-branch-outline" size={30} color={C.trackTextMut} />
               <Text style={s.mapEmptyTxt}>{t('empty.noTracks')}</Text>
             </View>
@@ -222,21 +224,26 @@ export default function TrackOverviewScreen() {
           )}
         </View>
 
-        {/* ── Schnellaktionen 2×2 ── */}
+        {/* ── Schnellaktionen: Hauptaktion + Zweitaktionen ── */}
+        <TouchableOpacity
+          onPress={primaryAction.go} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={primaryAction.label}
+          style={[s.action, s.actionPrimary, s.actionFull]}
+        >
+          <LinearGradient
+            colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Ionicons name={primaryAction.icon} size={22} color="#04201b" />
+          <Text style={[s.actionLabel, { color: '#04201b' }]}>{primaryAction.label}</Text>
+        </TouchableOpacity>
         <View style={s.actionsGrid}>
-          {actions.map((a, i) => (
+          {secondaryActions.map(a => (
             <TouchableOpacity
-              key={i} onPress={a.go} activeOpacity={0.85}
-              style={[s.action, a.primary ? s.actionPrimary : s.actionCard]}
+              key={a.label} onPress={a.go} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={a.label}
+              style={[s.action, s.actionCard]}
             >
-              {a.primary && (
-                <LinearGradient
-                  colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-              <Ionicons name={a.icon} size={22} color={a.primary ? '#04201b' : C.trackText} />
-              <Text style={[s.actionLabel, { color: a.primary ? '#04201b' : C.trackText }]}>{a.label}</Text>
+              <Ionicons name={a.icon} size={22} color={C.trackText} />
+              <Text style={[s.actionLabel, { color: C.trackText }]}>{a.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -272,7 +279,7 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 18, paddingBottom: 16 },
 
   globalBar:{ marginBottom: 14 },
-  mapCard: { minHeight: 200, borderRadius: 26, overflow: 'hidden', marginBottom: 14, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimaryDk + '2A' },
+  mapCard: { minHeight: 120, borderRadius: 26, overflow: 'hidden', marginBottom: 14, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimaryDk + '2A' },
   mapInner:{ height: 200, marginHorizontal: 12 },
   previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18 },
   scoreBox: { alignItems: 'center', gap: 3 },
@@ -280,6 +287,7 @@ const s = StyleSheet.create({
   previewCaption: { color: C.trackTextMut, fontSize: 11, textAlign: 'center', paddingHorizontal: 20, paddingBottom: 18, lineHeight: 16 },
   statsPanel: { borderTopWidth: 1, borderTopColor: C.trackBorder, padding: 14, backgroundColor: C.trackCard },
   mapEmpty:{ minHeight: 200, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
+  mapEmptyCompact:{ minHeight: 120 },
   mapEmptyTxt:{ fontSize: 13, color: C.trackTextMut, textAlign: 'center' },
 
   ovCap:     { fontSize: 10, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.4 },
@@ -289,6 +297,7 @@ const s = StyleSheet.create({
   actionsGrid:{ flexDirection: 'row', flexWrap: 'wrap', gap: 11, marginBottom: 16 },
   action:    { width: '47.5%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, paddingVertical: 16, borderRadius: 20, overflow: 'hidden' },
   actionCard:{ backgroundColor: C.trackCard, borderWidth: 1, borderColor: C.trackBorder },
+  actionFull:{ width: '100%', justifyContent: 'center', paddingVertical: 18, marginBottom: 11 },
   actionPrimary: { shadowColor: C.trackPrimary, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
   actionLabel:{ fontSize: 14.5, fontWeight: '900' },
 
