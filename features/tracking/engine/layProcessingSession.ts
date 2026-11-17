@@ -20,6 +20,7 @@ import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/uti
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { pushQaCandidateLine } from '@/features/tracking/utils/qaCandidateLog';
+import { refineCornerSharpness, sharpnessRefinementDue } from '@/features/tracking/utils/sharpnessRefinement';
 import {
   type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaSessionCapture,
 } from '@/features/tracking/utils/qaSessionCapture';
@@ -113,6 +114,8 @@ export interface LayProcessingState {
   gpsQualityStateRef: Box<GpsQualityState | null>;
   angleDbgRef: Box<AngleDebug>;
   liveTurnsRef: Box<Map<number, FusedTurn>>;
+  /** Als normal gemeldete Auto-Winkel, deren Schärfe noch genau einmal nachgeprüft wird (T-211). */
+  pendingSharpnessRef: Box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
   qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
@@ -154,6 +157,7 @@ export function createLayProcessingState(): LayProcessingState {
     gpsQualityStateRef: box<GpsQualityState | null>(null),
     angleDbgRef: box<AngleDebug>({ count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null }),
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
+    pendingSharpnessRef: box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>([]),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
     qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
@@ -188,6 +192,11 @@ export interface LayProcessorDeps {
   ptBuffer: Box<LayPointRow[]>;
   flushPoints: () => Promise<void>;
   commitMarker: (marker: MarkerSample, qa?: { source: QaMarkerSource; scale: QaDistanceScale; apexIndex: number | null }) => Promise<void>;
+  /**
+   * Stuft einen bereits gemeldeten Auto-Winkel von normal auf spitz hoch (T-211). Optional:
+   * ohne diesen Ausgang findet keine Nachprüfung statt und alles bleibt wie bisher.
+   */
+  upgradeAngleKind?: (markerId: string, kind: AngleKind) => void;
   onAngleRef: Box<((kind: AngleKind) => void) | undefined>;
   recordingRef: Box<boolean>;
   qaRef: Box<boolean>;
@@ -228,10 +237,10 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, pendingSharpnessRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = session;
   const {
-    store, localSessionId, ptBuffer, flushPoints, commitMarker, onAngleRef, recordingRef, qaRef,
+    store, localSessionId, ptBuffer, flushPoints, commitMarker, upgradeAngleKind, onAngleRef, recordingRef, qaRef,
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
   } = deps;
 
@@ -245,6 +254,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     session.detectorOffsetRef.current = detectPointsRef.current.at(-1)?.cumDist ?? session.detectorOffsetRef.current;
     detectPointsRef.current = []; detectEmaRef.current = null; rawTailRef.current = [];
     liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
+    pendingSharpnessRef.current = [];   // der Detektor-Puffer beginnt neu; über eine Lücke wird nicht nachgeprüft
     lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
     canonDistRef.current.interrupt();
   };
@@ -402,6 +412,10 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       dbg.lastReject = null;
       const p = detectPointsRef.current[c.apexIndex];
       const now = Date.now();
+      // Normal gemeldete Regelpfad-/Split-Apex-Ecken: Schärfe später einmal nachprüfen.
+      // Long-Baseline-Ecken sind bereits über lange Schenkel entschieden.
+      if (upgradeAngleKind && (c.kind === 'links' || c.kind === 'rechts') && fused?.source !== 'gps_long_baseline')
+        pendingSharpnessRef.current.push({ markerId: `angle-${now}-${c.kind}`, direction: c.kind, atM: c.atM });
       void commitMarker({
         id: `angle-${now}-${c.kind}`, type: 'winkel', material: null, angleKind: c.kind,
         lat: p.lat, lng: p.lng, accuracy: p.accuracy,
@@ -411,7 +425,30 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       onAngleRef.current?.(c.kind);
       committed.push({ kind: c.kind, atM: c.atM, apexIndex: c.apexIndex, source: fused?.source === 'gps_split_apex' ? 'auto_split_apex' : 'auto' });
     }
+    refinePendingSharpness();
     return committed;
+  };
+
+  // Nachträgliche Schärfe-Prüfung (T-211): je gemeldetem normalen Winkel genau EINMAL,
+  // sobald genug Weg dahinter liegt. Ändert nur die Klasse (normal → spitz) des bereits
+  // gespeicherten Markers; keine neue Ecke, keine Ansage, keine Änderung an der Erkennung.
+  const refinePendingSharpness = () => {
+    if (!upgradeAngleKind || !pendingSharpnessRef.current.length) return;
+    const points = detectPointsRef.current;
+    const still: typeof pendingSharpnessRef.current = [];
+    for (const pending of pendingSharpnessRef.current) {
+      if (!sharpnessRefinementDue(points, pending.atM)) { still.push(pending); continue; }
+      const r = refineCornerSharpness(points, pending.atM, pending.direction);
+      if (qaRef.current) pushQaCandidateLine(
+        `[schaerfe] Winkel bei ${pending.atM.toFixed(1)} m ${pending.direction}: ` +
+        (r.hit ? `innen=${r.hit.interiorAngleDeg.toFixed(1)}° max=${r.hit.maxInteriorDeg}° schenkel=${r.hit.baselinesM.join('/')}m ` : 'keine Langschenkel-Messung ') +
+        `→ ${r.spitz ? 'spitz' : 'bleibt normal'}`,
+      );
+      if (!r.spitz) continue;
+      angleDbgRef.current.acuteCount++;
+      upgradeAngleKind(pending.markerId, pending.direction === 'rechts' ? 'spitz_rechts' : 'spitz_links');
+    }
+    pendingSharpnessRef.current = still;
   };
 
   const detectCorner = (): LayCornerEvent[] => {
