@@ -106,3 +106,22 @@ it('does not report success or restore old rows when deletion fails after switch
   expect(mockToast).not.toHaveBeenCalled();
   expect(view.root.findAllByType(TrackRow).map((n: any) => n.props.h.id)).toEqual(['s-other']);
 });
+
+describe('overview actions', () => {
+  const labels = () => texts().filter((x: unknown) => typeof x === 'string');
+  it('shows Logbuch only once and opens the last track from Auswertung', async () => {
+    await mount();
+    expect(labels().filter((x: string) => x === 'Logbuch')).toHaveLength(1);
+    expect(labels()).toEqual(expect.arrayContaining(['track.lay', 'Auswertung', 'Insights']));
+    const auswertung = view.root.findAll((n: any) => n.props.accessibilityLabel === 'Auswertung' && typeof n.props.onPress === 'function')[0];
+    act(() => auswertung.props.onPress());
+    expect(mockRouter.push).toHaveBeenCalledWith('/track/s-d');
+  });
+  it('hides Auswertung when the dog has no track yet', async () => {
+    mockHistory.mockResolvedValue([]);
+    await mount();
+    expect(labels()).not.toContain('Auswertung');
+    expect(labels()).toEqual(expect.arrayContaining(['track.lay', 'Insights', 'Logbuch']));
+    expect(labels().filter((x: string) => x === 'Logbuch')).toHaveLength(1);
+  });
+});
