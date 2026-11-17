@@ -27,6 +27,12 @@ jest.mock('@/features/tracking/utils/positionSource', () => ({
     return { stop: jest.fn(), info: { isNativeAvailable: false, rawGnssSupported: false, source: 'expo', provider: null } };
   }),
 }));
+// Android-Wachhalter (T-209): der Simulator merkt sich nur, ob die Absuche ihn gerade eingeschaltet hat.
+jest.mock('@/features/tracking/native/searchKeepalive', () => ({
+  SEARCH_KEEPALIVE_TASK: 'anyvo-absuche-bg',
+  startSearchKeepalive: jest.fn(async () => { require('./searchBridge').searchBridge.keepaliveActive = true; }),
+  stopSearchKeepalive: jest.fn(async () => { require('./searchBridge').searchBridge.keepaliveActive = false; }),
+}));
 // SQLite-Ersatz: ein geschriebener Stapel übersteht einen App-Abbruch, der Puffer davor nicht.
 jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   ...jest.requireActual('@/features/tracking/repositories/localTrackRepository'),

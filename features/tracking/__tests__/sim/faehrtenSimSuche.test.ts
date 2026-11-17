@@ -85,6 +85,16 @@ describe('Lauf durch den echten Such-Recorder', () => {
     expect(o.search.trace.some(t => t.paused)).toBe(true);
   }, 120000);
 
+  test('Android: Bildschirm aus liefert nur mit Wachhalter weiter Positionen (T-209/T-210)', async () => {
+    const lock = { track: SHORT, device: 'dual', env: 'open', platform: 'android', dog: DOGS.ruhig, seed: 3,
+      interruptions: [{ kind: 'lock', atFrac: 0.3, durationS: 20 }] } as const;
+    const gap = (o: Awaited<ReturnType<typeof runSearchScenario>>) => Math.max(...o.search.trace.slice(1).map((t, i) => t.tMs - o.search.trace[i].tMs));
+    const withKeepalive = await runSearchScenario({ ...lock, interruptions: [...lock.interruptions] });
+    const without = await runSearchScenario({ ...lock, interruptions: [...lock.interruptions], androidKeepalive: false });
+    expect(gap(withKeepalive)).toBeLessThan(8000);
+    expect(gap(without)).toBeGreaterThan(18000);
+  }, 120000);
+
   test('Fährtenverlust und schwierige Formen erzeugen die erwartete Wahrheit (T-205)', () => {
     const lay = buildTruthTrack(SHAPE_TRACKS.Kreuzung, DEFAULT_WALK, makeRng(5));
     // Schenkel 4 kreuzt Schenkel 1: ein Punkt des letzten Schenkels liegt nah am ersten.

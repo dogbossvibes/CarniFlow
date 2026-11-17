@@ -39,7 +39,7 @@ npx jest features/tracking/__tests__/sim/faehrtenSim
 FAEHRTEN_SIM=full FAEHRTEN_SIM_OUT=/pfad/zum/ausgabeordner npx jest features/tracking/__tests__/sim/layMatrix
 ```
 
-- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Legen: `winkel`, `geraet`, `varianten`, `pruefung`;
+- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Legen: `winkel`, `geraet`, `varianten`, `pruefung`, `androidlegen`;
   Absuche: `suche`, `suchvarianten`, `formen`, `unterbrechungen`, `ablauf`, `android`, `ifh`). `ifh` läuft nicht mit `full`
   (lange Fährten rechnen sehr lange) und nur ausdrücklich: `FAEHRTEN_SIM=ifh FAEHRTEN_SIM_SEEDS=1`.
 - Alle Such-Gruppen: `FAEHRTEN_SIM=suche,suchvarianten,formen,unterbrechungen,ablauf,android npx jest features/tracking/__tests__/sim/searchMatrix --maxWorkers=6`.
@@ -100,6 +100,12 @@ Genauigkeit. Das passt zum langsam wandernden Fehlermodell.
 - **Sperrbildschirm/Anruf** sind als «keine Positionen in dieser Zeit» abgebildet: Die Absuche fordert keine
   Hintergrund-Ortung an (`positionStream`: `allowBackground: false`), iOS liefert dann keine Positionen. Dass die App
   in dieser Zeit tatsächlich angehalten wird, ist aus dem Code abgeleitet, nicht auf dem Gerät gemessen.
+- **Android-Gruppen (T-210):** `androidlegen` (Legen: Winkel × Schenkellänge mit Bildschirm an = live und Bildschirm aus =
+  30-s-Pakete, Varianten, IGP-1) und `android` (Absuche). Seit T-209 hält ein Vordergrund-Dienst die Ortung der Absuche bei
+  ausgeschaltetem Bildschirm wach; der Simulator liefert dann weiter Positionen, solange die Absuche den Wachhalter
+  eingeschaltet hat (Zeile «OHNE Wachhalter» = alter Stand zum Vergleich). Annahme: Der Bewegungssensor fällt bei
+  ausgeschaltetem Bildschirm aus. Gerätehersteller, die Dienste trotzdem beenden, sind nicht abgebildet.
+  Start: `FAEHRTEN_SIM=androidlegen,android FAEHRTEN_SIM_SEEDS=8 npx jest features/tracking/__tests__/sim/layMatrix.androidlegen features/tracking/__tests__/sim/searchMatrix.android` (~16 min).
 - **Android (korrigiert in T-207):** Die Absuche nutzt auf Android das GPS direkt im Sekundentakt (kein Bündeln,
   `AnyvoPrecisionLocationModule.kt`). Die Hintergrund-Option wirkt nur auf iOS, und die Absuche hat auf Android keinen
   Vordergrund-Dienst → bei ausgeschaltetem Bildschirm bildet der Simulator keine Positionen ab (aus dem Code abgeleitet).

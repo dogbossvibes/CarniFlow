@@ -54,8 +54,13 @@ export interface SearchRunInput {
    * in dieser Zeit aus (Annahme).
    */
   backgroundWindows?: readonly { fromMs: number; toMs: number }[];
-  /** Android ignoriert die Hintergrund-Option der Absuche (kein Vordergrund-Dienst) → im Hintergrund keine Positionen. */
+  /**
+   * Android ignoriert die Hintergrund-Option der Absuche; Positionen bei ausgeschaltetem Bildschirm kommen nur,
+   * solange der Wachhalter (T-209, Vordergrund-Dienst) läuft.
+   */
   platform?: 'ios' | 'android';
+  /** false = Stand ohne T-209 (Android 49/50): bei ausgeschaltetem Bildschirm keine Positionen. */
+  androidKeepalive?: boolean;
 }
 
 /** Zustand nach jeder GPS-Messung (für Pfote, Fortschritt und «falscher Schenkel»). */
@@ -246,7 +251,7 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
     useTrackingStore.setState(PRISTINE_STORE, true);
     await AsyncStorage.clear();
     searchBridge.sqlite.length = 0; searchBridge.speech.reset();
-    searchBridge.feedFix = null; searchBridge.feedMotion = null; searchBridge.backgroundAllowed = false;
+    searchBridge.feedFix = null; searchBridge.feedMotion = null; searchBridge.backgroundAllowed = false; searchBridge.keepaliveActive = false;
     searchBridge.motionAvailable = input.motionAvailable ?? true;
     resetVoiceEvents(startMs);
     // Ansagen auf Deutsch wie bei den Kundinnen (Länge der Sätze bestimmt die Sprechdauer).
@@ -324,7 +329,9 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
       }
       if (killed) continue;
       const inBackground = (input.backgroundWindows ?? []).some(w => ev.at >= w.fromMs && ev.at < w.toMs);
-      const backgroundGps = searchBridge.backgroundAllowed && input.platform !== 'android';
+      const backgroundGps = input.platform === 'android'
+        ? searchBridge.keepaliveActive && input.androidKeepalive !== false
+        : searchBridge.backgroundAllowed;
       if (inBackground && (ev.motion || !backgroundGps)) continue;
       if (ev.motion) {
         const m = ev.motion;
