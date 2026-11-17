@@ -1,3 +1,4 @@
+import { localDayKey, toISODate } from '@/features/dogs/dateInput';
 // Punktzahl-Ableitung für die Fährten-Übersicht.
 // Das Design zeigt eine 0–100-Punktzahl. Unser Model hat (noch) keine eigene
 // Punktespalte, aber ein `rating`. Ältere Fährten nutzen 1–5, daher mappen wir
@@ -26,20 +27,21 @@ export function averageScore(rows: ScoreSource[]): number | null {
 // "Serie": Anzahl aufeinanderfolgender Kalendertage (bis heute zurück) mit
 // mindestens einer abgeschlossenen Fährte.
 export function dayStreak(dates: (string | null | undefined)[]): number {
-  const days = new Set(
-    dates.filter(Boolean).map(d => new Date(d as string).toISOString().slice(0, 10)),
-  );
+  // Lokale Kalendertage: ein reines Datum bleibt, ein Zeitstempel zählt zum lokalen Tag
+  // (nicht UTC – sonst zählen Fährten zwischen 0 und 1/2 Uhr zum Vortag).
+  const days = new Set(dates.map(d => localDayKey(d)).filter((d): d is string => !!d));
   if (days.size === 0) return 0;
 
   let streak = 0;
   const cursor = new Date();
   // Toleranz: heute ODER gestern als Startpunkt zulassen.
-  const today = cursor.toISOString().slice(0, 10);
-  const yesterday = new Date(cursor.getTime() - 86400000).toISOString().slice(0, 10);
+  const today = toISODate(cursor);
+  const yesterdayDate = new Date(cursor); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = toISODate(yesterdayDate);
   if (!days.has(today) && !days.has(yesterday)) return 0;
   if (!days.has(today)) cursor.setDate(cursor.getDate() - 1);
 
-  while (days.has(cursor.toISOString().slice(0, 10))) {
+  while (days.has(toISODate(cursor))) {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }

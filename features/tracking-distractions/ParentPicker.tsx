@@ -11,6 +11,7 @@ import { C } from '@/constants/colors';
 import type { ParentReference } from './parentReference';
 import type { useDistractions } from './useDistractions';
 import './i18n';
+import { parseDay } from '@/features/dogs/dateInput';
 
 export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistractions>; dogId?: string }) {
  const { t } = useTranslation('distractions'), router = useRouter(), { dogs } = useDogs();
@@ -33,9 +34,8 @@ export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistr
  }, [data.userId, data.parents]);
  useFocusEffect(useCallback(() => { void load(); return () => { generation.current++; }; }, [load]));
  const filtered = rows.filter(row => (!selectedDog || row.dog_id === selectedDog));
- const action = (label: string, press: () => void) => <Pressable accessibilityRole="button" accessibilityLabel={label} style={s.button} onPress={press}><Text style={s.action}>{label}</Text></Pressable>;
  return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.content}>
-  {action(t('back'), () => router.canGoBack() ? router.back() : router.replace('/track' as never))}
+  <ActionButton label={t('back')} onPress={() => router.canGoBack() ? router.back() : router.replace('/track' as never)} />
   <Text accessibilityRole="header" style={s.title}>{t('chooseMain')}</Text><Text style={s.text}>{t('chooseHint')}</Text>
   <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
    {[{ id: '', name: t('allDogs') }, ...dogs].map(dog => <Pressable key={dog.id} accessibilityRole="button" accessibilityState={{ selected: selectedDog === dog.id }} onPress={() => { setDog(dog.id); setLimit(20); }} style={[s.button, selectedDog === dog.id && s.selected]}><Text style={s.action}>{dog.name}</Text></Pressable>)}
@@ -44,7 +44,7 @@ export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistr
   {failed && <Text accessibilityRole="alert" style={s.text}>{t('failure')}</Text>}
   {!loading && !filtered.length && <Text style={s.text}>{t('emptyMain')}</Text>}
   {!loading && filtered.slice(0,limit).map(row => {
-   const date = row.session_date && Number.isFinite(Date.parse(row.session_date)) ? new Date(row.session_date).toLocaleDateString() : t('unknownDate');
+   const date = row.session_date && Number.isFinite(Date.parse(row.session_date)) ? parseDay(row.session_date).toLocaleDateString() : t('unknownDate');
    const name = dogs.find(dog => dog.id === row.dog_id)?.name ?? t('dogFallback');
    const summary = `${name} · ${date} · ${typeof row.distance_meters === 'number' && Number.isFinite(row.distance_meters) ? Math.round(row.distance_meters) + ' m' : t('unknownDistance')}`;
    const preview = cached.find(ref => ref.id === row.id);
@@ -55,9 +55,13 @@ export function ParentPicker({ data, dogId }: { data: ReturnType<typeof useDistr
     <Text style={s.action}>{t('openMain')} →</Text>
    </Pressable>;
   })}
-  {filtered.length > limit && action(t('more'), () => setLimit(n => n + 20))}
-  {action(t('refresh'), () => { void load(); })}
+  {filtered.length > limit && <ActionButton label={t('more')} onPress={() => setLimit(n => n + 20)} />}
+  <ActionButton label={t('refresh')} onPress={() => { void load(); }} />
  </ScrollView></SafeAreaView>;
+}
+// Eigene Komponente statt Hilfsfunktion: Handler werden nur als Prop übergeben, nicht während des Renderns aufgerufen.
+function ActionButton({ label, onPress }: { label: string; onPress: () => void }) {
+ return <Pressable accessibilityRole="button" accessibilityLabel={label} style={s.button} onPress={onPress}><Text style={s.action}>{label}</Text></Pressable>;
 }
 const s = StyleSheet.create({ safe: { flex: 1, backgroundColor: C.bg }, content: { padding: 20, paddingBottom: 40, gap: 16 },
  title: { color: C.trackText, fontSize: 26, fontWeight: '800' }, heading: { color: C.trackText, fontSize: 17, fontWeight: '700' },
