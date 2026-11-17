@@ -51,7 +51,8 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 53,
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 54,
       "runtimeVersion": "1.0.8-sdk58-android-v1",
       "config": {
         "googleMaps": {
