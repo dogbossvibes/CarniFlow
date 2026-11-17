@@ -932,7 +932,8 @@ export default function TrackAuswertungScreen() {
             ) : selectedTrainer ? (
               <View style={{ gap: 12 }}>
                 <Text style={s.shareHint}>Trainer: {selectedTrainer.counterpartName ?? 'Trainer'}</Text>
-                <Text style={s.shareHint}>Geteilt werden die bereits gespeicherten Fährtendaten: Verlauf, Suchspur, Marker, Analyse, Wetter und Notizen.</Text>
+                {/* Fremd gelegte Gruppenfährte: Verlauf und Marker der Leger:in gehen nicht mit (foreignLaidLine.ts). */}
+                <Text style={s.shareHint}>{foreignLaid ? t('groups.foreignShareHint') : 'Geteilt werden die bereits gespeicherten Fährtendaten: Verlauf, Suchspur, Marker, Analyse, Wetter und Notizen.'}</Text>
                 <Pressable style={s.shareButton} onPress={() => createShare(selectedTrainer.counterpartId)}><Text style={s.shareButtonText}>Fährte teilen</Text></Pressable>
                 <Pressable onPress={() => setSelectedTrainer(null)}><Text style={s.shareAction}>Anderen Trainer auswählen</Text></Pressable>
               </View>
