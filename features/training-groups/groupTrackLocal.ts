@@ -9,7 +9,7 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { projectTrackTransferSource } from '@/features/tracking-transfer/source';
 import { parseTrackTransferReference, TRANSFER_LIMITS, type TrackTransferReference } from '@/features/tracking-transfer/reference';
 import { GroupApiError } from '@/features/tracking-exchange/groups/groupRpc';
-import type { GroupTrack, GroupTrackService } from '@/features/tracking-exchange/groups/trackService';
+import { isOwnGroupTrack, type GroupTrack, type GroupTrackService } from '@/features/tracking-exchange/groups/trackService';
 
 // Stufe 2b Gruppentraining: lokale Seite der Fährtenübergabe.
 // Leger:in: die mit dem gewohnten Recorder gelegte Fährte wird als Paket (Format der
@@ -39,7 +39,8 @@ export async function readLaidReference(userId: string, localId: string): Promis
   return { reference: projectTrackTransferSource(session, points, markers), dogId: session.dog_id };
 }
 
-export interface PendingHandover { trackId: string; localId: string; groupId: string; sessionId: string; createdAtMs: number }
+/** own = eigene Fährte (Issue #150): die Fläche wird eingetragen, die Fährte bleibt die eigene, offene Fährte des Hundes. */
+export interface PendingHandover { trackId: string; localId: string; groupId: string; sessionId: string; createdAtMs: number; own?: boolean }
 const handoverKey = (userId: string) => `anyvo_group_track_handover_v1:${userId}`;
 
 export async function listPendingHandovers(userId: string): Promise<PendingHandover[]> {
@@ -67,9 +68,27 @@ async function releaseLayerDog(dogId: string, localId: string) {
   if (registry.get(dogId)?.sessionId === localId) registry.remove(dogId);
 }
 
+// ── Eigene Fährte (Issue #150) ───────────────────────────────────────────────
+// Die lokal gelegte Fährte bleibt unverändert die eigene, normale Fährte. Gemerkt wird nur,
+// welche lokale Fährte zu welcher Gruppenfährte gehört (kleine Liste, keine Änderung an der Fährte).
+export interface OwnGroupTrackLink { trackId: string; localId: string; sessionId: string; createdAtMs: number }
+const ownKey = (userId: string) => `anyvo_group_own_tracks_v1:${userId}`;
+
+export async function listOwnGroupTracks(userId: string): Promise<OwnGroupTrackLink[]> {
+  try {
+    const value = JSON.parse((await AsyncStorage.getItem(ownKey(userId))) ?? '[]');
+    return Array.isArray(value) ? value.filter(v => v && typeof v.trackId === 'string' && typeof v.localId === 'string') : [];
+  } catch { return []; }
+}
+export async function rememberOwnGroupTrack(userId: string, link: OwnGroupTrackLink) {
+  const list = (await listOwnGroupTracks(userId)).filter(e => e.trackId !== link.trackId);
+  await AsyncStorage.setItem(ownKey(userId), JSON.stringify([...list, link].slice(-50)));
+}
+
 export type HandoverResult = 'sent' | 'queued' | 'dropped';
 /** Schickt die gelegte Fährte. Unklarer Ausgang (Netz) → in der Warteschlange lassen. */
 export async function submitHandover(service: GroupTrackService, userId: string, entry: PendingHandover): Promise<HandoverResult> {
+  if (entry.own) await rememberOwnGroupTrack(userId, { trackId: entry.trackId, localId: entry.localId, sessionId: entry.sessionId, createdAtMs: entry.createdAtMs });
   await addPendingHandover(userId, entry);
   const { reference, dogId } = await readLaidReference(userId, entry.localId);
   try {
@@ -83,7 +102,8 @@ export async function submitHandover(service: GroupTrackService, userId: string,
     throw error;
   }
   await removePendingHandover(userId, entry.trackId);
-  await releaseLayerDog(dogId, entry.localId);
+  // Eigene Fährte: bleibt für den eigenen Hund offen (Liegezeit, Absuche wie gewohnt).
+  if (!entry.own) await releaseLayerDog(dogId, entry.localId);
   return 'sent';
 }
 
@@ -108,6 +128,24 @@ export async function findImportedGroupTrack(userId: string, trackId: string): P
   let searched = false;
   try { searched = !!JSON.parse(row.payload_json ?? '{}')?.run; } catch { searched = false; }
   return { localId: row.local_id, dogId: row.dog_id, blind: marker?.blind ?? false, searched };
+}
+
+/** Eigene Gruppenfährte: die lokal gelegte Fährte dieses Geräts (auf anderen Geräten: null). Nur lesend. */
+export async function findOwnGroupTrack(userId: string, trackId: string): Promise<ImportedGroupTrack | null> {
+  const link = (await listOwnGroupTracks(userId)).find(e => e.trackId === trackId);
+  if (!link) return null;
+  const db = await getLocalDb();
+  const row = await db.getFirstAsync<{ local_id: string; dog_id: string | null; payload_json: string | null }>(
+    'select local_id,dog_id,payload_json from local_training_sessions where local_id=? and user_id=? and deleted_at is null', link.localId, userId);
+  if (!row || !row.dog_id) return null;
+  let searched = false;
+  try { searched = !!JSON.parse(row.payload_json ?? '{}')?.run; } catch { searched = false; }
+  return { localId: row.local_id, dogId: row.dog_id, blind: false, searched };
+}
+
+/** Lokale Fährte zu einer Gruppenfährte, bei der ich Hundeführer:in bin. */
+export function findLocalGroupTrack(userId: string, track: Pick<GroupTrack, 'trackId' | 'layerUserId' | 'handlerUserId'>) {
+  return isOwnGroupTrack(track) ? findOwnGroupTrack(userId, track.trackId) : findImportedGroupTrack(userId, track.trackId);
 }
 
 type SQLValue = string | number | null;
@@ -169,7 +207,8 @@ export function createGroupTrackImportPlan(input: { userId: string; dogId: strin
 
 /** Legt die Fährte einmalig für den eigenen Hund an. Bestehende (auch schon abgesuchte) Kopie bleibt unverändert. */
 export async function importGroupTrack(userId: string, track: GroupTrack, reference: TrackTransferReference): Promise<ImportedGroupTrack> {
-  if (track.handlerUserId !== userId) throw new GroupApiError('GROUP_UNAVAILABLE');
+  // Eigene Fährte nie importieren: sie liegt schon als normale Fährte auf dem Gerät, das sie gelegt hat.
+  if (track.handlerUserId !== userId || isOwnGroupTrack(track)) throw new GroupApiError('GROUP_UNAVAILABLE');
   const existing = await findImportedGroupTrack(userId, track.trackId);
   if (existing) return existing;
   const sessionId = Crypto.randomUUID();

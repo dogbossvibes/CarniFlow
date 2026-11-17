@@ -55,7 +55,7 @@ jest.mock('@/i18n/format', () => ({ formatTime: () => '23:59' }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-a', name: 'Ayla' }, { id: 'dog-z', name: 'Zora' }] }) }));
 jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), client: {}, state: { phase: 'idle' } }) }));
 jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: (...args: unknown[]) => { mockLiveArgs.push(args); return { positions: [] }; } }));
-jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, importGroupTrack: async () => null,
+jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, findLocalGroupTrack: async () => null, importGroupTrack: async () => null,
   flushPendingHandovers: async () => {}, listPendingHandovers: async () => [] }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 

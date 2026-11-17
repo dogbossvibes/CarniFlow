@@ -3,7 +3,8 @@ import { GroupApiError, type createGroupRpcClient } from './groupRpc';
 import { id, number, record, values } from './groupModels';
 import { parseTrackTransferReference, type TrackTransferReference } from '@/features/tracking-transfer/reference';
 
-// Stufe 2 Gruppentraining: Fährten für andere legen.
+// Stufe 2 Gruppentraining: Fährten für andere legen. Issue #150: auch eine eigene Fährte
+// (Leger:in = Hundeführer:in, eigener angemeldeter Hund; nie «blind», keine Übergabe).
 // Server: supabase/migrations/20261113090000_training_group_stage2a.sql (training_group_tracks_v1).
 // Alle sehen nur Status und eine grobe Fläche; den genauen Verlauf (fetch) bekommen
 // nur Leger:in und Hundeführer:in.
@@ -47,12 +48,19 @@ export function parseGroupTrack(value: unknown): GroupTrack {
     createdAtMs: number(r.createdAtMs), laidAtMs: nullableNumber(r.laidAtMs), searchStartedAtMs: nullableNumber(r.searchStartedAtMs),
     searchedAtMs: nullableNumber(r.searchedAtMs), area, distanceM: nullableNumber(r.distanceM),
   };
-  if (track.layerUserId === track.handlerUserId
+  // Eigene Fährte (Issue #150): Leger:in = Hundeführer:in ist erlaubt, aber nie «blind».
+  if ((track.layerUserId === track.handlerUserId && track.blind)
     || ((track.status === 'lying' || track.status === 'searching' || track.status === 'searched') && (track.laidAtMs === null || !track.area))) {
     throw new GroupApiError('GROUP_INVALID_RESPONSE');
   }
   return track;
 }
+
+/** Eigene Fährte im Gruppentraining: dieselbe Person legt und sucht ab. */
+export const isOwnGroupTrack = (track: Pick<GroupTrack, 'layerUserId' | 'handlerUserId'>) => track.layerUserId === track.handlerUserId;
+
+/** Wie lange ein Server ohne eigene Fährten nicht erneut gefragt wird. */
+export const OWN_TRACKS_RETRY_MS = 5 * 60 * 1000;
 
 /** Liegezeit ohne Ziel: läuft ab dem Speichern, bleibt beim Start der Absuche stehen. */
 export function lyingMs(track: GroupTrack, serverNowMs: number): number | null {
@@ -69,6 +77,8 @@ export function formatDuration(ms: number): string {
 
 export function createGroupTrackService(client: Client, userId: string) {
   const assignIds = new Map<string, string>();
+  // Server ohne die Migration für eigene Fährten lehnt «includeOwn» ab: dann ohne fragen.
+  let ownUnsupportedUntil = 0;
   const call = (action: string, request: Record<string, unknown>) => client.call(userId, 'training_group_tracks_v1', action, request);
   const single = async (action: string, request: Record<string, unknown>, trackId: string) => {
     const track = parseGroupTrack((await call(action, request)).track);
@@ -76,11 +86,21 @@ export function createGroupTrackService(client: Client, userId: string) {
     return track;
   };
   return {
-    async list(sessionId: string): Promise<{ tracks: GroupTrack[]; serverNowMs: number }> {
-      const data = await call('list', { sessionId });
+    /** ownTracks = false: der Server kennt eigene Fährten noch nicht (Migration fehlt). */
+    async list(sessionId: string): Promise<{ tracks: GroupTrack[]; serverNowMs: number; ownTracks: boolean }> {
+      let data: Record<string, unknown> | null = null;
+      let ownTracks = Date.now() >= ownUnsupportedUntil;
+      if (ownTracks) {
+        try { data = await call('list', { sessionId, includeOwn: true }); }
+        catch (error) {
+          if (!(error instanceof GroupApiError) || error.code !== 'GROUP_INVALID_REQUEST') throw error;
+          ownTracks = false; ownUnsupportedUntil = Date.now() + OWN_TRACKS_RETRY_MS;
+        }
+      }
+      data ??= await call('list', { sessionId });
       const tracks = values(data.tracks, parseGroupTrack, 200);
       if (data.sessionId !== sessionId || tracks.some(t => t.sessionId !== sessionId)) throw new GroupApiError('GROUP_INVALID_RESPONSE');
-      return { tracks, serverNowMs: data.serverNowMs as number };
+      return { tracks, serverNowMs: data.serverNowMs as number, ownTracks };
     },
     /** Gleiche Eingabe nach unklarer Antwort = gleiche trackId (keine doppelte Fährte). */
     async assign(sessionId: string, handlerParticipationId: string, blind: boolean): Promise<GroupTrack> {
