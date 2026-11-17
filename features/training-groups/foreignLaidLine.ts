@@ -29,6 +29,29 @@ export function isForeignLaidPayload(payloadJson: string | null | undefined): bo
   try { return validMarker(record(JSON.parse(payloadJson ?? '{}'))[FOREIGN_LAID_KEY]); } catch { return false; }
 }
 
+/**
+ * Die Fährtenansicht lädt zuerst die Server-Zeile; die Markierung liegt aber in der lokalen Kopie
+ * (und erst seit dem Sync-Nachtrag auch in track_data auf dem Server). Trägt eines von beiden die
+ * Markierung, trägt sie auch das Ergebnis. Nur im Speicher; gleiche Referenz, wenn nichts zu tun ist.
+ */
+export function carryForeignLaidMarker<T>(detail: T, localDetail: unknown): T {
+  if (detail == null || typeof detail !== 'object' || isForeignLaidGroupTrack(detail)) return detail;
+  const local = record(localDetail);
+  const marker = validMarker(record(local.track_data)[FOREIGN_LAID_KEY]) ? record(local.track_data)[FOREIGN_LAID_KEY]
+    : validMarker(local[FOREIGN_LAID_KEY]) ? local[FOREIGN_LAID_KEY] : null;
+  if (!marker) return detail;
+  const d = detail as unknown as Rec;
+  return { ...d, track_data: { ...record(d.track_data), [FOREIGN_LAID_KEY]: marker } } as unknown as T;
+}
+
+/** Die Markierung selbst (für den Abgleich mit dem Server), sonst null. */
+export function readForeignLaidMarker(detail: unknown): Rec | null {
+  const d = record(detail), value = record(d.track_data)[FOREIGN_LAID_KEY] ?? d[FOREIGN_LAID_KEY];
+  if (!validMarker(value)) return null;
+  const m = record(value);
+  return { version: 1, trackId: m.trackId, blind: m.blind === true };
+}
+
 // Koordinaten und Linien in Kennzahlen (z. B. Positionen von Gegenständen in der Analyse)
 // stammen von der gelegten Linie und werden entfernt. Die Absuchelinie selbst bleibt.
 const COORDINATE_KEY = /(latitude|longitude|lat|lng|lon)$/i;

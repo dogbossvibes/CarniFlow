@@ -6,7 +6,7 @@ import { buildSharedTrackCopy, SHARED_COPY_MAX_CHARS, SHARED_COPY_VERSION } from
 import { loadHomeZones } from './store';
 import { confirmTrainerShare } from './confirm';
 import { HOME_ZONE_NS, type HomeZoneKey } from './i18n';
-import { isForeignLaidGroupTrack, searchOnlyDetail } from '@/features/training-groups/foreignLaidLine';
+import { isForeignLaidGroupTrack, LAID_LINE_WITHHELD, searchOnlyDetail } from '@/features/training-groups/foreignLaidLine';
 
 // Heimzone bei Trainer-Freigaben (Issue #121). Die Zone bleibt auf dem Gerät:
 // der Server erhält nur die bereits gekürzte Kopie.
@@ -72,6 +72,9 @@ export async function refreshTrainerShareCopies(detail: unknown, shares: readonl
   const wanted = plan.kind === 'copy' ? plan.copy : null;
   for (const share of active) {
     if ((share.shared_copy_digest ?? null) === (wanted?.digest ?? null)) continue;
+    // Sicherung: Trägt die bestehende Kopie «ohne gelegte Linie», wird sie nie durch das Original ersetzt,
+    // auch wenn das geladene Detail die Markierung (noch) nicht trägt (z. B. Server-Zeile von vor dem Sync-Nachtrag).
+    if (!wanted && share.shared_copy?.[LAID_LINE_WITHHELD] === true) continue;
     try { await updateTrackShareCopy(share.id, wanted); } catch { /* nächster Versuch beim nächsten Öffnen */ }
   }
 }

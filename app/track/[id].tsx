@@ -16,7 +16,8 @@ import { TrackExportActions } from '@/features/tracking/components/TrackExportAc
 import { LinkedTrainingsCard } from '@/features/training/trackLinks/components/LinkedTrainingsCard';
 import { refreshTrainerShareCopies, shareTrackWithHomeZone } from '@/features/home-zone/trainerShare';
 import { GroupEvaluationCard, type OutsideShareGate } from '@/features/training-groups/GroupEvaluationCard';
-import { isForeignLaidGroupTrack, searchOnlyDetail } from '@/features/training-groups/foreignLaidLine';
+import { carryForeignLaidMarker, isForeignLaidGroupTrack, readForeignLaidMarker, searchOnlyDetail } from '@/features/training-groups/foreignLaidLine';
+import { backfillForeignLaidMarker } from '@/features/training-groups/foreignLaidSync';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -173,6 +174,14 @@ export default function TrackAuswertungScreen() {
       const localDisplay = d && !localOnly && userId && d.owner_id === userId
         ? await getLocalTrackDetail(id, userId, { ownedOnly: true }).catch(() => null) : null;
       if (!alive || loadEpoch !== authGeneration.current) return;
+      // Übernommene Gruppenfährte: Die Server-Zeile trägt die Markierung evtl. (noch) nicht, die lokale Kopie schon.
+      // Ohne sie gingen Export und Trainer-Freigabe mit der gelegten Linie der Leger:in hinaus.
+      if (d && localDisplay && !isForeignLaidGroupTrack(d)) {
+        const marked = carryForeignLaidMarker(d, localDisplay);
+        const marker = marked !== d ? readForeignLaidMarker(marked) : null;
+        if (marker && userId) void backfillForeignLaidMarker(id, userId, marker);
+        d = marked;
+      }
       if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
         try {
           const receipt = parseTransferReceipt(d.track_data.trackTransferReceipt);

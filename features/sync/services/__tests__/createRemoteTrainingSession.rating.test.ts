@@ -103,3 +103,20 @@ it('preserves per-object recording evidence through local reload and cloud JSON 
   expect(lastPayload().track_data.run).not.toHaveProperty('run_points');
   expect(source.payload_json).toBe(before);
 });
+
+describe('createRemoteTrainingSession — übernommene Gruppenfährte (Folge #146)', () => {
+  const groupTrack = { version: 1, trackId: '50000000-0000-4000-8000-000000000001', blind: false };
+  it('nimmt die Markierung additiv in track_data mit, neben den bisherigen Feldern', async () => {
+    const res = await createRemoteTrainingSession(localTrack({ payload: { distanceMeters: 175, segments: [{ a: 1 }], groupTrack } }));
+    expect(res.error).toBeNull();
+    expect(lastPayload().track_data).toEqual({ groupTrack, segments: [{ a: 1 }] });
+  });
+  it('auch wenn sonst nichts in track_data stünde', async () => {
+    await createRemoteTrainingSession(localTrack({ payload: { distanceMeters: 175, groupTrack } }));
+    expect(lastPayload().track_data).toEqual({ groupTrack });
+  });
+  it('gewöhnliche Fährten bleiben unverändert (keine Markierung, kein zusätzliches Feld)', async () => {
+    await createRemoteTrainingSession(localTrack({ payload: { distanceMeters: 175, segments: [{ a: 1 }] } }));
+    expect(lastPayload().track_data).toEqual({ segments: [{ a: 1 }] });
+  });
+});
