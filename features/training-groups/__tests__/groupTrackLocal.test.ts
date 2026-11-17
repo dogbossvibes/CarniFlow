@@ -1,4 +1,4 @@
-import { createGroupTrackImportPlan, readGroupTrackMarker, submitHandover, listPendingHandovers } from '../groupTrackLocal';
+import { createGroupTrackImportPlan, findLocalGroupTrack, findOwnGroupTrack, importGroupTrack, listOwnGroupTracks, readGroupTrackMarker, submitHandover, listPendingHandovers } from '../groupTrackLocal';
 import { projectTrackTransferSource } from '@/features/tracking-transfer/source';
 import { GroupApiError } from '@/features/tracking-exchange/groups/groupRpc';
 
@@ -96,5 +96,67 @@ describe('Übergabe durch die Leger:in', () => {
     await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('dropped');
     expect(await listPendingHandovers(userId)).toEqual([]);
     expect(mockClearPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
+  const userId = 'a1111111-1111-4111-8111-111111111111', dogId = 'a0000000-0000-4000-8000-00000000000a';
+  const entry = { trackId: input.trackId, localId: 'lay-1', groupId: 'g', sessionId: 's', createdAtMs: 1, own: true };
+  const ownTrack = { trackId: input.trackId, layerUserId: userId, handlerUserId: userId };
+  let before = '';
+  beforeEach(() => {
+    mockStore.clear(); mockClearPending.mockClear(); mockRemove.mockClear();
+    const { session, points, markers } = rowsFromPlan(createGroupTrackImportPlan({ ...input, userId, sessionId: 'lay-1', dogId }, reference));
+    const { groupTrack: _m, ...rest } = JSON.parse(session.payload_json as string); void _m;
+    mockRows.session = { ...session, payload_json: JSON.stringify(rest) }; mockRows.points = points; mockRows.markers = markers;
+    before = JSON.stringify(mockRows);
+  });
+
+  it('eingetragen: kein Übergabeschritt, die Fährte bleibt für den eigenen Hund offen und unverändert', async () => {
+    const submit = jest.fn(async () => ({}));
+    await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('sent');
+    expect(submit).toHaveBeenCalledWith(input.trackId, reference);
+    expect(await listPendingHandovers(userId)).toEqual([]);
+    expect(mockClearPending).not.toHaveBeenCalled();
+    expect(mockRemove).not.toHaveBeenCalled();
+    expect(JSON.stringify(mockRows)).toBe(before);
+    expect(await listOwnGroupTracks(userId)).toEqual([{ trackId: input.trackId, localId: 'lay-1', sessionId: 's', createdAtMs: 1 }]);
+    await expect(findOwnGroupTrack(userId, input.trackId)).resolves.toEqual({ localId: 'lay-1', dogId, blind: false, searched: false });
+    await expect(findLocalGroupTrack(userId, ownTrack)).resolves.toMatchObject({ localId: 'lay-1' });
+  });
+
+  it('ohne Netz: wartet mit Kennzeichen «eigene», lokale Fährte bleibt', async () => {
+    const submit = jest.fn(async () => { throw new GroupApiError('GROUP_CONNECTION'); });
+    await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('queued');
+    expect(await listPendingHandovers(userId)).toEqual([expect.objectContaining({ trackId: input.trackId, own: true })]);
+    expect(JSON.stringify(mockRows)).toBe(before);
+    expect(mockClearPending).not.toHaveBeenCalled();
+  });
+
+  it.each(['GROUP_UNAVAILABLE', 'GROUP_REVOKED'] as const)('Server lehnt ab (%s, z. B. ohne die Migration): lokal gelegte Fährte bleibt erhalten', async code => {
+    const submit = jest.fn(async () => { throw new GroupApiError(code); });
+    await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('dropped');
+    expect(await listPendingHandovers(userId)).toEqual([]);
+    expect(JSON.stringify(mockRows)).toBe(before);
+    expect(mockClearPending).not.toHaveBeenCalled();
+    expect(mockRemove).not.toHaveBeenCalled();
+  });
+
+  it('abgesucht wird an der eigenen lokalen Fährte erkannt', async () => {
+    await submitHandover({ submit: async () => ({}) } as never, userId, entry);
+    mockRows.session = { ...mockRows.session, payload_json: JSON.stringify({ run: { finishedAt: 'x' } }) };
+    await expect(findOwnGroupTrack(userId, input.trackId)).resolves.toMatchObject({ searched: true });
+  });
+
+  it('auf einem anderen Gerät (kein Eintrag): keine lokale Fährte, und nie ein Import als Kopie', async () => {
+    await expect(findOwnGroupTrack(userId, input.trackId)).resolves.toBeNull();
+    await expect(importGroupTrack(userId, { ...ownTrack, dogId, blind: false } as never, reference)).rejects.toThrow('GROUP_UNAVAILABLE');
+  });
+
+  it('«für andere» unverändert: ohne Kennzeichen wird der eigene Hund weiter freigegeben', async () => {
+    const { own: _own, ...other } = entry; void _own;
+    await expect(submitHandover({ submit: async () => ({}) } as never, userId, other)).resolves.toBe('sent');
+    expect(mockClearPending).toHaveBeenCalledWith(dogId);
+    expect(await listOwnGroupTracks(userId)).toEqual([]);
   });
 });

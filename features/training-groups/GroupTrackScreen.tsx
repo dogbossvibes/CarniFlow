@@ -15,10 +15,10 @@ import { ContactScreenHeader } from '@/features/contacts/ContactScreenHeader';
 import { contactStyles as cs } from '@/features/contacts/contactStyles';
 import type { GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import type { GroupSession } from '@/features/tracking-exchange/groups/groupModels';
-import { formatDuration, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
+import { formatDuration, isOwnGroupTrack, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
 import type { TrackTransferReference } from '@/features/tracking-transfer/reference';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
-import { findImportedGroupTrack, importGroupTrack, syncImportedBlind, type ImportedGroupTrack } from './groupTrackLocal';
+import { findLocalGroupTrack, importGroupTrack, syncImportedBlind, type ImportedGroupTrack } from './groupTrackLocal';
 
 /** Eine Fährte im Gruppentraining aus Sicht von Hundeführer:in (Absuchen) oder Leger:in (Ansehen). */
 export default function GroupTrackScreen() {
@@ -49,19 +49,25 @@ export default function GroupTrackScreen() {
       const list = await tracks.list(sessionId);
       const current = list.tracks.find(x => x.trackId === trackId) ?? null;
       const sess = await groups.session(sessionId).then(r => r.session).catch(() => null);
-      let local = current && current.handlerUserId === userId ? await findImportedGroupTrack(userId, trackId) : null;
+      // Eigene Fährte (Issue #150): die lokal gelegte Fährte dieses Geräts, nie ein Import.
+      const ownTrack = !!current && isOwnGroupTrack(current);
+      let local = current && current.handlerUserId === userId ? await findLocalGroupTrack(userId, current) : null;
       let ref: TrackTransferReference | null = null;
       // Genauer Verlauf nur für Leger:in und Hundeführer:in; die Hundeführerin bekommt ihn sofort auf ihr Gerät.
       if (current && (current.layerUserId === userId || current.handlerUserId === userId) && current.status !== 'laying' && current.status !== 'revoked') {
         try {
           const fetched = await tracks.fetch(trackId);
           ref = fetched.reference;
-          if (current.handlerUserId === userId && !local) local = await importGroupTrack(userId, fetched.track, fetched.reference);
+          if (current.handlerUserId === userId && !local && !ownTrack) local = await importGroupTrack(userId, fetched.track, fetched.reference);
         } catch (e) { if (!local) throw e; }
       }
       // Absuche lokal abgeschlossen → Status nachreichen.
       if (current?.handlerUserId === userId && local?.searched && current.status === 'searching') {
         await tracks.searched(trackId).catch(() => null);
+      }
+      // Eigene Fährte über den gewohnten Fährten-Bildschirm abgesucht: beide Schritte nachreichen.
+      if (ownTrack && current?.handlerUserId === userId && local?.searched && current.status === 'lying') {
+        await tracks.searchStart(trackId).then(() => tracks.searched(trackId)).catch(() => null);
       }
       if (token !== generation.current) return;
       setTrack(current); setSession(sess); setReference(ref); setImported(local);
@@ -79,6 +85,7 @@ export default function GroupTrackScreen() {
   useEffect(() => () => { generation.current++; }, []);
 
   const handler = !!track && track.handlerUserId === userId;
+  const own = !!track && isOwnGroupTrack(track);
   const blind = !!track && track.blind && track.status !== 'searched';
   const serverNow = clock ? clock.serverNowMs + Math.max(0, now - clock.at) : now;
   const lying = track ? lyingMs(track, serverNow) : null;
@@ -93,7 +100,7 @@ export default function GroupTrackScreen() {
     if (!track || !imported || !tracks || busy) return;
     setBusy('search'); setError(null);
     try {
-      await syncImportedBlind(imported.localId, track.trackId, track.blind);
+      if (!own) await syncImportedBlind(imported.localId, track.trackId, track.blind);
       // Status «wird abgesucht» und Liegezeit-Stopp auf dem Server; ohne Netz später nachgereicht.
       if (track.status === 'lying') await tracks.searchStart(track.trackId).catch(() => null);
       const decision = await applyTrackRecovery({ sessionId: imported.localId, dogId: imported.dogId, hasRemoteSearchRun: false,
@@ -109,7 +116,7 @@ export default function GroupTrackScreen() {
     <View style={cs.root}>
       <SafeAreaView edges={['top']} style={cs.flex}>
         <ContactScreenHeader title={t('groups.trackScreenTitle', { dog })}
-          subtitle={track ? [handler ? t('groups.trackBy', { name: layerName }) : t('groups.trackByYou'), track.blind ? t('groups.blind') : null].filter(Boolean).join(' · ') : undefined} />
+          subtitle={track ? [own ? t(handler ? 'groups.trackOwnSub' : 'groups.trackOwnTag') : handler ? t('groups.trackBy', { name: layerName }) : t('groups.trackByYou'), track.blind ? t('groups.blind') : null].filter(Boolean).join(' · ') : undefined} />
         <ScrollView contentContainerStyle={cs.scroll}>
           {errorKey ? <Text style={[cs.body, { color: C.trackDanger }]} accessibilityRole="alert">{t(errorKey)}</Text> : null}
           {!track && !error ? <Text style={cs.hint}>{t('groups.loading')}</Text> : null}
@@ -143,7 +150,7 @@ export default function GroupTrackScreen() {
             </View>
           )}
 
-          {handler && imported && track && track.status !== 'searched' ? (
+          {handler && !own && imported && track && track.status !== 'searched' ? (
             <AnyvoCard>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <Ionicons name="cloud-offline-outline" size={18} color={C.trackTextSec} />
@@ -151,7 +158,7 @@ export default function GroupTrackScreen() {
               </View>
             </AnyvoCard>
           ) : null}
-          {handler && !imported && track && (track.status === 'lying' || track.status === 'searching') ? <Text style={cs.hint}>{t('groups.preparing')}</Text> : null}
+          {handler && !imported && track && (track.status === 'lying' || track.status === 'searching') ? <Text style={cs.hint}>{t(own ? 'groups.ownOtherDevice' : 'groups.preparing')}</Text> : null}
 
           {handler && imported && track && (track.status === 'lying' || track.status === 'searching') ? (
             <AnyvoButton label={t('groups.search')} icon="play" loading={busy === 'search'} onPress={() => { void search(); }} />
