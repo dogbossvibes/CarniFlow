@@ -20,6 +20,7 @@ import {
   getHeatCalendarStats, getMonthGrid, heatHistoryMetadata, phaseTone, type HeatCalendarDay, type HeatCalendarFilter, type HeatPhaseTone,
 } from '@/features/dogs/heatCalendar';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { toWeekRows } from '@/lib/calendarGrid';
 import { useToast } from '@/components/ui/Toast';
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -209,9 +210,11 @@ function DogHeatCalendarScreenContent({ resolvedDog }: { resolvedDog: import('@/
             </View>
 
             <View style={s.weekdays}>{WEEKDAYS.map(day => <Text key={day} style={s.weekday}>{day}</Text>)}</View>
-            <View style={s.grid}>
-              {getMonthGrid(cursor.year, cursor.month).map((key, index) => {
-                if (!key) return <View key={`empty-${index}`} style={s.dayCell} />;
+            <View>
+              {toWeekRows(getMonthGrid(cursor.year, cursor.month)).map((week, weekIndex) => (
+              <View key={`week-${weekIndex}`} style={s.weekRow}>
+              {week.map((key, index) => {
+                if (!key) return <View key={`empty-${weekIndex}-${index}`} style={s.dayCell} />;
                 const day = daysByKey.get(key)!;
                 const tone = phaseTone(day.phase?.phaseType ?? day.cycle?.phase);
                 const colors = PHASE_COLORS[tone];
@@ -234,6 +237,8 @@ function DogHeatCalendarScreenContent({ resolvedDog }: { resolvedDog: import('@/
                   </TouchableOpacity>
                 );
               })}
+              </View>
+              ))}
             </View>
 
             <View style={s.legend}>
@@ -359,9 +364,9 @@ const s = StyleSheet.create({
   todayButton: { marginLeft: 'auto', paddingHorizontal: 4, paddingVertical: 7 },
   todayText: { color: C.trackPrimary, fontSize: 11, fontWeight: '800' },
   weekdays: { flexDirection: 'row' },
-  weekday: { width: `${100 / 7}%`, textAlign: 'center', color: C.trackTextMut, fontWeight: '800', fontSize: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayCell: { width: `${100 / 7}%`, height: 48, alignItems: 'center', paddingTop: 6, position: 'relative', borderRadius: 7 },
+  weekday: { flex: 1, textAlign: 'center', color: C.trackTextMut, fontWeight: '800', fontSize: 10 },
+  weekRow: { flexDirection: 'row' },
+  dayCell: { flex: 1, height: 48, alignItems: 'center', paddingTop: 6, position: 'relative', borderRadius: 7 },
   dayCellData: { backgroundColor: 'rgba(255,255,255,0.018)' },
   dayCellToday: { backgroundColor: 'rgba(21,230,195,0.10)' },
   dayNumber: { zIndex: 1, fontSize: 12, color: C.trackTextSec, fontWeight: '700' },
