@@ -1,5 +1,51 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53 nach OTA #154, #155, #156 – 2026-11-17
+
+Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt die Angaben «Aktiv» in den
+Abschnitten darunter. Alle Release-Karten bis #156 stehen nach Gerätetest der Nutzerin auf
+«Veröffentlicht»; im Board ist keine Nachkontrolle offen.
+
+**Wichtig: Android Build 53 ist in der Play-Produktion für Kunden** (laut Nutzerin, 17.11.2026,
+von ihr selbst in der Play Console freigegeben). Damit erreichen alle Android-OTAs auf Runtime
+`1.0.8-sdk58-android-v1` Kunden; die OTAs #145, #148 und #154 wurden irrtümlich als «nur
+interner Test-Track» eingestuft. Testweg für Android-OTAs ab jetzt wie für Kunden wählen.
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `53bca350` (aktive Production `fb127898` plus main `f15bc94c`), Group
+  `c8205897-7829-4f9d-b1d2-649084758179`. Karte #156: eigene Fährte im Gruppentraining (PR #151).
+- Davor: Karte #155, Source `fb127898`, Group `e1ab0893-b43e-4560-80bb-f5d00c672601`:
+  Gruppentraining Stufe 4a erstmals auf iOS (PR #139), Heimzonen-Abfrage beim Teilen (#140),
+  gelegte Linie nur bei selbst gelegter Fährte (#153, Issue #146 Variante B), Heimzonen-Text (#147).
+- **App Store:** Build 60 (1.0.8) ist zur Prüfung eingereicht, **Freigabe automatisch**. Nach der
+  Freigabe durch Apple erreicht der jeweils aktive OTA-Stand Kunden ab dem zweiten Start.
+- **Release-Quelle:** `release/ios60-main-f15bc94c-20261117`. Jede weitere iOS-60-OTA muss
+  `53bca350` enthalten.
+
+**Android Build 53** (1.0.8, versionCode 53, Runtime `1.0.8-sdk58-android-v1`, Play-Produktion)
+- **Aktiv:** Source `14a93bc6` (aktive Production `ae61b2eb` plus main `f15bc94c`), Group
+  `baf968e5-cfde-4f4e-a830-d52c1229dec5`. Karte #156.
+- Davor: Karte #154, Source `ae61b2eb`, Group `650aef16-dee3-49c2-842d-b7921dc132ec` (#153, #147).
+- **Release-Quelle:** `release/android53-main-f15bc94c-20261117`. Jede weitere OTA auf dieser
+  Runtime muss `14a93bc6` enthalten.
+- Android-OTAs: kein npm-Kurzskript; Production-Wrapper direkt mit Plattform android aufrufen.
+- Android 1.0.5 (49), Runtime `1.0.5-gnss-v1`, Group `6b52516b`: unverändert.
+
+**Datenbank (laut Nutzerin in Production ausgeführt, vom MASTER nicht geprüft):** Gruppentraining
+Stufe 2a, 2b, 3, 4a, `20261116230000_training_group_own_track` (#150),
+`20261116233000_training_group_eval_laid_line` (#146).
+
+**Offene Punkte**
+- Android: Push ohne FCM (#141, neuer nativer Build nötig), «Standort teilen» erster Versuch (#142),
+  Kartenstift-Farbe (#143). #141 und #142 betreffen jetzt Kunden.
+- «Mit Trainer teilen», Export und «Fährten gemeinsam» geben eine übernommene Gruppenfährte samt
+  gelegter Linie der Leger:in weiter (nicht Teil von #146; eigener Entscheid offen).
+- Eigene Gruppenfährte: Ein-Hund-Fall und normal fortgesetzte eigene Fährte lassen einen Eintrag auf
+  «wird gelegt» stehen (siehe Karte #156).
+- Einstiege «Gruppentraining» / «Fährten gemeinsam» zusammenführen (#144).
+- PR #152 (Variante A zu #146) ist auf Entscheid der Nutzerin zu schliessen; das Schliessen hat der
+  Release-Guard dem MASTER gesperrt.
+
 ## Stand Android Build 53 nach OTA #145 und #148 – 2026-11-16 (Nacht)
 
 Aktueller Production-Stand **Android Build 53** (1.0.8, versionCode 53, Runtime
