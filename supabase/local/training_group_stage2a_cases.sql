@@ -92,8 +92,10 @@ select pg_temp.ok('layer assigns a blind track to Luna',
   from (select pg_temp.t('assign','{"sessionId":"30000000-0000-4000-8000-000000000001","trackId":"50000000-0000-4000-8000-000000000001","handlerParticipationId":"40000000-0000-4000-8000-0000000000b1","blind":true}')->'track' x) q));
 select pg_temp.ok('assign is idempotent',
  pg_temp.t('assign','{"sessionId":"30000000-0000-4000-8000-000000000001","trackId":"50000000-0000-4000-8000-000000000001","handlerParticipationId":"40000000-0000-4000-8000-0000000000b1","blind":true}')->'track'->>'trackId' = '50000000-0000-4000-8000-000000000001');
-select pg_temp.fails('layer cannot assign to own dog','GROUP_UNAVAILABLE',
- $q$select pg_temp.t('assign','{"sessionId":"30000000-0000-4000-8000-000000000001","trackId":"50000000-0000-4000-8000-000000000002","handlerParticipationId":"30000000-0000-4000-8000-000000000001","blind":false}')$q$);
+-- Issue #150 (20261116230000_training_group_own_track.sql): die eigene Fährte ist erlaubt, aber nie «blind».
+-- Die erlaubten Fälle stehen in training_group_own_track_cases.sql.
+select pg_temp.fails('layer cannot assign a blind track to own dog','GROUP_INVALID_REQUEST',
+ $q$select pg_temp.t('assign','{"sessionId":"30000000-0000-4000-8000-000000000001","trackId":"50000000-0000-4000-8000-000000000002","handlerParticipationId":"30000000-0000-4000-8000-000000000001","blind":true}')$q$);
 select pg_temp.as_user('d4444444-4444-4444-8444-444444444444');
 select pg_temp.fails('outsider cannot list tracks','GROUP_UNAVAILABLE',
  $q$select pg_temp.t('list','{"sessionId":"30000000-0000-4000-8000-000000000001"}')$q$);

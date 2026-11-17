@@ -16,15 +16,15 @@ import { resolveTrackOverlayColorKey, trackOverlayColor } from '@/features/track
 import { useGroupLiveShare } from '@/features/tracking-exchange/live/LiveShareProvider';
 import { GroupApiError, type GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import { canManageGroup, type GroupParticipant, type GroupSession, type GroupSessionSummary, type TrainingGroup } from '@/features/tracking-exchange/groups/groupModels';
-import { formatDuration, GROUP_TRACK_HANDOVER_READY, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
+import { formatDuration, GROUP_TRACK_HANDOVER_READY, isOwnGroupTrack, lyingMs, type GroupTrack } from '@/features/tracking-exchange/groups/trackService';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
 import { GroupTracksMap, type CourseView } from './GroupTracksMap';
 import { WhoSeesWhatSheet } from './WhoSeesWhatSheet';
 import { useGroupLivePositions } from '@/features/tracking-exchange/live/useGroupLivePositions';
 import { isLiveShareReleaseReady } from '@/features/tracking-exchange/live/releaseGate';
-import { findImportedGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
+import { findLocalGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
 
-type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[] };
+type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean };
 
 export function dogColor(dogId: string, colorKey: string | null): string {
   return colorKey && /^#[\da-f]{6}$/i.test(colorKey) ? colorKey : trackOverlayColor(resolveTrackOverlayColorKey(dogId, colorKey));
@@ -64,12 +64,16 @@ export default function GroupSessionScreen() {
     try {
       for (const track of list) {
         if (track.handlerUserId !== uid || (track.status !== 'lying' && track.status !== 'searching')) continue;
-        let local = await findImportedGroupTrack(uid, track.trackId);
-        if (!local) {
+        // Eigene Fährte (Issue #150): liegt schon als normale Fährte auf dem Gerät, nie importieren.
+        const ownTrack = isOwnGroupTrack(track);
+        let local = await findLocalGroupTrack(uid, track);
+        if (!local && !ownTrack) {
           const fetched = await tracks.fetch(track.trackId).catch(() => null);
           if (fetched) local = await importGroupTrack(uid, fetched.track, fetched.reference).catch(() => null);
         }
         if (local?.searched && track.status === 'searching') await tracks.searched(track.trackId).catch(() => null);
+        // Eigene Fährte über den gewohnten Fährten-Bildschirm abgesucht: beide Schritte nachreichen.
+        if (ownTrack && local?.searched && track.status === 'lying') await tracks.searchStart(track.trackId).then(() => tracks.searched(track.trackId)).catch(() => null);
       }
     } finally { preparing.current = false; }
   }, [services.tracks]);
@@ -107,10 +111,10 @@ export default function GroupSessionScreen() {
       }
       // Ohne Netz gelegte Fährten nachreichen, bevor die Liste gelesen wird.
       if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId);
-      const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs };
+      const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs, ownTracks: true };
       const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;
-      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover });
+      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover, ownTracks: trackList.ownTracks !== false });
       if (services.userId) { void prepareHandlerTracks(services.userId, trackList.tracks); void loadCourses(services.userId, trackList.tracks); }
       setError(null);
     } catch (e) {
@@ -153,6 +157,10 @@ export default function GroupSessionScreen() {
   const freeDogs = dogs.filter(d => !ownDogIds.has(d.id));
   const others = participants.filter(p => p.userId !== userId);
   const errorKey = groupErrorText(error);
+  // Eigene Fährte (Issue #150): gewählt ist eine eigene Teilnahme. Server ohne die Migration: nicht anbieten.
+  const ownSupported = data?.ownTracks !== false;
+  const ownChoice = mine.find(p => p.participationId === handlerParticipation) ?? null;
+  const closeAssign = () => { setAssigning(false); setHandlerParticipation(null); setBlind(false); };
 
   const toggleDog = (dogId: string) => setSelectedDogs(prev => prev.includes(dogId) ? prev.filter(x => x !== dogId) : [...prev, dogId]);
   const joinDogs = () => {
@@ -185,14 +193,26 @@ export default function GroupSessionScreen() {
   const assign = () => {
     const tracks = services.tracks;
     if (!tracks || !handlerParticipation) return;
-    const layerDog = mine[0]?.dogId;
-    if (!layerDog) return;
-    const assigned: { trackId: string | null } = { trackId: null };
-    void run('assign', async () => { assigned.trackId = (await tracks.assign(sessionId, handlerParticipation, blind)).trackId; }, () => {
-      setAssigning(false); setHandlerParticipation(null); setBlind(false);
-      // Gewohnter Recorder; nach dem Stoppen geht die Fährte an die Hundeführerin.
-      if (assigned.trackId) router.push({ pathname: '/track/legen', params: { dogId: layerDog, groupTrackId: assigned.trackId, groupId, groupSessionId: sessionId } } as never);
-    });
+    // Eigene Fährte: Aufzeichnung für den gewählten eigenen Hund, nie blind.
+    const layerDog = ownChoice?.dogId ?? mine[0]?.dogId;
+    if (!layerDog || busy) return;
+    const own = !!ownChoice;
+    setBusy('assign'); setError(null);
+    void (async () => {
+      try {
+        const trackId = (await tracks.assign(sessionId, handlerParticipation, own ? false : blind)).trackId;
+        closeAssign();
+        // Gewohnter Recorder; nach dem Stoppen geht die Fährte an die Hundeführerin. Eigene Fährte:
+        // sie bleibt die eigene, normale Fährte, nur ihre Fläche wird im Gruppentraining eingetragen.
+        router.push({ pathname: '/track/legen', params: { dogId: layerDog, groupTrackId: trackId, groupId, groupSessionId: sessionId, ...(own ? { groupOwn: '1' } : {}) } } as never);
+        await load(true);
+      } catch (e) {
+        const code = groupErrorCode(e);
+        // Server ohne die Migration lehnt die eigene Teilnahme ab: verständlich sagen, nichts ist verloren.
+        if (own && (code === 'GROUP_UNAVAILABLE' || code === 'GROUP_INVALID_REQUEST')) Alert.alert(t('groups.ownTrackTitle'), t('groups.ownUnavailable'));
+        else setError(code);
+      } finally { setBusy(null); }
+    })();
   };
 
   const pendingHandover = new Set(data?.pendingHandover ?? []);
@@ -202,7 +222,7 @@ export default function GroupSessionScreen() {
     if (track.status === 'laying') {
       void listPendingHandovers(userId ?? '').then(list => {
         const entry = list.find(e => e.trackId === track.trackId);
-        if (entry) router.push({ pathname: '/groups/handover', params: { trackId: entry.trackId, localId: entry.localId, groupId, sessionId } } as never);
+        if (entry) router.push({ pathname: '/groups/handover', params: { trackId: entry.trackId, localId: entry.localId, groupId, sessionId, ...(entry.own ? { own: '1' } : {}) } } as never);
       });
       return;
     }
@@ -211,11 +231,13 @@ export default function GroupSessionScreen() {
   const trackTitle = (track: GroupTrack) => {
     const handler = byParticipation.get(track.handlerParticipationId);
     const dog = handler?.dogName ?? '—';
+    if (isOwnGroupTrack(track)) return track.layerUserId === userId ? t('groups.trackOwn', { dog }) : t('groups.trackOwnOther', { name: memberName(track.layerUserId), dog });
     if (track.handlerUserId === userId) return t('groups.trackForYou', { dog });
     if (track.layerUserId === userId) return t('groups.trackFor', { name: memberName(track.handlerUserId), dog });
     return t('groups.trackOther', { layer: memberName(track.layerUserId), name: memberName(track.handlerUserId), dog });
   };
   const trackSub = (track: GroupTrack) => {
+    if (isOwnGroupTrack(track)) return track.layerUserId === userId ? t('groups.trackOwnTag') : `${t('groups.trackOwnTag')} · ${t('groups.trackAreaOnly')}`;
     const parts = [track.layerUserId === userId ? t('groups.trackByYou') : track.handlerUserId === userId ? t('groups.trackBy', { name: memberName(track.layerUserId) }) : t('groups.trackAreaOnly')];
     if (track.blind && (track.layerUserId === userId || track.handlerUserId === userId)) parts.push(t('groups.blind'));
     return parts.join(' · ');
@@ -234,7 +256,8 @@ export default function GroupSessionScreen() {
   const mineTrack = (tr: GroupTrack) => tr.layerUserId === userId || tr.handlerUserId === userId;
   // Blind und noch nicht abgesucht: für die Hundeführerin weder Linie noch Fläche, nur der Start.
   const blindForMe = (tr: GroupTrack) => tr.handlerUserId === userId && tr.blind && tr.status !== 'searched';
-  const areas = visibleTracks.flatMap(tr => tr.area && tr.status !== 'revoked' && !mineTrack(tr)
+  // Fläche: fremde Fährten und die eigene Fährte (so sieht man, was die Gruppe davon sieht).
+  const areas = visibleTracks.flatMap(tr => tr.area && tr.status !== 'revoked' && (!mineTrack(tr) || isOwnGroupTrack(tr))
     ? [{ trackId: tr.trackId, area: tr.area, color: trackColor(tr) }] : []);
   const courseViews: CourseView[] = visibleTracks.flatMap(tr => mineTrack(tr) && tr.status !== 'revoked' && courses[tr.trackId]
     ? [{ trackId: tr.trackId, points: courses[tr.trackId], color: trackColor(tr), startOnly: blindForMe(tr) }] : []);
@@ -256,6 +279,18 @@ export default function GroupSessionScreen() {
     const names = recipients.map(uid => memberName(uid));
     void live.startNamed({ shareId: Crypto.randomUUID(), userId, sessionId, dogId, recipientIds: recipients, durationMs: 2 * 60 * 60 * 1000 }, names)
       .then(ok => { if (!ok) Alert.alert(t('groups.shareLocation'), t('groups.shareFailed')); });
+  };
+
+  const choiceRow = (p: GroupParticipant, label: string) => {
+    const on = handlerParticipation === p.participationId;
+    return (
+      <TouchableOpacity key={p.participationId} style={cs.row} accessibilityRole="radio" accessibilityState={{ selected: on }}
+        onPress={() => setHandlerParticipation(p.participationId)}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dogColor(p.dogId, p.colorKey) }} />
+        <Text style={[cs.rowTitle, { flex: 1 }]}>{label}</Text>
+        <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={on ? C.trackPrimary : C.trackTextMut} />
+      </TouchableOpacity>
+    );
   };
 
   const dogChoice = (list: { id: string; name: string; track_overlay_color_key?: string | null }[]) => list.length === 0
@@ -304,6 +339,7 @@ export default function GroupSessionScreen() {
               {visibleTracks.map((track, index) => {
                 const st = status(track);
                 const own = track.layerUserId === userId && (track.status === 'laying' || track.status === 'lying');
+                const ownTrack = isOwnGroupTrack(track);
                 return (
                   <View key={track.trackId}>
                     {index > 0 ? <View style={cs.divider} /> : null}
@@ -319,10 +355,12 @@ export default function GroupSessionScreen() {
                     </TouchableOpacity>
                     {own && active ? (
                       <View style={[cs.actions, { marginTop: 0, marginBottom: 6 }]}>
-                        <TouchableOpacity style={cs.textButton} accessibilityRole="button" disabled={!!busy}
-                          onPress={() => { const tracks = services.tracks; if (tracks) void run(`blind-${track.trackId}`, () => tracks.setBlind(track.trackId, !track.blind)); }}>
-                          <Text style={cs.textButtonLabel}>{t(track.blind ? 'groups.blindOff' : 'groups.blindOn')}</Text>
-                        </TouchableOpacity>
+                        {ownTrack ? null : (
+                          <TouchableOpacity style={cs.textButton} accessibilityRole="button" disabled={!!busy}
+                            onPress={() => { const tracks = services.tracks; if (tracks) void run(`blind-${track.trackId}`, () => tracks.setBlind(track.trackId, !track.blind)); }}>
+                            <Text style={cs.textButtonLabel}>{t(track.blind ? 'groups.blindOff' : 'groups.blindOn')}</Text>
+                          </TouchableOpacity>
+                        )}
                         <TouchableOpacity style={cs.textButton} accessibilityRole="button" disabled={!!busy}
                           onPress={() => confirm(t('groups.cancelTrack'), t('groups.confirmCancelTrack'), () => { const tracks = services.tracks; if (tracks) void run(`cancel-${track.trackId}`, () => tracks.cancel(track.trackId)); })}>
                           <Text style={cs.dangerLabel}>{t('groups.cancelTrack')}</Text>
@@ -338,37 +376,33 @@ export default function GroupSessionScreen() {
           {joined && active && assigning && (
             <AnyvoCard>
               <Text style={cs.section}>{t('groups.layForWho')}</Text>
-              {others.length === 0 ? <Text style={cs.body}>{t('groups.noTracks')}</Text> : null}
-              {others.map(p => {
-                const on = handlerParticipation === p.participationId;
-                return (
-                  <TouchableOpacity key={p.participationId} style={cs.row} accessibilityRole="radio" accessibilityState={{ selected: on }}
-                    onPress={() => setHandlerParticipation(p.participationId)}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dogColor(p.dogId, p.colorKey) }} />
-                    <Text style={[cs.rowTitle, { flex: 1 }]}>{p.displayName} · {p.dogName}</Text>
-                    <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={on ? C.trackPrimary : C.trackTextMut} />
-                  </TouchableOpacity>
-                );
-              })}
-              <View style={[cs.row, { alignItems: 'flex-start' }]}>
-                <View style={cs.rowText}>
-                  <Text style={cs.rowTitle}>{t('groups.blindTitle')}</Text>
-                  <Text style={cs.rowSub}>{t('groups.blindHint')}</Text>
+              <Text style={[cs.hint, { marginTop: 4 }]} accessibilityRole="header">{t('groups.layForMe')}</Text>
+              {ownSupported ? mine.map(p => choiceRow(p, p.dogName)) : <Text style={cs.body}>{t('groups.ownSoon')}</Text>}
+              <Text style={[cs.hint, { marginTop: 10 }]} accessibilityRole="header">{t('groups.layForOthers')}</Text>
+              {others.length === 0 ? <Text style={cs.body}>{t('groups.noOthers')}</Text> : null}
+              {others.map(p => choiceRow(p, `${p.displayName} · ${p.dogName}`))}
+              {ownChoice ? null : (
+                <View style={[cs.row, { alignItems: 'flex-start' }]}>
+                  <View style={cs.rowText}>
+                    <Text style={cs.rowTitle}>{t('groups.blindTitle')}</Text>
+                    <Text style={cs.rowSub}>{t('groups.blindHint')}</Text>
+                  </View>
+                  <Switch value={blind} onValueChange={setBlind} accessibilityLabel={t('groups.blindTitle')}
+                    trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
                 </View>
-                <Switch value={blind} onValueChange={setBlind} accessibilityLabel={t('groups.blindTitle')}
-                  trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
-              </View>
+              )}
               <Text style={cs.hint}>{t('groups.lyingHint')}</Text>
               <Text style={[cs.hint, { marginTop: 4 }]}>{t('groups.areaHint')}</Text>
+              <Text style={[cs.hint, { marginTop: 4 }]}>{t('groups.ownHint')}</Text>
               <View style={cs.actions}>
-                <AnyvoButton style={cs.flex} label={t('groups.cancel')} variant="ghost" onPress={() => setAssigning(false)} />
+                <AnyvoButton style={cs.flex} label={t('groups.cancel')} variant="ghost" onPress={closeAssign} />
                 <AnyvoButton style={cs.flex} label={t('groups.layStart')} loading={busy === 'assign'} disabled={!handlerParticipation || !!busy} onPress={assign} />
               </View>
             </AnyvoCard>
           )}
 
           {joined && active && !assigning && (GROUP_TRACK_HANDOVER_READY
-            ? <AnyvoButton label={t('groups.layFor')} icon="git-commit-outline" disabled={!!busy || others.length === 0} onPress={() => setAssigning(true)} />
+            ? <AnyvoButton label={t('groups.layFor')} icon="git-commit-outline" disabled={!!busy || (others.length === 0 && !ownSupported)} onPress={() => setAssigning(true)} />
             : <Text style={[cs.hint, { textAlign: 'center' }]}>{t('groups.layForSoon')}</Text>)}
 
           {joined && (
