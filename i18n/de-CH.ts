@@ -241,6 +241,10 @@ export const deCH = {
   'common.modalBody': 'Dies ist ein Modal-Screen.',
   'common.appErrorTitle': 'Etwas ist schiefgelaufen',
   'common.appErrorBody': 'Die App hatte einen kurzen Aussetzer. Versuch es nochmal.',
+  'updates.startTitle': 'ANYVO wird aktualisiert …',
+  'updates.startBody': 'Die neue Version wird geladen. Dauert höchstens 8 Sekunden, deine Daten bleiben erhalten.',
+  'updates.readyTitle': 'Update bereit.',
+  'updates.readyBody': 'Es wird beim nächsten Öffnen von ANYVO aktiv.',
 
   // Profil / Konto
   'profile.title':          'Profil',

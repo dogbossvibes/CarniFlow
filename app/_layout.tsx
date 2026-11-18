@@ -26,6 +26,7 @@ import { RestingLiveActivitySync } from '@/features/tracking/components/RestingL
 import { LiveShareProvider } from '@/features/tracking-exchange/live/LiveShareProvider';
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
+import { OtaStartGate } from '@/components/OtaStartGate';
 import { useT } from '@/i18n';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
@@ -66,6 +67,8 @@ const eb = StyleSheet.create({
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+    {/* Kaltstart: neue OTA sofort statt erst beim nächsten Start (nie während einer Aufnahme). */}
+    <OtaStartGate>
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
       <DiagnosticsAccessSync />
@@ -116,6 +119,7 @@ export default function RootLayout() {
       <AppLockGate />
     </SessionProvider>
     </QueryClientProvider>
+    </OtaStartGate>
     </GestureHandlerRootView>
   );
 }
