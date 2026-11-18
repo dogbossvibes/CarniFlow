@@ -33,19 +33,26 @@
 //      Fensterlänge). Stand-Zittern summiert Pfadlänge ohne Fortschritt.
 //
 // GRENZEN (bewusst): Schenkel unter 12 m und die letzten 12 m vor dem Ende
-// deckt dieser Pfad nicht ab — dort bleibt es beim bisherigen Verhalten. Die
-// Schärfe („spitz") wird hier nie behauptet; ausserhalb des Normalbands wird
-// die Ecke als normale Ecke mit `sharpness: 'unresolved'` gespeichert. Motion
-// fliesst nicht ein: bei langsamem Gehen ist der Scheitel-Zeitpunkt nur auf
+// deckt dieser Pfad nicht ab — dort bleibt es beim bisherigen Verhalten.
+//
+// SCHÄRFE (T-211): „spitz" wird nur behauptet, wenn JEDE gültige Schenkellänge
+// (mindestens 8 m und 12 m) für sich einen Innenwinkel im Spitz-Band misst und
+// die Positionsunsicherheit die kürzeste Schenkellänge nicht klar übersteigt
+// (gleiche Grenze wie im Regelpfad, SHARPNESS_MAX_RATIO). Das ist derselbe
+// Konsens-Gedanke wie `spitzConsensus`, nur über lange statt kurze Fenster —
+// lange Schenkel lösen den Winkel besser auf als die 2–8-m-Fenster des
+// Regelpfads. Sonst bleibt die Ecke ausserhalb des Normalbands eine normale
+// Ecke mit `sharpness: 'unresolved'`. Motion fliesst nicht ein: bei langsamem Gehen ist der Scheitel-Zeitpunkt nur auf
 // viele Sekunden genau bekannt, ein ±1-s-Motion-Fenster wäre Zufall.
 //
 // Reine Funktion, kein React/Native.
 // ──────────────────────────────────────────────────────────────────────────
 import { calculateDistance, calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import {
-  robustBearing, normalizeDeg, clamp01, ACCEPT_SCORE, NORMAL_MIN, NORMAL_MAX,
+  robustBearing, normalizeDeg, clamp01, ACCEPT_SCORE, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
   type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
+import { SHARPNESS_MAX_RATIO } from '@/features/tracking/utils/turnGeometryQuality';
 
 /** Schenkellängen (m), aufsteigend. Die ersten LONG_BASELINE_REQUIRED sind Pflicht. */
 export const LONG_BASELINES_M = [8, 12, 16] as const;
@@ -98,7 +105,11 @@ export interface LongBaselineHit {
   /** Mittel der Drehung über alle gültigen Schenkellängen (vorzeichenbehaftet). */
   headingDeltaDeg: number;
   interiorAngleDeg: number;
-  sharpness: 'normal' | 'unresolved';
+  sharpness: 'normal' | 'spitz' | 'unresolved';
+  /** Grösster Innenwinkel über alle gültigen Schenkellängen (Grad) — Beleg für „spitz". */
+  maxInteriorDeg: number;
+  /** Median-Accuracy im längsten Fensterpaar ÷ kürzeste Schenkellänge; null = keine Accuracy. */
+  accuracyToLegRatio: number | null;
   confidence: number;
   /** Gültige Schenkellängen (m), aufsteigend. */
   baselinesM: number[];
@@ -187,12 +198,27 @@ export function evaluateLongBaselineCorner(points: readonly ShortLegPoint[], ape
   );
   if (confidence < ACCEPT_SCORE) return null;
 
+  // Schärfe: jede Schenkellänge muss für sich im Spitz-Band liegen, und die
+  // Geometrie muss den Winkel auflösen können (Accuracy ÷ kürzeste Schenkellänge).
+  const maxInteriorDeg = 180 - minMag;
+  const accs: number[] = [];
+  for (let k = before.endIndex; k <= after.endIndex; k++) {
+    const a = points[k].accuracy;
+    if (a != null && Number.isFinite(a)) accs.push(a);
+  }
+  accs.sort((x, y) => x - y);
+  const accuracyToLegRatio = accs.length ? accs[Math.floor(accs.length / 2)] / baselinesM[0] : null;
+  const spitz = maxInteriorDeg <= SPITZ_MAX && 180 - maxMag >= SPITZ_MIN
+    && (accuracyToLegRatio == null || accuracyToLegRatio <= SHARPNESS_MAX_RATIO);
+
   return {
     apexIndex,
     direction: sign > 0 ? 'rechts' : 'links',
     headingDeltaDeg: magnitude * sign,
     interiorAngleDeg: interior,
-    sharpness: interior >= NORMAL_MIN && interior <= NORMAL_MAX ? 'normal' : 'unresolved',
+    sharpness: interior >= NORMAL_MIN && interior <= NORMAL_MAX ? 'normal' : spitz ? 'spitz' : 'unresolved',
+    maxInteriorDeg: Math.round(maxInteriorDeg * 10) / 10,
+    accuracyToLegRatio: accuracyToLegRatio == null ? null : Math.round(accuracyToLegRatio * 100) / 100,
     confidence, baselinesM, disagreementDeg, before, after,
   };
 }

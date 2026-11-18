@@ -34,7 +34,8 @@
 //      verrauschten, langsam gelaufenen Spuren praktisch jedes Fenster
 //      verwirft, wird die Richtung über lange Schenkel (8/12/16 m) gemessen —
 //      mit eigenen, strengeren Gates (siehe longBaselineCorner.ts). Die
-//      Fenster des Regelpfads werden dafür NICHT gelockert.
+//      Fenster des Regelpfads werden dafür NICHT gelockert. „spitz" gilt dort
+//      nur bei Konsens ALLER Schenkellängen und auflösbarer Geometrie (T-211).
 //   3. IMU-ONLY-Ereignisse (gerichtete Drehung ohne GPS-Ecke) werden nur
 //      PROTOKOLLIERT (`imuOnly`), nie persistiert: ohne GPS-Beleg ist ein
 //      Motion-Ereignis von Handy-Drehen im Gehen nicht zu unterscheiden
@@ -581,9 +582,10 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       const d = byApex.get(h.apexIndex);
       if (!d) continue;
       longBaseline++;
-      corners.push({ kind: h.direction, apexIndex: h.apexIndex, atM });
+      const longKind = kindFor(h.direction, h.sharpness === 'spitz' ? 'spitz' : 'normal');
+      corners.push({ kind: longKind, apexIndex: h.apexIndex, atM });
       Object.assign(d, {
-        rejectReason: null, classification: h.direction, confidence: Math.round(h.confidence * 1000) / 1000,
+        rejectReason: null, classification: longKind, confidence: Math.round(h.confidence * 1000) / 1000,
         confidenceBeforeMotion: Math.round(h.confidence * 1000) / 1000, motionAdjustment: 0,
         headingDeltaDeg: Math.round(h.headingDeltaDeg * 10) / 10, interiorAngleDeg: Math.round(h.interiorAngleDeg * 10) / 10,
         bearingBefore: Math.round(h.before.bearingDeg * 10) / 10, bearingAfter: Math.round(h.after.bearingDeg * 10) / 10,
@@ -592,6 +594,8 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
         fitResidualBeforeM: Math.round(h.before.residualM * 100) / 100, fitResidualAfterM: Math.round(h.after.residualM * 100) / 100,
         chosenScaleM: h.baselinesM[h.baselinesM.length - 1],
         direction: h.direction, sharpness: h.sharpness, sharpnessDemoted: false,
+        sharpnessConsensusPairs: h.baselinesM.length, sharpnessMaxInteriorDeg: h.maxInteriorDeg,
+        accuracyToLegRatio: h.accuracyToLegRatio,
         fusionSource: 'gps_long_baseline' as const,
       });
       const t = turnFromDiag(d, atM, null);

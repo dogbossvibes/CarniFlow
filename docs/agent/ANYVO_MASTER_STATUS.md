@@ -1,5 +1,55 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #163, #165, #167, #168, #170 – 2026-11-17 (Abend)
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #170. Ersetzt die Angaben
+«Aktiv» in den Abschnitten darunter. Heute fünf weitere Chargen auf beiden Plattformen live;
+Release-Karten #163, #165, #167, #168 stehen auf «Live – Nachkontrolle offen», #170 nach
+Gerätetest der Nutzerin auf «Veröffentlicht».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `aa671f74` (aktive Production `0cd591e7` plus main `43485d20`), Group
+  `54fba149-b328-46f3-b709-9b0d8db29d90`. Karte #170.
+- **App Store:** Build 60 (1.0.8) weiterhin in Prüfung, Freigabe automatisch.
+- **Release-Quelle:** `release/ios60-main-43485d20-20261117`. Jede weitere iOS-60-OTA muss
+  `aa671f74` enthalten.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `4a8751a1` (aktive Production `4068e2f5` plus main `43485d20`), Group
+  `c2774223-cbd9-40c9-9083-0ebd5ce47871`. Karte #170.
+- **Build 53** (versionCode 53) ist in der Play-Produktion; alle OTAs auf dieser Runtime erreichen Kunden.
+- **Build 54** (versionCode 54, EAS-Build `83691722-41ec-455d-80fb-7e7b32e39dab`, Profil production,
+  Source `58dd232e` = aktive Production `90ab2c70` plus PR #159 FCM): an den internen Test-Track
+  übermittelt; die Nutzerin gibt ihn in der Play Console weiter. Gleiche Runtime wie Build 53,
+  bekommt also dieselben OTAs. Push über FCM (#141) wirkt erst mit Build 54.
+- **Release-Quelle:** `release/android53-main-43485d20-20261117`. Jede weitere OTA auf dieser
+  Runtime muss `4a8751a1` enthalten.
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen heute (nach #156), je beide Plattformen**
+
+| Karte | Inhalt | Android Group | iOS Group | Testweg / Board |
+|---|---|---|---|---|
+| #163 | Kalender: Datum und Wochentag deckungsgleich (PR #157) | `966d4e69` | `54b38909` | Nachher, Nachkontrolle offen |
+| #165 | «Standort teilen» beim ersten Einschalten (PR #162, Issue #142) | `14e14da7` | `5492df96` | Nachher, Nachkontrolle offen |
+| #167 | Fremd gelegte Gruppenfährte nur mit Absuche weitergeben (PR #164, #166; JS-Teil von #159) | `ce5617a7` | `a44bb9bd` | Nachher, Nachkontrolle offen |
+| #168 | Tagesdatum für Trainingseinheiten lokal statt UTC (PR #160) | `15c66ab8` | `b6f2e26a` | Nachher (ohne Test vorher, Entscheid Nutzerin), Nachkontrolle offen |
+| #170 | Fährten-Tag, Wochenstatistik und Ansichten lokal statt UTC (PR #169) | `c2774223` | `54fba149` | Vorher (Android-Emulator, Staging), Gerätetest bestanden, Veröffentlicht |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Datenbank:** keine neue Voraussetzung. #167 nutzt die bestehende Migration
+`20261116200000_track_share_home_zone_copy` (laut Nutzerin am 16.11.2026 bestätigt).
+
+**Offene Punkte**
+- Gerätenachkontrolle #163, #165, #167, #168 (Checklisten in den Karten).
+- Build 54 in der Play Console weitergeben; danach Push auf Android-Gerät prüfen, dann #141 schliessen.
+- Issue #161 (Fährten-Tagesdatum) ist mit PR #169 / Karte #170 umgesetzt und kann geschlossen werden.
+- Hinweis H2 aus #167 (Heimzone, fehlgeschlagener Nachtrag): Folgekorrektur empfohlen.
+- Bestehende Einträge mit UTC-Vortag (Einheiten, Fährten) werden nicht automatisch korrigiert.
+- PR #171 (Fährten-Übersicht aufräumen) offen, nicht Teil dieser Chargen.
+- #143 Kartenstift-Farbe und #144 Einstiege zusammenführen (Mockup zuerst) unverändert offen.
+
 ## Stand iOS 60 und Android Build 53 nach OTA #154, #155, #156 – 2026-11-17
 
 Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt die Angaben «Aktiv» in den

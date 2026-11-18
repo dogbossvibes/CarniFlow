@@ -1,5 +1,20 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #163, #165, #167, #168, #170 – 2026-11-17 (Abend)
+
+**Erledigt:** Fünf OTA-Chargen auf iOS 60 und Android 53/54 live: Kalender-Raster (#163, PR #157),
+«Standort teilen» beim ersten Einschalten (#165, PR #162), fremd gelegte Gruppenfährte nur mit
+Absuche (#167, PR #164/#166), Trainings-Tagesdatum lokal (#168, PR #160), Fährten-Tagesdatum lokal
+(#170, PR #169). Android Build 54 (FCM-Push, PR #159) gebaut und an den internen Test-Track
+übermittelt. Karte #170 nach Gerätetest auf Veröffentlicht. PR #152 geschlossen, Issue #142 erledigt.
+
+**Offen:**
+- **Gerätenachkontrolle:** #163, #165, #167, #168.
+- **Android Build 54:** in der Play Console weitergeben, Push auf dem Gerät prüfen, dann #141 schliessen.
+- **Issue #161** schliessen (umgesetzt mit #169).
+- **App Store:** Antwort von Apple auf Build 60 (1.0.8) abwarten; Freigabe ist automatisch.
+- Folgekorrektur H2 aus #167; PR #171 offen; #143, #144 unverändert.
+
 ## Stand nach OTA #154, #155, #156 – 2026-11-17
 
 **Erledigt:** Android-OTA #154 (#153, #147), iOS-60-OTA #155 (Stufe 4a, #140, #153, #147) und

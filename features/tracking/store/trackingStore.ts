@@ -79,6 +79,8 @@ export interface MarkerSample {
 
 interface TrackingState {
   annotateAngleGeometry: (entries: unknown) => void;
+  /** Stuft einen normalen Winkel-Marker auf spitz hoch (T-211); true = geändert. Andere Marker bleiben unberührt. */
+  upgradeAngleKind: (markerId: string, kind: AngleKind) => boolean;
   currentSessionId:    string | null;
   dogId:               string | null;   // Besitzer der aktiven Fährte (bestehende dogs.id) — Schlüssel des Puffers
   isRecording:         boolean;
@@ -149,6 +151,7 @@ interface TrackingState {
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
   noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; unobservedProgressM?: number; unobservedObjectIds?: string[]; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
+  noteSearchManualBreaks: (breaks: SearchRunBreak[]) => void;  // T-213: Taste «Fährtenverlust», sofort persistiert
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
   noteSearchAutoDwell: (objectKey: string) => void;
   dismissSearchAutoDwell: (objectKey: string) => void;
@@ -277,6 +280,13 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
   annotateAngleGeometry: (entries) => { set(s => ({ markers: attachSpecialGeometry(s.markers, entries) })); persist(get); },
   addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
+  upgradeAngleKind: (markerId, kind) => {
+    const from = kind === 'spitz_links' ? 'links' : kind === 'spitz_rechts' ? 'rechts' : null;
+    if (!from || !get().markers.some(m => m.id === markerId && m.type === 'winkel' && m.angleKind === from)) return false;
+    set(s => ({ markers: s.markers.map(m => m.id === markerId && m.type === 'winkel' && m.angleKind === from ? { ...m, angleKind: kind } : m) }));
+    persist(get);
+    return true;
+  },
   addSegment: (segment) => { set(s => ({ segments: [...s.segments, segment] })); persistNow(get); },
   updateSegment: (id, patch) => {
     set(s => ({ segments: s.segments.map(seg => seg.id === id ? { ...seg, ...patch, updatedAt: Date.now() } : seg) }));
@@ -361,6 +371,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
       breaks: p.breaks,
     } }));
     persist(get);
+  },
+  noteSearchManualBreaks: (breaks) => {
+    set(s => ({ searchRunState: { ...s.searchRunState, breaks } }));
+    persistNow(get);
   },
   noteSearchObjectFound: (key) => {
     if (get().searchRunState.foundObjectIds.includes(key)) return;

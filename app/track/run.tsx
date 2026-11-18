@@ -1598,6 +1598,17 @@ export default function TrackRunScreen() {
             <Ionicons name="flag" size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
+          {/* T-213: Fährtenverlust des Hundes melden / wieder auf der Fährte (das Handy sieht den Hund nicht). */}
+          <Pressable
+            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            style={arming ? { opacity: 0.45 } : s.manualLossActive ? { borderColor: FT.warn, backgroundColor: 'rgba(255,181,71,0.16)' } : undefined}
+            onPress={() => { hapticTap(); s.toggleManualLoss(); }} disabled={arming}
+            accessibilityRole="button" accessibilityState={{ selected: s.manualLossActive }}
+            accessibilityLabel={t(s.manualLossActive ? 'track.lossEndA11y' : 'track.lossStartA11y')}
+          >
+            <Ionicons name={s.manualLossActive ? 'checkmark-circle' : 'help-buoy'} size={20} color={s.manualLossActive ? FT.warn : FT.text} />
+            <Text className="text-[10.5px] font-extrabold text-ft-text" numberOfLines={1} adjustsFontSizeToFit>{t(s.manualLossActive ? 'track.lossEnd' : 'track.lossStart')}</Text>
+          </Pressable>
           <HoldToStopButton
             onStop={handleFinish}
             disabled={finishing || arming}
