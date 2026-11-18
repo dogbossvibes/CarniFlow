@@ -1,5 +1,21 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #186 und #187 – 2026-11-18 (Nachmittag)
+
+**Erledigt:** OTA-Startprüfung beim Kaltstart (#186, PR #178) auf iOS 60 und Android 53/54 live.
+Fährten-Winkelerkennung (#187, PR #179 + #182) nur auf iOS 60 live. PR #188 («Fährten gemeinsam»
+ins Gruppentraining) gemergt, noch nicht ausgeliefert. Production am 18.11. frisch aus EAS bestätigt.
+
+**Offen:**
+- **Gerätenachkontrolle:** #186, #187, dazu #176, #180, #163, #165, #167, #168.
+- **PR #188** ausliefern: eigene OTA nach Freigabe (Android: mit oder ohne #179/#182 entscheiden).
+- **PR #184, #185** mergen (Nutzerin); #183 überholt, schliessen.
+- **Folgeideen:** Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit (#178).
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen.
+- **Issue #7** (P0, ACTIVE-Abo) offen: Stand klären.
+- **OTA-Verzeichnis** (`ota-ledger.json`, Stand 07.11.) vor dem nächsten nativen Build auffrischen.
+- Folgekorrektur H2 aus #167; #143, #144 unverändert.
+
 ## Stand nach OTA #176 und #180 – 2026-11-18
 
 **Erledigt:** Zwei OTA-Chargen auf iOS 60 und Android 53/54 live: Fährten-Übersicht aufgeräumt

@@ -279,7 +279,9 @@ describe('Dry-Run (Preflight) und Quellen', () => {
     ]);
   });
   it('12b. Doku: Master-Status ist nur Snapshot, EAS ist die Live-Quelle; Multi-Dog ist NICHT Production', () => {
-    const ms = readFileSync('docs/agent/ANYVO_MASTER_STATUS.md', 'utf8');
+    // Abschnitte bis 31.10.2026 liegen seit 18.11.2026 unverändert in der Archivdatei.
+    const ms = readFileSync('docs/agent/ANYVO_MASTER_STATUS.md', 'utf8')
+      + readFileSync('docs/agent/ANYVO_MASTER_STATUS_ARCHIV_2026-10.md', 'utf8');
     expect(ms).toContain('**EAS is the only binding source for what is live right now.**');
     expect(ms).toContain('must **never** be used on its own as a release source');
     expect(ms).toContain('| Production HEAD (iOS) | `34e618519b2da670fc5e7efd4ec43e08afc4ed53` |');

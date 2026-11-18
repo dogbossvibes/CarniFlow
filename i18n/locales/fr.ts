@@ -2715,6 +2715,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "groups.ended": "Terminé",
   "groups.you": "toi",
   "groups.joinWithCode": "Rejoindre avec un code",
+  "groups.openTrackFile": "Ouvrir un fichier de piste reçu",
+  "groups.openTrackFileHint": "Enregistrez d’abord le fichier dans Fichiers ou Téléchargements, puis sélectionnez-le ici.",
   "groups.create": "Créer un groupe",
   "groups.createTitle": "Nom du groupe",
   "groups.createTitlePlaceholder": "p. ex. Groupe de pistage du samedi",

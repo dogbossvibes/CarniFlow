@@ -2694,6 +2694,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "groups.ended": "Ended",
   "groups.you": "you",
   "groups.joinWithCode": "Join with a code",
+  "groups.openTrackFile": "Open received track file",
+  "groups.openTrackFileHint": "Save the file to Files or Downloads first, then select it here.",
   "groups.create": "Create group",
   "groups.createTitle": "Group name",
   "groups.createTitlePlaceholder": "e.g. Saturday tracking group",

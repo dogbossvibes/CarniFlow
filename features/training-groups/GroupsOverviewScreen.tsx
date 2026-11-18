@@ -136,6 +136,11 @@ export default function GroupsOverviewScreen() {
             <AnyvoButton label={t('groups.joinWithCode')} icon="enter-outline" variant="secondary"
               onPress={() => router.push('/groups/join' as never)} />
 
+            {/* Empfangene Fährten-Datei öffnen (vorher Karte «Fährten gemeinsam» in der Fährten-Übersicht). */}
+            <AnyvoButton label={t('groups.openTrackFile')} icon="document-outline" variant="secondary"
+              onPress={() => router.push('/track/share' as never)} />
+            <Text style={cs.hint}>{t('groups.openTrackFileHint')}</Text>
+
             <AnyvoCard>
               {!creating ? (
                 <AnyvoButton label={t('groups.create')} icon="add" variant="secondary" onPress={() => setCreating(true)} />
