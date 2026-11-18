@@ -2741,6 +2741,8 @@ export const deCH = {
   "groups.ended": "Beendet",
   "groups.you": "du",
   "groups.joinWithCode": "Mit Code beitreten",
+  "groups.openTrackFile": "Empfangene Fährten-Datei öffnen",
+  "groups.openTrackFileHint": "Datei zuerst unter «Dateien» bzw. «Downloads» speichern, dann hier auswählen.",
   "groups.create": "Gruppe erstellen",
   "groups.createTitle": "Name der Gruppe",
   "groups.createTitlePlaceholder": "z. B. Fährtengruppe Samstag",
