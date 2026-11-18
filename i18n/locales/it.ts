@@ -2694,6 +2694,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "groups.ended": "Terminato",
   "groups.you": "tu",
   "groups.joinWithCode": "Unisciti con un codice",
+  "groups.openTrackFile": "Apri file di pista ricevuto",
+  "groups.openTrackFileHint": "Salva prima il file in File o Download, poi selezionalo qui.",
   "groups.create": "Crea gruppo",
   "groups.createTitle": "Nome del gruppo",
   "groups.createTitlePlaceholder": "ad es. Gruppo pista sabato",

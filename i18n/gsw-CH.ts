@@ -2702,6 +2702,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "groups.ended": "Beendet",
   "groups.you": "du",
   "groups.joinWithCode": "Mit Code biiträte",
+  "groups.openTrackFile": "Empfangeni Fährte-Datei öffne",
+  "groups.openTrackFileHint": "Datei zersch under «Dateien» bzw. «Downloads» speichere, denn do uswähle.",
   "groups.create": "Gruppe erstelle",
   "groups.createTitle": "Name vo de Gruppe",
   "groups.createTitlePlaceholder": "z. B. Fährtegruppe Samschtig",
