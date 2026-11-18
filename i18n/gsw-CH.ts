@@ -219,6 +219,10 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'common.modalBody':'Das isch en Modal-Screen.',
   'common.appErrorTitle': 'Öppis isch schiefgloffe',
   'common.appErrorBody': 'D App het en churze Ussetzer gha. Versuech es nomal.',
+  'updates.startTitle': 'ANYVO wird aktualisiert …',
+  'updates.startBody': 'Di nöi Version wird glade. Duuret höchstens 8 Sekunde, dini Date bliibed erhalte.',
+  'updates.readyTitle': 'Update parat.',
+  'updates.readyBody': 'Es wird bim nächschte Öffne vo ANYVO aktiv.',
 
   // Profil / Konto
   'profile.title':          'Profil',
