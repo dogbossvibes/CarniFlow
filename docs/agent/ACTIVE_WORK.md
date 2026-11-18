@@ -1,5 +1,19 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #176 und #180 – 2026-11-18
+
+**Erledigt:** Zwei OTA-Chargen auf iOS 60 und Android 53/54 live: Fährten-Übersicht aufgeräumt
+(#176, PR #171) sowie Spitzwinkel-Hochstufung und Taste «Fährtenverlust» (#180, PR #175 und #177,
+Testweg Vorher im Android-Emulator auf Staging). Staging-Constraint für Winkelarten mit Freigabe
+der Nutzerin erweitert. PR #178 (OTA-Startprüfung) erstellt.
+
+**Offen:**
+- **Gerätenachkontrolle:** #176, #180, dazu #163, #165, #167, #168.
+- **PR #179** (Geradeaus-Sperre) gemergt, nicht ausgeliefert: eigene Charge nach iOS-Feldtest.
+- **PR #178** mergen (Nutzerin), danach eigene OTA.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen; Issue #161 schliessen.
+- Folgekorrektur H2 aus #167; #143, #144 unverändert.
+
 ## Stand nach OTA #163, #165, #167, #168, #170 – 2026-11-17 (Abend)
 
 **Erledigt:** Fünf OTA-Chargen auf iOS 60 und Android 53/54 live: Kalender-Raster (#163, PR #157),

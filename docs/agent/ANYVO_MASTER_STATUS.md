@@ -1,5 +1,55 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #176 und #180 – 2026-11-18
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #180. Ersetzt die Angaben
+«Aktiv» in den Abschnitten darunter. Heute zwei Chargen auf beiden Plattformen live; Karten #176
+und #180 stehen auf «Live – Nachkontrolle offen».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `e4ac8b76` (aktive Production `f555f15b` plus main `0fcad296`), Group
+  `41021491-629f-4783-9662-00c7ecc4cfc6`. Karte #180.
+- **App Store:** Build 60 (1.0.8) ist für Kunden verfügbar (Nutzerin sah am 18.11. die App-Store-Version).
+  Nach Neuinstallation zeigt die App zuerst den eingebetteten Stand von Build 60; die aktuelle OTA
+  greift erst beim zweiten Start. Abhilfe: PR #178 (OTA-Startprüfung), offen.
+- **Release-Quelle:** `release/ios60-main-0fcad296-20261118`. Jede weitere iOS-60-OTA muss
+  `e4ac8b76` enthalten.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `7b8681a8` (aktive Production `9ecd8b66` plus main `0fcad296`), Group
+  `78a7a39d-db9d-46e6-8508-b873b628f3be`. Karte #180.
+- Build 53 in der Play-Produktion, Build 54 im internen Test-Track (unverändert seit 17.11.).
+- **Release-Quelle:** `release/android53-main-0fcad296-20261118`. Jede weitere OTA auf dieser
+  Runtime muss `7b8681a8` enthalten.
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen heute, je beide Plattformen**
+
+| Karte | Inhalt | Android Group | iOS Group | Testweg / Board |
+|---|---|---|---|---|
+| #176 | Fährten-Übersicht aufgeräumt (PR #171) | `eaef9f21` | `d8767895` | Nachher (Android-Emulator vorher), Nachkontrolle offen |
+| #180 | Spitzwinkel-Hochstufung (PR #175, T-212) + Taste «Fährtenverlust» (PR #177, T-213) | `78a7a39d` | `41021491` | Vorher (Android-Emulator, Staging), Nachkontrolle offen |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Datenbank**
+- Production: `track_markers_angle_kind_check` erlaubt `spitz_links`/`spitz_rechts` (Nutzerin hat am
+  18.11. lesend geprüft).
+- Staging: Constraint war noch alt und lehnte Spitzwinkel beim Sync ab. Mit Freigabe der Nutzerin
+  nur den angle_kind-Teil der Migration `20260913220000_track_markers_contract` angewendet (reine
+  Erweiterung, keine Datenänderung). Der Material-Teil ist auf Staging nicht anwendbar: dort gibt es
+  2 Gegenstände mit Material `filz`, das die Migrationsdatei nicht mehr zulässt.
+
+**Offene Punkte**
+- Gerätenachkontrolle #176 und #180 (Checklisten in den Karten), dazu weiterhin #163, #165, #167, #168.
+- PR #179 (T-214, Geradeaus-Sperre, nur iOS wirksam) ist gemergt, aber bewusst nicht ausgeliefert:
+  eigene Charge nach iOS-Feldtest (Handy in der Hand und in der Tasche).
+- PR #178 (OTA-Startprüfung beim Kaltstart) offen; Merge entscheidet die Nutzerin, danach eigene OTA.
+- Auswertung zeigt Abrisse (auch automatische) nicht mit Dauer an; vorbestehend, Folgeidee.
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen; Issue #161 kann geschlossen werden.
+- Prüfskript-Hinweis: `check-ota-coverage.mjs` kann im Hintergrund hängen, wenn stdin offen bleibt;
+  mit `< /dev/null` aufrufen.
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #163, #165, #167, #168, #170 – 2026-11-17 (Abend)
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #170. Ersetzt die Angaben
