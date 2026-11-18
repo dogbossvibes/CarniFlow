@@ -9,6 +9,7 @@ import {
 } from '../../engine/layProcessingSession';
 import { MotionEvidenceBuffer, type MotionWindowSample } from '../../utils/motionTurnEvidence';
 import type { AngleKind, MarkerSample } from '../../store/trackingStore';
+import type { FusedTurn } from '../../utils/turnFusion';
 import type { SimFix } from './gpsModel';
 
 export const LAT0 = 47.3, LNG0 = 8.5;
@@ -19,7 +20,11 @@ export const toLatLng = (x: number, y: number) => ({ latitude: LAT0 + y / M_LAT,
 export const toLocal = (lat: number, lng: number) => ({ x: (lng - LNG0) * M_LNG, y: (lat - LAT0) * M_LAT });
 
 export interface RecordedPoint { x: number; y: number; tMs: number; accuracy: number | null }
-export interface RecordedCorner { kind: AngleKind; x: number; y: number; atM: number; committedAtMs: number }
+export interface RecordedCorner {
+  kind: AngleKind; x: number; y: number; atM: number; committedAtMs: number;
+  /** Fusions-Diagnose der Engine im Moment der Meldung (Quelle, Geometrie, Confidence) — nur für die Ursachenanalyse. */
+  fused: FusedTurn | null;
+}
 /** Manuell gesetzter Gegenstand: Position = Live-Punkt der App im Moment des Antippens (wie addMarker). */
 export interface RecordedObject { index: number; x: number; y: number; accuracy: number | null; atM: number; tMs: number }
 
@@ -66,7 +71,7 @@ export function runLay(input: LayRunInput): LayRunResult {
   const t0 = input.t0Ms ?? SIM_T0_MS;
   let clock = t0;
   const result: LayRunResult = { line: [], corners: [], objects: [], distanceM: 0, fixesTotal: 0, rejects: {}, anchor: null, anchorReleasedAtMs: null, fixComputeMaxMs: 0, fixComputeTotalMs: 0 };
-  const markers: { marker: MarkerSample; at: number }[] = [];
+  const markers: { marker: MarkerSample; at: number; fused: FusedTurn | null }[] = [];
   let puck: { x: number; y: number; accuracy: number | null } | null = null;
   const taps = [...(input.objectTapsMs ?? [])].sort((a, b) => a - b);
   const state: LayStoreFacade = {
@@ -84,7 +89,7 @@ export function runLay(input: LayRunInput): LayRunResult {
     localSessionId: { current: 'sim' },
     ptBuffer,
     flushPoints: async () => { ptBuffer.current = []; },
-    commitMarker: async marker => { markers.push({ marker, at: clock }); },
+    commitMarker: async (marker, qa) => { markers.push({ marker, at: clock, fused: qa?.apexIndex != null ? session.liveTurnsRef.current.get(qa.apexIndex) ?? null : null }); },
     // Nachträgliche Spitz-Hochstufung (T-211): wie im Store nur normal → spitz desselben Markers.
     upgradeAngleKind: (markerId, kind) => { const hit = markers.find(m => m.marker.id === markerId); if (hit) hit.marker = { ...hit.marker, angleKind: kind }; },
     onAngleRef: { current: undefined },
@@ -141,9 +146,9 @@ export function runLay(input: LayRunInput): LayRunResult {
 
   const anchor = session.startAnchorRef.current;
   result.anchor = anchor ? toLocal(anchor.lat, anchor.lng) : null;
-  for (const { marker, at } of markers) {
+  for (const { marker, at, fused } of markers) {
     if (marker.type !== 'winkel' || !marker.angleKind || marker.lat == null || marker.lng == null) continue;
-    result.corners.push({ kind: marker.angleKind, ...toLocal(marker.lat, marker.lng), atM: marker.distance_from_start ?? 0, committedAtMs: at });
+    result.corners.push({ kind: marker.angleKind, ...toLocal(marker.lat, marker.lng), atM: marker.distance_from_start ?? 0, committedAtMs: at, fused });
   }
   return result;
 }
