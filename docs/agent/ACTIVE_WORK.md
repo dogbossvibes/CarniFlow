@@ -10,8 +10,12 @@ der Nutzerin erweitert. PR #178 (OTA-Startprüfung) erstellt.
 **Offen:**
 - **Gerätenachkontrolle:** #176, #180, dazu #163, #165, #167, #168.
 - **PR #179** (Geradeaus-Sperre) gemergt, nicht ausgeliefert: eigene Charge nach iOS-Feldtest.
-- **PR #178** mergen (Nutzerin), danach eigene OTA.
-- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen; Issue #161 schliessen.
+- **PR #178** (OTA-Startprüfung) gemergt, Auslieferung nicht dokumentiert: eigene OTA nach Freigabe.
+- **PR #182** (T-215, Winkel bei schlechtem GPS) gemergt, Auslieferung nicht dokumentiert: Testweg
+  und Charge festlegen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen.
+- **Issue #7** (P0, ACTIVE-Abo) auf GitHub weiterhin offen: Stand klären.
+- **OTA-Verzeichnis** (`ota-ledger.json`, Stand 07.11.) vor dem nächsten nativen Build auffrischen.
 - Folgekorrektur H2 aus #167; #143, #144 unverändert.
 
 ## Stand nach OTA #163, #165, #167, #168, #170 – 2026-11-17 (Abend)

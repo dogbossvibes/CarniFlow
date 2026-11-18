@@ -44,9 +44,19 @@ Details, Platform Update IDs und Source-Commits stehen in den Karten.
 - Gerätenachkontrolle #176 und #180 (Checklisten in den Karten), dazu weiterhin #163, #165, #167, #168.
 - PR #179 (T-214, Geradeaus-Sperre, nur iOS wirksam) ist gemergt, aber bewusst nicht ausgeliefert:
   eigene Charge nach iOS-Feldtest (Handy in der Hand und in der Tasche).
-- PR #178 (OTA-Startprüfung beim Kaltstart) offen; Merge entscheidet die Nutzerin, danach eigene OTA.
+- PR #178 (OTA-Startprüfung beim Kaltstart) ist seit 18.11. gemergt (`9e1ba92`); eine Auslieferung ist
+  nicht dokumentiert. Eigene OTA-Charge nach Freigabe der Nutzerin.
+- PR #182 (T-215, sensorverankerte Winkel bei schlechtem GPS, Geradeaus-Sperre richtungsabhängig) ist
+  seit 18.11. gemergt (`ee2f2a1`); eine Auslieferung ist nicht dokumentiert. Tracking betroffen:
+  Testweg und Charge (mit T-214 oder getrennt) sind festzulegen.
 - Auswertung zeigt Abrisse (auch automatische) nicht mit Dauer an; vorbestehend, Folgeidee.
-- Build 54 weitergeben, Push prüfen, dann #141 schliessen; Issue #161 kann geschlossen werden.
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen. Issue #161 ist seit 17.11. geschlossen.
+- Issue #7 (P0, bezahltes ACTIVE-Abo nicht freigeschaltet) ist auf GitHub weiterhin offen, letzte
+  Änderung 28.10.; aktueller Stand ist zu klären.
+- `ota-ledger.json` endet am 07.11.; vor dem nächsten nativen Build auffrischen
+  (`npm run release:refresh:ota-ledger`).
+- Nachtrag 18.11. aus einer Cloud-Sitzung im Auftrag der Nutzerin: nur Git- und GitHub-Abgleich,
+  Production-Stand dabei nicht frisch aus EAS gelesen.
 - Prüfskript-Hinweis: `check-ota-coverage.mjs` kann im Hintergrund hängen, wenn stdin offen bleibt;
   mit `< /dev/null` aufrufen.
 
