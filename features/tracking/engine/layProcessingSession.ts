@@ -20,6 +20,10 @@ import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/uti
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { pushQaCandidateLine } from '@/features/tracking/utils/qaCandidateLog';
+import {
+  evaluateStraightWalk, STRAIGHT_VETO_LOOKBACK_S, STRAIGHT_VETO_MAX_AGE_S, STRAIGHT_VETO_STICKY_M, STRAIGHT_VETO_STRONG_GPS_CONFIDENCE,
+  type StraightVetoResult,
+} from '@/features/tracking/utils/motionStraightVeto';
 import { refineCornerSharpness, sharpnessRefinementDue } from '@/features/tracking/utils/sharpnessRefinement';
 import {
   type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaSessionCapture,
@@ -116,6 +120,8 @@ export interface LayProcessingState {
   liveTurnsRef: Box<Map<number, FusedTurn>>;
   /** Als normal gemeldete Auto-Winkel, deren Schärfe noch genau einmal nachgeprüft wird (T-211). */
   pendingSharpnessRef: Box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>;
+  /** Detektor-Meter der Scheitel, die die Geradeaus-Sperre zurückgehalten hat (T-214). */
+  straightVetoAtRef: Box<number[]>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
   qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
@@ -158,6 +164,7 @@ export function createLayProcessingState(): LayProcessingState {
     angleDbgRef: box<AngleDebug>({ count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null }),
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
     pendingSharpnessRef: box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>([]),
+    straightVetoAtRef: box<number[]>([]),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
     qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
@@ -237,7 +244,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, pendingSharpnessRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, pendingSharpnessRef, straightVetoAtRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = session;
   const {
     store, localSessionId, ptBuffer, flushPoints, commitMarker, upgradeAngleKind, onAngleRef, recordingRef, qaRef,
@@ -255,6 +262,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     detectPointsRef.current = []; detectEmaRef.current = null; rawTailRef.current = [];
     liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
     pendingSharpnessRef.current = [];   // der Detektor-Puffer beginnt neu; über eine Lücke wird nicht nachgeprüft
+    straightVetoAtRef.current = [];
     lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
     canonDistRef.current.interrupt();
   };
@@ -366,6 +374,14 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
         );
       }
     }
+    // QA-Zeile der Geradeaus-Sperre (T-214) — bewusst ausserhalb der Commit-Schleife,
+    // damit dort weiterhin genau EINE Zeile je bestätigter Ecke steht.
+    const logStraightVeto = (apexIndex: number, kind: AngleKind, source: string, gpsConfidence: number, verdict: StraightVetoResult) => {
+      if (!qaRef.current) return;
+      pushQaCandidateLine(
+        `VETO geradeaus idx=${apexIndex} ${kind} src=${source} conf=${gpsConfidence.toFixed(2)} ` +
+        `maxYaw3s=${verdict.maxWindowYawDeg ?? '—'}° netYaw=${verdict.netYawDeg ?? '—'}° → nicht gemeldet`);
+    };
     for (const c of corners) {
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
       const fused = turns.find(t => t.apexIndex === c.apexIndex) ?? null;
@@ -377,6 +393,30 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       // kann sich mit neuen Fixen verschieben. Innerhalb ihres Sperrabstands zur
       // zuletzt gemeldeten Ecke ist sie dieselbe Ecke — nie ein zweiter Marker.
       if (fused?.source === 'gps_long_baseline' && c.atM - lastCornerAtRef.current < LONG_BASELINE_EXCLUSION_M) continue;
+      // ── Geradeaus-Sperre (T-214) ──────────────────────────────────────────
+      // Schwach belegter GPS-Winkel, während der Bewegungssensor lückenlos
+      // «gegangen, aber nicht gedreht» zeigt → nicht melden. Wirkt nur
+      // zurückhaltend; ohne belastbare Sensordaten gilt die Erkennung wie bisher.
+      // Long-Baseline-Ecken werden zu spät bestätigt, um im Ringpuffer zu liegen.
+      if (motionActiveRef.current && fused?.source !== 'gps_long_baseline') {
+        const dg = diagnostics.find(x => x.apexIndex === c.apexIndex) ?? null;
+        const gpsConfidence = fused?.confidenceBeforeMotion ?? dg?.confidenceBeforeMotion ?? fused?.confidence ?? dg?.confidence ?? 0;
+        if (gpsConfidence < STRAIGHT_VETO_STRONG_GPS_CONFIDENCE) {
+          const apexT = detectPointsRef.current[c.apexIndex]?.t ?? null;
+          const nowMs = Date.now();
+          const fresh = apexT != null && nowMs - apexT <= STRAIGHT_VETO_MAX_AGE_S * 1000;
+          const verdict = evaluateStraightWalk(
+            fresh ? motionBufRef.current.samplesIn(apexT - STRAIGHT_VETO_LOOKBACK_S * 1000, nowMs) : [], apexT, nowMs);
+          const known = straightVetoAtRef.current.some(m => Math.abs(m - c.atM) <= STRAIGHT_VETO_STICKY_M);
+          if (verdict.decided ? verdict.straight : known) {
+            if (!known) {
+              straightVetoAtRef.current.push(c.atM);
+              logStraightVeto(c.apexIndex, c.kind, fused?.source ?? 'gps', gpsConfidence, verdict);
+            }
+            continue;
+          }
+        }
+      }
       if (fused) liveTurnsRef.current.set(c.apexIndex, fused);
       lastCornerRescuedRef.current = fused?.source === 'gps_split_apex';
       lastCornerAtRef.current = c.atM;
