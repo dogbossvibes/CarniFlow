@@ -22,6 +22,8 @@ export interface SearchRunBreak {
   startedAtSec: number;
   recoveredAtSec?: number;
   durationSec?: number;
+  /** T-213: per Taste «Fährtenverlust» gemeldet/bestätigt. */
+  manual?: boolean;
 }
 
 export interface SearchSegmentAnnounced {
@@ -107,6 +109,7 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
           ...(typeof x.recoveredAfterM === 'number' ? { recoveredAfterM: x.recoveredAfterM } : {}),
           ...(typeof x.recoveredAtSec === 'number' ? { recoveredAtSec: x.recoveredAtSec } : {}),
           ...(typeof x.durationSec === 'number' ? { durationSec: x.durationSec } : {}),
+          ...(x.manual === true ? { manual: true } : {}),
         }];
       })
     : [];

@@ -151,6 +151,7 @@ interface TrackingState {
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
   noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; unobservedProgressM?: number; unobservedObjectIds?: string[]; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
+  noteSearchManualBreaks: (breaks: SearchRunBreak[]) => void;  // T-213: Taste «Fährtenverlust», sofort persistiert
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
   noteSearchAutoDwell: (objectKey: string) => void;
   dismissSearchAutoDwell: (objectKey: string) => void;
@@ -370,6 +371,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
       breaks: p.breaks,
     } }));
     persist(get);
+  },
+  noteSearchManualBreaks: (breaks) => {
+    set(s => ({ searchRunState: { ...s.searchRunState, breaks } }));
+    persistNow(get);
   },
   noteSearchObjectFound: (key) => {
     if (get().searchRunState.foundObjectIds.includes(key)) return;

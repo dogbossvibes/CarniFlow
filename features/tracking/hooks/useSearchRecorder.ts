@@ -95,6 +95,10 @@ export type Break = {
   // meanSec/maxSec ein (siehe trackAnalytics.computeReacquisitionStats).
   recoveredAtSec?: number;
   durationSec?: number;
+  // T-213: vom Hundeführer per Taste «Fährtenverlust» gemeldet (oder bestätigt). Ein
+  // manueller Abriss endet nur durch erneutes Antippen, nie durch die automatische
+  // Entwarnung — das Handy ist beim Hundeführer und sieht den Hund nicht.
+  manual?: boolean;
 };
 
 const toRad = (d: number) => (d * Math.PI) / 180;
@@ -203,6 +207,10 @@ export interface SearchRecorder {
   flushRawCapture: () => Promise<import('../storage/gpsCapture').GpsCaptureSnapshot | null>;
   setPaused: (p: boolean) => void;
   markObject: () => void;
+  /** T-213: true, solange ein per Taste gemeldeter Fährtenverlust offen ist. */
+  manualLossActive: boolean;
+  /** T-213: Fährtenverlust des Hundes melden (1. Antippen) bzw. «wieder auf der Fährte» (2. Antippen). */
+  toggleManualLoss: () => void;
   dismissAutoObject: (id: string) => void;
   confirmEnd: () => void;
 }
@@ -346,6 +354,8 @@ export function useSearchRecorder(opts: {
   // T-208: Wechsel-Kandidat, der noch durch eine weitere Messung bestätigt werden muss.
   const reacquirePendingRef = useRef<{ firstArcM: number; arcM: number; count: number } | null>(null);
   const breaksRef = useRef<Break[]>([]);
+  const manualLossRef = useRef(false);
+  const [manualLossActive, setManualLossActive] = useState(false);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
   // Anker-Recovery (Root-Cause-Fix, siehe searchFix.ts ANCHOR_RESET_*): die
@@ -1024,7 +1034,8 @@ export function useSearchRecorder(opts: {
         }
       } else if (assessment.transition === 'recovered') {
         const lastBreak = breaksRef.current[breaksRef.current.length - 1];
-        if (lastBreak && lastBreak.recoveredAtSec == null) {
+        // T-213: einen manuell gemeldeten Fährtenverlust beendet nur die Taste.
+        if (lastBreak && lastBreak.recoveredAtSec == null && !lastBreak.manual) {
           lastBreak.recoveredAfterM = Math.round(distRef.current);
           const recoveredAtSec = (now - startMsRef.current) / 1000;
           lastBreak.recoveredAtSec = recoveredAtSec;
@@ -1303,6 +1314,12 @@ export function useSearchRecorder(opts: {
     lastReliableCursorMRef.current = null;
     lastReliableAtSecRef.current = null;
     breaksRef.current = rs ? rs.breaks.map(b => ({ ...b, at: { ...b.at } })) : [];
+    {
+      // T-213: ein beim Abbruch offener manueller Fährtenverlust bleibt nach dem Fortsetzen offen.
+      const lastBreak = breaksRef.current[breaksRef.current.length - 1];
+      manualLossRef.current = !!lastBreak && lastBreak.manual === true && lastBreak.recoveredAtSec == null;
+      setManualLossActive(manualLossRef.current);
+    }
     offTrackWarningSinceRef.current = null;
     offTrackReliableRef.current = false;
     offTrackRef.current = { ...initialOffTrack(), state: rs?.offTrackState ?? 'on_track' };
@@ -1477,6 +1494,36 @@ export function useSearchRecorder(opts: {
     }
   }, [laidObjects, pushSnapshot]);
 
+  // T-213: Taste «Fährtenverlust». Das Handy ist beim Hundeführer; den Verlust des HUNDES
+  // kann nur der Mensch melden. 1. Antippen öffnet einen Abriss (oder übernimmt einen gerade
+  // offenen automatischen), 2. Antippen schliesst ihn mit Dauer und Strecke. Nutzt dieselbe
+  // Abriss-Liste wie die automatische Erkennung → gleiche Auswertung, keine zweite Datenstruktur.
+  const toggleManualLoss = useCallback(() => {
+    if (!recordingRef.current) return;
+    const nowSec = Math.max(0, (Date.now() - startMsRef.current) / 1000);
+    const lastBreak = breaksRef.current[breaksRef.current.length - 1];
+    if (!manualLossRef.current) {
+      if (lastBreak && lastBreak.recoveredAtSec == null) lastBreak.manual = true;
+      else {
+        const at = smoothRef.current ?? pointsRef.current[pointsRef.current.length - 1];
+        if (!at) return;   // noch keine Position → nichts zu verorten
+        breaksRef.current.push({ at: { latitude: at.latitude, longitude: at.longitude }, t: Math.floor(nowSec), startedAtSec: nowSec, manual: true });
+      }
+      manualLossRef.current = true;
+    } else {
+      if (lastBreak && lastBreak.manual && lastBreak.recoveredAtSec == null) {
+        lastBreak.recoveredAfterM = Math.round(distRef.current);
+        lastBreak.recoveredAtSec = nowSec;
+        lastBreak.durationSec = Math.round(Math.max(0, nowSec - lastBreak.startedAtSec) * 10) / 10;
+      }
+      manualLossRef.current = false;
+    }
+    setManualLossActive(manualLossRef.current);
+    // Sofort in den Recovery-State spiegeln (nicht erst beim nächsten Fix).
+    useTrackingStore.getState().noteSearchManualBreaks(breaksRef.current.slice());
+    pushSnapshot();
+  }, [pushSnapshot]);
+
   const dismissAutoObject = useCallback((id: string) => {
     if (!autoDwellIdsRef.current.has(id)) return;
     const i = laidObjects.findIndex((o, index) => searchObjectKey(o, index) === id);
@@ -1522,6 +1569,6 @@ export function useSearchRecorder(opts: {
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, flushRawCapture, setPaused, markObject, dismissAutoObject, confirmEnd,
+    start, stop, flushRawCapture, setPaused, markObject, manualLossActive, toggleManualLoss, dismissAutoObject, confirmEnd,
   };
 }
