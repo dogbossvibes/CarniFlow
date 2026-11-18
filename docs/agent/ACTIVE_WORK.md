@@ -1,5 +1,20 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #190 – 2026-11-18 (Abend)
+
+**Erledigt:** PR #188 («Fährten gemeinsam» ins Gruppentraining) auf iOS 60 und Android 53/54 live
+(#190); Android hat damit auch PR #179/#182 (dort inaktiv). Nachkontrolle im iOS-Simulator und
+Android-Emulator bestanden. PR #183 geschlossen, #184, #185, #189 gemergt. Staging-Datenbank auf
+den Migrationsstand von main gebracht (Gruppentraining lädt dort wieder).
+
+**Offen:**
+- **Gerätenachkontrolle:** #190, #187, #186, #180, #176, dazu #163, #165, #167, #168.
+- **Maestro-Grundgerüst** (Aufgaben-Sitzung, nur lokal, ohne Kosten): PR abwarten.
+- **Folgeideen:** Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit (#178).
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen.
+- **Issue #7** (P0, ACTIVE-Abo) offen: Stand klären.
+- **OTA-Verzeichnis** (`ota-ledger.json`) vor dem nächsten nativen Build auffrischen.
+
 ## Stand nach OTA #186 und #187 – 2026-11-18 (Nachmittag)
 
 **Erledigt:** OTA-Startprüfung beim Kaltstart (#186, PR #178) auf iOS 60 und Android 53/54 live.
