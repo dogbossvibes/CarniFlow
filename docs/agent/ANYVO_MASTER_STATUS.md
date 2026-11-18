@@ -1,5 +1,54 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #186 und #187 – 2026-11-18 (Nachmittag)
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #187, am 18.11. erneut
+frisch aus EAS gelesen (neueste Group je Runtime: iOS `547ebf6d`, Android `e6ea4e30`). Ersetzt die
+Angaben «Aktiv» in den Abschnitten darunter. Karten #186 und #187 stehen auf
+«Live – Nachkontrolle offen».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `f899b16f` (Release-Quelle mit #186 `c862108b` plus main `ee2f2a1d`), Group
+  `547ebf6d-6735-48d7-afb4-ce08eccfdf3d`. Karte #187.
+- **Release-Quelle:** `release/ios60-main-ee2f2a1d-20261118`. Jede weitere iOS-60-OTA muss
+  `f899b16f` enthalten.
+- Die OTA-Startprüfung (PR #178) ist ab #186 enthalten; sie wirkt ab dem zweiten Start nach dieser OTA.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `d62a842c` (`7b8681a8` plus PR #178), Group
+  `e6ea4e30-1e66-4724-a0f8-91f3e16ec431`. Karte #186.
+- **Release-Quelle:** `release/android53-pr178-922fd6d4-20261118`. Jede weitere OTA auf dieser
+  Runtime muss `d62a842c` enthalten.
+- PR #179 und #182 (Winkelerkennung) sind auf Android **nicht** ausgeliefert (Nutzerentscheid:
+  Android nur, wenn ohnehin fällig).
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen am Nachmittag**
+
+| Karte | Inhalt | Ziele | Android Group | iOS Group | Testweg / Board |
+|---|---|---|---|---|---|
+| #186 | OTA-Startprüfung beim Kaltstart (PR #178) | iOS 60 + Android 53/54 | `e6ea4e30` | `e9d6ef25` | Nachher, Nachkontrolle offen |
+| #187 | Fährten-Winkelerkennung (PR #179 T-214 + PR #182 T-215) | nur iOS 60 | – | `547ebf6d` | Nachher (Nutzerentscheid, kein Feldtest vorher), Nachkontrolle offen |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Gemergt, nicht ausgeliefert**
+- PR #188: «Fährten gemeinsam» aus der Fährten-Übersicht entfernt, «Empfangene Fährten-Datei öffnen»
+  neu im Gruppentraining (main `6b7e2a80`). Eigene OTA nach Freigabe der Nutzerin; auf Android käme
+  ab main auch PR #179/#182 mit, sofern nicht getrennt.
+
+**Offene Punkte**
+- Gerätenachkontrolle #186 und #187 (iPhone-Testliste der Nutzerin in #187), dazu weiterhin #176,
+  #180, #163, #165, #167, #168.
+- Folgeideen aus den Reviews: neue Bewegungs-Refs beim Aufnahmestart zurücksetzen (PR #182);
+  optionales Zeitlimit für `reloadAsync` und Android-AppState beim ersten Rendern prüfen (PR #178).
+- Offene PRs: #184 (Prüfskript `status:check`) und #185 (MASTER_STATUS-Archiv), Merge durch die
+  Nutzerin. #183 ist überholt und wird geschlossen; die noch gültigen Punkte stehen hier.
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen. Issue #161 ist seit 17.11. geschlossen.
+- Issue #7 (P0, ACTIVE-Abo) ist auf GitHub weiterhin offen; Stand klären.
+- `ota-ledger.json` endet am 07.11.; vor dem nächsten nativen Build auffrischen
+  (`npm run release:refresh:ota-ledger`).
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #176 und #180 – 2026-11-18
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #180. Ersetzt die Angaben
