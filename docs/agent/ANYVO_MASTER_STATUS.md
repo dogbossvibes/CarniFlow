@@ -11,7 +11,8 @@ und #180 stehen auf «Live – Nachkontrolle offen».
   `41021491-629f-4783-9662-00c7ecc4cfc6`. Karte #180.
 - **App Store:** Build 60 (1.0.8) ist für Kunden verfügbar (Nutzerin sah am 18.11. die App-Store-Version).
   Nach Neuinstallation zeigt die App zuerst den eingebetteten Stand von Build 60; die aktuelle OTA
-  greift erst beim zweiten Start. Abhilfe: PR #178 (OTA-Startprüfung), offen.
+  greift erst beim zweiten Start. Abhilfe: PR #178 (OTA-Startprüfung), gemergt,
+  Auslieferung nicht dokumentiert.
 - **Release-Quelle:** `release/ios60-main-0fcad296-20261118`. Jede weitere iOS-60-OTA muss
   `e4ac8b76` enthalten.
 
