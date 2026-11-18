@@ -104,7 +104,9 @@ scenarios.push({ name: 'motionEvidence current+qa', qa: true, steps: (() => {
     if (st.k === 'fix') for (let j = 1; j <= 4; j++) {
       const t = st.t + j * 200;
       const near = (st.y > 18 && st.x < 2) || (st.x > 18 && st.y > 18);
-      out.push({ k: 'motion', t, headingDelta: near ? 18 : (j % 2 ? 0.4 : -0.4), stepDelta: j === 2 ? 1 : 0 });
+      // Beide Winkel sind Rechtswinkel → negative Drehung (positiv = links, MOTION_YAW_LEFT_SIGN). T-215: Vorzeichen
+      // an die Konvention angeglichen, seit die Geradeaus-Sperre die Drehrichtung auswertet.
+      out.push({ k: 'motion', t, headingDelta: near ? -18 : (j % 2 ? 0.4 : -0.4), stepDelta: j === 2 ? 1 : 0 });
     }
   }
   return out;

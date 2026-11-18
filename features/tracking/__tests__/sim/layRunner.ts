@@ -9,6 +9,7 @@ import {
 } from '../../engine/layProcessingSession';
 import { MotionEvidenceBuffer, type MotionWindowSample } from '../../utils/motionTurnEvidence';
 import type { AngleKind, MarkerSample } from '../../store/trackingStore';
+import type { ShortLegPoint } from '../../utils/shortLegCornerDetection';
 import type { FusedTurn } from '../../utils/turnFusion';
 import type { SimFix } from './gpsModel';
 
@@ -41,6 +42,8 @@ export interface LayRunResult {
   /** Rechenzeit der Engine je GPS-Messung auf diesem Rechner (ms) — wächst sie mit der Fährtenlänge? */
   fixComputeMaxMs: number;
   fixComputeTotalMs: number;
+  /** Detektor-Puffer der Engine am Ende des Laufs (je Abschnitt zwischen Unterbrechungen) — nur für die Ursachenanalyse. */
+  detectSections: ShortLegPoint[][];
 }
 
 export interface LayRunInput {
@@ -70,7 +73,7 @@ function startupDiagnostics(): NonNullable<LayProcessorDeps['startupRef']['curre
 export function runLay(input: LayRunInput): LayRunResult {
   const t0 = input.t0Ms ?? SIM_T0_MS;
   let clock = t0;
-  const result: LayRunResult = { line: [], corners: [], objects: [], distanceM: 0, fixesTotal: 0, rejects: {}, anchor: null, anchorReleasedAtMs: null, fixComputeMaxMs: 0, fixComputeTotalMs: 0 };
+  const result: LayRunResult = { line: [], corners: [], objects: [], distanceM: 0, fixesTotal: 0, rejects: {}, anchor: null, anchorReleasedAtMs: null, fixComputeMaxMs: 0, fixComputeTotalMs: 0, detectSections: [] };
   const markers: { marker: MarkerSample; at: number; fused: FusedTurn | null }[] = [];
   let puck: { x: number; y: number; accuracy: number | null } | null = null;
   const taps = [...(input.objectTapsMs ?? [])].sort((a, b) => a - b);
@@ -144,6 +147,7 @@ export function runLay(input: LayRunInput): LayRunResult {
     console.log = realLog;
   }
 
+  result.detectSections = [...session.completedDetectorSectionsRef.current, session.detectPointsRef.current].filter(sec => sec.length > 0);
   const anchor = session.startAnchorRef.current;
   result.anchor = anchor ? toLocal(anchor.lat, anchor.lng) : null;
   for (const { marker, at, fused } of markers) {

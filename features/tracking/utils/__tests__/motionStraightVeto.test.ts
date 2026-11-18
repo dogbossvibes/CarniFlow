@@ -37,6 +37,19 @@ describe('Geradeaus-Sperre (T-214)', () => {
     expect(evaluateStraightWalk(simulate(20, turn(90, 15, 16), HAND, 5), at(14), at(17)).straight).toBe(false);
   });
 
+  it('mit Richtung des GPS-Winkels (T-215): nur eine Drehung in dieselbe Richtung hebt die Sperre auf', () => {
+    // positive Drehrate = links
+    const left = simulate(20, turn(90, 13.5, 14.5), HAND, 3);
+    expect(evaluateStraightWalk(left, at(14), at(17), 'links').straight).toBe(false);
+    expect(evaluateStraightWalk(left, at(14), at(17), 'rechts')).toMatchObject({ decided: true, straight: true });
+    const right = simulate(20, turn(-90, 13.5, 14.5), POCKET, 3);
+    expect(evaluateStraightWalk(right, at(14), at(17), 'rechts').straight).toBe(false);
+    expect(evaluateStraightWalk(right, at(14), at(17), 'links')).toMatchObject({ decided: true, straight: true });
+    // geradeaus bleibt geradeaus, egal welche Richtung das GPS behauptet
+    const none = simulate(20, STRAIGHT, HAND, 3);
+    for (const dir of ['links', 'rechts'] as const) expect(evaluateStraightWalk(none, at(14), at(17), dir).straight).toBe(true);
+  });
+
   it('langsam gelaufener Bogen (60° über 6 s): gilt als Drehung', () => {
     expect(evaluateStraightWalk(simulate(20, turn(60, 9, 15), HAND, 7), at(14), at(17)).straight).toBe(false);
   });

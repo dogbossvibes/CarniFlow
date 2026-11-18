@@ -16,7 +16,7 @@
 //
 // Reine Funktion, kein React/Native.
 // ──────────────────────────────────────────────────────────────────────────
-import { COUPLING_DEFAULTS, TURN_EVIDENCE_DEFAULTS, type MotionWindowSample } from '@/features/tracking/utils/motionTurnEvidence';
+import { COUPLING_DEFAULTS, MOTION_YAW_LEFT_SIGN, TURN_EVIDENCE_DEFAULTS, type MotionWindowSample } from '@/features/tracking/utils/motionTurnEvidence';
 
 /** So weit vor dem GPS-Scheitel wird nach einer Drehung gesucht (s). Der Scheitel kann bei Drift mehrere Meter neben dem echten Winkel liegen. */
 export const STRAIGHT_VETO_LOOKBACK_S = 8;
@@ -51,9 +51,14 @@ const undecided = (reason: StraightVetoResult['reason']): StraightVetoResult =>
 /**
  * Prüft, ob der Bewegungssensor zwischen `apexTimeMs − Rückblick` und `nowMs`
  * eine Drehung gesehen hat. `samples` = Inhalt des Ringpuffers (zeitlich sortiert).
+ *
+ * Mit `direction` (Richtung des GPS-Winkels, T-215) zählt nur eine Drehung in
+ * DIESE Richtung als Beleg: eine Handydrehung in die Gegenrichtung hebt die
+ * Sperre nicht auf. Ohne `direction` zählt jede Drehung.
  */
 export function evaluateStraightWalk(
   samples: readonly MotionWindowSample[], apexTimeMs: number | null | undefined, nowMs: number,
+  direction?: 'links' | 'rechts',
 ): StraightVetoResult {
   if (apexTimeMs == null || !Number.isFinite(apexTimeMs) || !Number.isFinite(nowMs)) return undecided('no_samples');
   if (nowMs - apexTimeMs > STRAIGHT_VETO_MAX_AGE_S * 1000 || nowMs < apexTimeMs) return undecided('too_old');
@@ -70,12 +75,17 @@ export function evaluateStraightWalk(
   if (steps <= 0 && gait / win.length < TURN_EVIDENCE_DEFAULTS.gaitAccelMinFraction) return undecided('no_locomotion');
 
   const windowMs = STRAIGHT_VETO_WINDOW_S * 1000;
-  let net = 0, maxWindow = 0, sum = 0, lo = 0;
+  // Drehanteil in Richtung des GPS-Winkels (positiv = stützt ihn).
+  const toward = (yaw: number) => yaw * MOTION_YAW_LEFT_SIGN * (direction === 'rechts' ? -1 : 1);
+  let net = 0, maxWindow = 0, maxToward = -Infinity, sum = 0, lo = 0;
   for (let hi = 0; hi < win.length; hi++) {
     net += win[hi].headingDelta; sum += win[hi].headingDelta;
     while (win[hi].t - win[lo].t > windowMs) { sum -= win[lo].headingDelta; lo++; }
     if (Math.abs(sum) > Math.abs(maxWindow)) maxWindow = sum;
+    if (toward(sum) > maxToward) maxToward = toward(sum);
   }
-  const straight = Math.abs(maxWindow) < STRAIGHT_VETO_MAX_YAW_DEG && Math.abs(net) < STRAIGHT_VETO_MAX_YAW_DEG;
+  const straight = direction
+    ? maxToward < STRAIGHT_VETO_MAX_YAW_DEG && toward(net) < STRAIGHT_VETO_MAX_YAW_DEG
+    : Math.abs(maxWindow) < STRAIGHT_VETO_MAX_YAW_DEG && Math.abs(net) < STRAIGHT_VETO_MAX_YAW_DEG;
   return { decided: true, straight, maxWindowYawDeg: Math.round(maxWindow * 10) / 10, netYawDeg: Math.round(net * 10) / 10, reason: 'ok' };
 }

@@ -24,6 +24,9 @@ import {
   evaluateStraightWalk, STRAIGHT_VETO_LOOKBACK_S, STRAIGHT_VETO_MAX_AGE_S, STRAIGHT_VETO_STICKY_M, STRAIGHT_VETO_STRONG_GPS_CONFIDENCE,
   type StraightVetoResult,
 } from '@/features/tracking/utils/motionStraightVeto';
+import {
+  detectMotionTurnEpisodes, evaluateMotionAnchoredCorner, ANCHOR_EPISODE_MERGE_S, type MotionTurnEpisode,
+} from '@/features/tracking/utils/motionAnchoredCorner';
 import { refineCornerSharpness, sharpnessRefinementDue } from '@/features/tracking/utils/sharpnessRefinement';
 import {
   type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaSessionCapture,
@@ -122,6 +125,10 @@ export interface LayProcessingState {
   pendingSharpnessRef: Box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>;
   /** Detektor-Meter der Scheitel, die die Geradeaus-Sperre zurückgehalten hat (T-214). */
   straightVetoAtRef: Box<number[]>;
+  /** Sensorverankerte Winkel (T-215): offene Dreh-Episoden, erledigte Episoden (Zeit) und gemeldete Scheitel (Detektor-Meter). */
+  motionEpisodesRef: Box<MotionTurnEpisode[]>;
+  motionEpisodesDoneRef: Box<number[]>;
+  motionAnchoredAtRef: Box<number[]>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
   qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
@@ -165,6 +172,9 @@ export function createLayProcessingState(): LayProcessingState {
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
     pendingSharpnessRef: box<{ markerId: string; direction: 'links' | 'rechts'; atM: number }[]>([]),
     straightVetoAtRef: box<number[]>([]),
+    motionEpisodesRef: box<MotionTurnEpisode[]>([]),
+    motionEpisodesDoneRef: box<number[]>([]),
+    motionAnchoredAtRef: box<number[]>([]),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
     qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
@@ -244,7 +254,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, pendingSharpnessRef, straightVetoAtRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, pendingSharpnessRef, straightVetoAtRef, motionEpisodesRef, motionEpisodesDoneRef, motionAnchoredAtRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = session;
   const {
     store, localSessionId, ptBuffer, flushPoints, commitMarker, upgradeAngleKind, onAngleRef, recordingRef, qaRef,
@@ -263,6 +273,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
     pendingSharpnessRef.current = [];   // der Detektor-Puffer beginnt neu; über eine Lücke wird nicht nachgeprüft
     straightVetoAtRef.current = [];
+    motionEpisodesRef.current = []; motionEpisodesDoneRef.current = []; motionAnchoredAtRef.current = [];
     lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
     canonDistRef.current.interrupt();
   };
@@ -393,6 +404,9 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       // kann sich mit neuen Fixen verschieben. Innerhalb ihres Sperrabstands zur
       // zuletzt gemeldeten Ecke ist sie dieselbe Ecke — nie ein zweiter Marker.
       if (fused?.source === 'gps_long_baseline' && c.atM - lastCornerAtRef.current < LONG_BASELINE_EXCLUSION_M) continue;
+      // Ein sensorverankerter Winkel (T-215) sitzt nur auf einige Meter genau: in seinem
+      // Sperrabstand ist jeder spätere GPS-Kandidat dieselbe Ecke, nie ein zweiter Marker.
+      if (motionAnchoredAtRef.current.some(m => Math.abs(m - c.atM) < LONG_BASELINE_EXCLUSION_M)) continue;
       // ── Geradeaus-Sperre (T-214) ──────────────────────────────────────────
       // Schwach belegter GPS-Winkel, während der Bewegungssensor lückenlos
       // «gegangen, aber nicht gedreht» zeigt → nicht melden. Wirkt nur
@@ -406,7 +420,8 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
           const nowMs = Date.now();
           const fresh = apexT != null && nowMs - apexT <= STRAIGHT_VETO_MAX_AGE_S * 1000;
           const verdict = evaluateStraightWalk(
-            fresh ? motionBufRef.current.samplesIn(apexT - STRAIGHT_VETO_LOOKBACK_S * 1000, nowMs) : [], apexT, nowMs);
+            fresh ? motionBufRef.current.samplesIn(apexT - STRAIGHT_VETO_LOOKBACK_S * 1000, nowMs) : [], apexT, nowMs,
+            c.kind === 'rechts' || c.kind === 'spitz_rechts' ? 'rechts' : 'links');
           const known = straightVetoAtRef.current.some(m => Math.abs(m - c.atM) <= STRAIGHT_VETO_STICKY_M);
           if (verdict.decided ? verdict.straight : known) {
             if (!known) {
@@ -465,8 +480,61 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       onAngleRef.current?.(c.kind);
       committed.push({ kind: c.kind, atM: c.atM, apexIndex: c.apexIndex, source: fused?.source === 'gps_split_apex' ? 'auto_split_apex' : 'auto' });
     }
+    anchorMotionCorners(committed);
     refinePendingSharpness();
     return committed;
+  };
+
+  // ── Sensorverankerte Winkel (T-215) ─────────────────────────────────────
+  // Rückfall für Winkel, die das GPS am Scheitel nicht auflöst: Der Bewegungssensor
+  // liefert den Zeitpunkt der Drehung, das GPS muss sie über 16 m davor/danach in
+  // derselben Richtung bestätigen (siehe motionAnchoredCorner.ts). Gemeldet wird
+  // rund 13–16 m nach dem Winkel, immer als normaler Winkel; die Schärfe klärt die
+  // Nachprüfung (T-211).
+  const anchorMotionCorners = (committed: LayCornerEvent[]) => {
+    if (!motionActiveRef.current) return;
+    const nowMs = Date.now();
+    const mergeMs = ANCHOR_EPISODE_MERGE_S * 1000;
+    for (const ep of detectMotionTurnEpisodes(motionBufRef.current.samplesIn(-Infinity, Infinity))) {
+      if (nowMs - ep.tMs < 2000) continue;   // Drehung noch nicht abgeschlossen
+      if (motionEpisodesDoneRef.current.some(t => Math.abs(t - ep.tMs) < mergeMs)) continue;
+      if (motionEpisodesRef.current.some(p => Math.abs(p.tMs - ep.tMs) < mergeMs)) continue;
+      motionEpisodesRef.current.push(ep);
+    }
+    if (!motionEpisodesRef.current.length) return;
+    const still: MotionTurnEpisode[] = [];
+    for (const ep of motionEpisodesRef.current) {
+      const verdict = nowMs - ep.tMs > 60_000 ? null : evaluateMotionAnchoredCorner(detectPointsRef.current, ep);
+      if (verdict?.status === 'wait') { still.push(ep); continue; }
+      motionEpisodesDoneRef.current.push(ep.tMs);
+      if (verdict?.status !== 'hit') continue;
+      const { hit } = verdict;
+      // Schon gemeldet (automatisch oder manuell) oder von einer späteren Ecke überholt → kein zweiter Marker.
+      if (hit.atM - lastCornerAtRef.current < LONG_BASELINE_EXCLUSION_M) continue;
+      lastCornerAtRef.current = hit.atM;
+      lastCornerRescuedRef.current = false;
+      motionAnchoredAtRef.current.push(hit.atM);
+      const dbg = angleDbgRef.current;
+      dbg.count++; dbg.lastType = hit.direction; dbg.lastDir = hit.direction; dbg.lastReject = null;
+      const p = detectPointsRef.current[hit.apexIndex];
+      const id = `angle-${nowMs}-${hit.direction}`;
+      logMotionAnchor(hit.apexIndex, hit.direction, hit.gpsTurnDeg, hit.yawDeg);
+      if (upgradeAngleKind) pendingSharpnessRef.current.push({ markerId: id, direction: hit.direction, atM: hit.atM });
+      void commitMarker({
+        id, type: 'winkel', material: null, angleKind: hit.direction,
+        lat: p.lat, lng: p.lng, accuracy: p.accuracy,
+        distance_from_start: Math.round(hit.atM * 10) / 10,
+        note: null, audio_url: null, found: false, t: nowMs,
+      }, { source: 'auto', scale: 'detector', apexIndex: hit.apexIndex });
+      onAngleRef.current?.(hit.direction);
+      committed.push({ kind: hit.direction, atM: hit.atM, apexIndex: hit.apexIndex, source: 'auto' });
+    }
+    motionEpisodesRef.current = still;
+    motionEpisodesDoneRef.current = motionEpisodesDoneRef.current.filter(t => nowMs - t < 120_000);
+  };
+  const logMotionAnchor = (apexIndex: number, direction: 'links' | 'rechts', gpsTurnDeg: number, yawDeg: number) => {
+    if (!qaRef.current) return;
+    pushQaCandidateLine(`AUTO sensorverankert idx=${apexIndex} ${direction} gpsTurn16m=${gpsTurnDeg}° yaw3s=${yawDeg}° → accepted`);
   };
 
   // Nachträgliche Schärfe-Prüfung (T-211): je gemeldetem normalen Winkel genau EINMAL,
