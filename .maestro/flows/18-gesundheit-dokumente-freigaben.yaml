@@ -1,0 +1,17 @@
+# Gesundheitsakte: Dokumente (Formular ohne Datei-Upload) und Freigaben (Ansicht).
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- tapOn: "Dokumente"
+- tapOn: "Dokument hinzufügen"
+- assertVisible: "GESUNDHEITSKATEGORIE"
+- assertVisible: "DOKUMENTTYP"
+- tapOn: "Tierarztbericht"
+- assertVisible: ".*PDF oder Bild auswählen.*"
+- runFlow: ../common/back.yaml
+- assertVisible: "Dokumente"
+- tapOn: "Freigaben"
+- assertVisible: "NEUE FREIGABE"
+- assertVisible: "BESTEHENDE FREIGABEN"
+- assertVisible: "Kontakt hinzufügen"

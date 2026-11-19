@@ -1,0 +1,37 @@
+# Gesundheitsakte: Gewicht erfassen, Verlauf ansehen, Messung bearbeiten und wieder löschen.
+# Setzt voraus, dass der Testhund sonst keine Gewichtsmessungen hat.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Gewicht"
+      FORM: "Gewicht erfassen"
+      FIELD: "z. B. 24,5"
+      VALUE: "11.1"
+- scrollUntilVisible:
+    element: "Gewichtsverlauf ansehen"
+    direction: DOWN
+- tapOn: "Gewichtsverlauf ansehen"
+- assertVisible: "Messung vom .*11.1 kg.*"
+- assertVisible: "Gewicht eintragen"
+- assertVisible: "1 Monat"
+- tapOn: "1 Jahr"
+- tapOn: "Messung vom .*11.1 kg.*"
+- assertVisible: "Gewicht erfassen"
+- tapOn: "11.1"
+- eraseText: 6
+- inputText: "11.2"
+- runFlow: ../common/hide-keyboard.yaml
+- runFlow: ../common/dismiss-logbox.yaml
+- tapOn: "Speichern"
+- assertVisible: "Messung vom .*11.2 kg.*"
+- tapOn: "Zurück"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Gewicht"
+      ROW: "Gewicht, lange drücken zum Löschen"
+      VALUE: "11.2 kg"

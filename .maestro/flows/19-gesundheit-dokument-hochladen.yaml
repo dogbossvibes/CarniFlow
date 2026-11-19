@@ -1,0 +1,56 @@
+# Gesundheitsakte: Test-PDF über den System-Dateidialog auswählen, hochladen,
+# in der Dokumentliste wiederfinden und wieder löschen.
+# Voraussetzung: .maestro/fixtures/e2e-maestro-testdokument.pdf liegt auf dem Gerät
+# (legt `npm run test:e2e` automatisch ab, siehe docs/agent/MAESTRO.md).
+appId: com.anyvo.app
+env:
+  DOC: "e2e-maestro-testdokument"
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- tapOn: "Dokumente"
+- tapOn: "Dokument hinzufügen"
+- assertVisible: "DOKUMENTTYP"
+- tapOn: "Tierarztbericht"
+- tapOn: ".*PDF oder Bild auswählen.*"
+# System-Dateidialog (Android: «Recent», iOS: «Zuletzt benutzt»/«Durchsuchen»).
+# Android zeigt die Datei als «….pdf», iOS als Kachel «…, pdf, Zeit, Grösse» (nur die
+# Kachel ist antippbar). iOS öffnet den Dialog im leeren Tab «Verlauf»: zu «Durchsuchen» → «Auf meinem iPhone» wechseln.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Durchsuchen"
+          optional: true
+      - tapOn:
+          text: "Auf meinem iPhone"
+          optional: true
+- extendedWaitUntil:
+    visible: "${DOC}.*"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    text: "${DOC}(\\.pdf|, pdf.*)"
+- extendedWaitUntil:
+    visible: "TITEL"
+    timeout: 15000
+- assertVisible: ".*${DOC}.pdf"
+- scrollUntilVisible:
+    element: "Hochladen & speichern"
+    direction: DOWN
+- tapOn: "Hochladen & speichern"
+# Nach erfolgreichem Upload schliesst das Formular und die Liste zeigt das Dokument.
+- extendedWaitUntil:
+    notVisible: "DOKUMENTTYP"
+    timeout: 30000
+- assertNotVisible: "Noch keine Dokumente"
+- assertVisible: ".*${DOC}.*"
+# Aufräumen: nur das eben hochgeladene Testdokument löschen.
+- tapOn: ".*${DOC}.*"
+- tapOn: "Löschen"
+- tapOn:
+    text: "Löschen"
+    rightOf: "Abbrechen"
+- assertVisible: "Noch keine Dokumente"

@@ -1,0 +1,38 @@
+# Hund bearbeiten: Feld «Futter» ändern, speichern, prüfen, wieder leeren.
+appId: com.anyvo.app
+env:
+  FOOD: "E2E Maestro Futter"
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-dog.yaml
+# Der Bearbeiten-Knopf hat kein Accessibility-Label (nur Stift-Symbol).
+- tapOn: ""
+- assertVisible: "PROFIL BEARBEITEN"
+- scrollUntilVisible:
+    element: "z. B. Royal Canin"
+    direction: DOWN
+- tapOn: "z. B. Royal Canin"
+- inputText: ${FOOD}
+- runFlow: ../common/hide-keyboard.yaml
+- scrollUntilVisible:
+    element: "Änderungen speichern"
+    direction: DOWN
+- tapOn: "Änderungen speichern"
+- extendedWaitUntil:
+    visible: ".*Gesundheitsakte.*"
+    timeout: 15000
+- tapOn: ""
+- scrollUntilVisible:
+    element: ${FOOD}
+    direction: DOWN
+# Zurücksetzen, damit der Testhund unverändert bleibt.
+- tapOn: ${FOOD}
+- eraseText: 30
+- runFlow: ../common/hide-keyboard.yaml
+- scrollUntilVisible:
+    element: "Änderungen speichern"
+    direction: DOWN
+- tapOn: "Änderungen speichern"
+- extendedWaitUntil:
+    visible: ".*Gesundheitsakte.*"
+    timeout: 15000

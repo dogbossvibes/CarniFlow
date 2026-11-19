@@ -1,0 +1,10 @@
+# Vom Startbildschirm ins Profil des Testhundes (Name über DOG_NAME, Standard «Testhund»).
+appId: com.anyvo.app
+env:
+  DOG_NAME: ${DOG_NAME || 'Testhund'}
+---
+- tapOn: "(?-i)Hunde(, tab.*)?"
+- assertVisible: "Mit mir geteilt"
+- tapOn: ${DOG_NAME}
+- runFlow: dismiss-help.yaml
+- assertVisible: ".*Gesundheitsakte.*"

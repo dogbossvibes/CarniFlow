@@ -1,0 +1,26 @@
+# Gruppentraining: Übersicht, Formular «Mit Code beitreten» und Formular «Gruppe erstellen».
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-tracks.yaml
+- scrollUntilVisible:
+    element: ".*Gruppen, Einladungen per Code.*"
+    direction: DOWN
+- tapOn: ".*Gruppen, Einladungen per Code.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "Gruppentraining"
+- assertVisible: "DEINE GRUPPEN"
+- assertVisible: "Empfangene Fährten-Datei öffnen"
+- tapOn: "Mit Code beitreten"
+- assertVisible: "Gruppe beitreten"
+- assertVisible: "Einladungscode"
+- assertVisible: "Prüfen"
+- runFlow: ../common/back.yaml
+- assertVisible: "DEINE GRUPPEN"
+# Formular nur öffnen und wieder schliessen: Erstellen braucht ACTIVE und es gibt
+# keinen Aufräumweg für Testgruppen.
+- tapOn: "Gruppe erstellen"
+- assertVisible: "Name der Gruppe"
+- assertVisible: "Erstellen"
+- tapOn: "Abbrechen"
+- assertVisible: "Gruppe erstellen"

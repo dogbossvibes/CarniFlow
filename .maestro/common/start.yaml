@@ -1,0 +1,16 @@
+# Gemeinsamer Einstieg: App neu starten (Anmeldung und Daten bleiben erhalten),
+# auf den Startbildschirm warten, Dev-Hinweise wegräumen, Sprache sicherstellen.
+appId: com.anyvo.app
+---
+- launchApp:
+    stopApp: true
+    clearState: false
+- extendedWaitUntil:
+    visible: "Start(, tab.*)?"
+    timeout: 90000
+- runFlow: dismiss-logbox.yaml
+- tapOn: "Start(, tab.*)?"
+- runFlow: ensure-german.yaml
+- assertVisible: ".*Alle ansehen.*"
+# Hinweis Tab-Leiste: Maestro vergleicht ohne Gross-/Kleinschreibung, «Hunde» träfe
+# sonst auch die Kennzahl «HUNDE». Tabs deshalb mit `(?-i)` (Gross-/Kleinschreibung beachten) wählen.

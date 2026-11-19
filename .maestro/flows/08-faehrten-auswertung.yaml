@@ -1,0 +1,13 @@
+# Auswertung der letzten Fährte öffnen (setzt mindestens eine gespeicherte Fährte voraus).
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-tracks.yaml
+- tapOn: "Auswertung"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "AUSWERTUNG"
+- assertVisible: "/100"
+- scrollUntilVisible:
+    element: "BEDINGUNGEN"
+    direction: DOWN
+- assertVisible: "Logbuch"
