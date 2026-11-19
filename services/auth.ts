@@ -4,6 +4,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
 import { EMAIL_CONFIRM_REDIRECT_URL, RECOVERY_DEEP_LINK } from '@/features/auth/accountSecurity';
+import { getNativeGoogleIdToken } from '@/services/googleNativeSignIn';
 
 // Required to complete OAuth sessions on web (no-op on native)
 WebBrowser.maybeCompleteAuthSession();
@@ -147,7 +148,25 @@ async function runGoogleOAuth(): Promise<GoogleOAuthResult> {
     return { error: error ?? null };
   }
 
-  // Native (iOS / Android): use in-app WebBrowser session
+  // Native (iOS / Android): zuerst der native Google-Login (keine Supabase-Adresse
+  // im Systemdialog). Nur in Builds mit dem Modul und gesetzten Client-IDs aktiv;
+  // sonst bzw. bei einem Fehler weiter mit dem bewährten Web-Login darunter.
+  const native = await getNativeGoogleIdToken();
+  if (native.type === 'cancelled') return { error: null, cancelled: true };
+  if (native.type === 'success') {
+    const { error: idErr } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token:    native.idToken,
+    });
+    if (!idErr) return { error: null };
+    // Token abgelehnt (z. B. Client-ID oder Nonce-Einstellung im Supabase-Provider
+    // fehlt): Login nicht blockieren, sondern über den Web-Weg fortfahren.
+    console.warn('[auth] Nativer Google-Login von Supabase abgelehnt, Web-Login folgt:', idErr.message);
+  } else if (native.reason !== 'not-configured') {
+    console.warn('[auth] Nativer Google-Login nicht verfügbar, Web-Login folgt:', native.reason);
+  }
+
+  // Web-Login über in-app WebBrowser-Session (Fallback und ältere Builds)
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options:  { redirectTo, skipBrowserRedirect: true, queryParams },
