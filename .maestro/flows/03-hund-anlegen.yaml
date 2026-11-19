@@ -40,16 +40,27 @@ env:
     commands:
       - runFlow: ../common/start.yaml
       - tapOn: "(?-i)Hunde(, tab.*)?"
-      - assertVisible: ${E2E_DOG}
-      # Aufräumen: nur den eben angelegten Testhund löschen.
-      - tapOn: ${E2E_DOG}
-      - runFlow: ../common/dismiss-help.yaml
-      - tapOn: ""
-      - assertVisible: "PROFIL BEARBEITEN"
-      - assertVisible: ${E2E_DOG}
-      - scrollUntilVisible:
-          element: ".*Hund löschen"
-          direction: DOWN
-      - tapOn: ".*Hund löschen"
-      - tapOn: "Löschen"
-      - assertNotVisible: ${E2E_DOG}
+      - assertVisible: "${E2E_DOG}(, .*)?"
+      # Aufräumen: nur Testhunde löschen. Schleife, damit auch Reste abgebrochener Läufe verschwinden.
+      - repeat:
+          while:
+            visible: "${E2E_DOG}(, .*)?"
+          times: 5
+          commands:
+            - tapOn:
+                text: "${E2E_DOG}(, .*)?"
+                index: 0
+            - runFlow: ../common/dismiss-help.yaml
+            - tapOn: ""
+            - assertVisible: "PROFIL BEARBEITEN"
+            - assertVisible: ${E2E_DOG}
+            - scrollUntilVisible:
+                element: ".*Hund löschen"
+                direction: DOWN
+            - tapOn: ".*Hund löschen"
+            - assertVisible: "Hund löschen\\?"
+            - tapOn: "Endgültig löschen"
+            - extendedWaitUntil:
+                visible: "Mit mir geteilt"
+                timeout: 20000
+      - assertNotVisible: "${E2E_DOG}(, .*)?"

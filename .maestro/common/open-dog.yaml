@@ -5,6 +5,7 @@ env:
 ---
 - tapOn: "(?-i)Hunde(, tab.*)?"
 - assertVisible: "Mit mir geteilt"
-- tapOn: ${DOG_NAME}
+# iOS hängt nach dem ersten Training «, Letztes Training: …» an das Label der Zeile.
+- tapOn: "${DOG_NAME}(, .*)?"
 - runFlow: dismiss-help.yaml
 - assertVisible: ".*Gesundheitsakte.*"

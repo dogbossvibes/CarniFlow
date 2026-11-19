@@ -7,11 +7,19 @@ appId: com.anyvo.app
 - runFlow: ../common/dismiss-help.yaml
 - assertVisible: "Training erfassen"
 - assertVisible: "Heute trainiert"
-- tapOn: "Übung auswählen"
-- assertVisible: "Allgemeines Training"
-# Lädt die Übungsliste nicht, sind die Übungen gesperrt und es kann nicht gespeichert werden.
-- assertNotVisible: "Historie nicht verfügbar.*"
-- tapOn: "Allgemeines Training"
+# Ein wiederhergestellter Entwurf hat die Übung schon gewählt (dann steht «Weitere Übung auswählen»).
+- runFlow:
+    when:
+      visible: "Übung auswählen"
+    commands:
+      - tapOn: "Übung auswählen"
+      - assertVisible: "Allgemeines Training"
+      # Lädt die Übungsliste nicht, sind die Übungen gesperrt und es kann nicht gespeichert werden.
+      - assertNotVisible: "Historie nicht verfügbar.*"
+      # Die Karte «Letztes Mal» zeigt denselben Übungsnamen: die Zeile in der Übungsliste wählen.
+      - tapOn:
+          text: "Allgemeines Training"
+          below: "Übung auswählen"
 - scrollUntilVisible:
     element: ".*Einheit speichern"
     direction: DOWN
