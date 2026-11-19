@@ -1,0 +1,28 @@
+# Gesundheitseintrag im Verlauf öffnen und löschen.
+# Erwartet: FILTER (Filter-Chip im Verlauf), ROW (Zeile im Verlauf), VALUE (Text,
+# der im Detail stehen muss – schützt vorhandene Einträge vor dem Löschen).
+appId: com.anyvo.app
+---
+- runFlow: dismiss-logbox.yaml
+- scrollUntilVisible:
+    element: "Verlauf"
+    direction: UP
+- tapOn: "Verlauf"
+# Der Filter grenzt nur ein; auf schmalen Bildschirmen liegen hintere Chips ausserhalb.
+- tapOn:
+    text: ${FILTER}
+    below: "Verlauf"
+    optional: true
+- tapOn:
+    text: ${ROW}
+    index: 0
+- assertVisible: ".*${VALUE}.*"
+- tapOn: "Löschen"
+- tapOn:
+    text: "Löschen"
+    rightOf: "Abbrechen"
+- assertNotVisible: ".*${VALUE}.*"
+- tapOn:
+    text: "Alle"
+    below: "Verlauf"
+    optional: true

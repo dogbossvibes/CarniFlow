@@ -1,0 +1,55 @@
+# Gesundheitsakte: Allergie, Unverträglichkeit und Diagnose erfassen, in den
+# Notfallinformationen wiederfinden und wieder löschen.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Allergie"
+      FORM: "Allergie erfassen"
+      FIELD: "Bezeichnung"
+      VALUE: "E2E Maestro Allergie"
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Unverträglichkeit"
+      FORM: "Unverträglichkeit erfassen"
+      FIELD: "Bezeichnung"
+      VALUE: "E2E Maestro Unvertraeglichkeit"
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Diagnose"
+      FORM: "Diagnose erfassen"
+      FIELD: "Bezeichnung"
+      VALUE: "E2E Maestro Diagnose"
+- tapOn: "Übersicht"
+- scrollUntilVisible:
+    element: "Notfallinformationen"
+    direction: DOWN
+- tapOn: "Notfallinformationen"
+- assertVisible: "BESITZERKONTAKT"
+- assertVisible: ".*E2E Maestro Allergie.*"
+- assertVisible: ".*E2E Maestro Unvertraeglichkeit.*"
+- assertVisible: ".*E2E Maestro Diagnose.*"
+- tapOn: "Schlie(ß|ss)en"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Alle"
+      ROW: ".*E2E Maestro Allergie.*"
+      VALUE: "E2E Maestro Allergie"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Alle"
+      ROW: ".*E2E Maestro Unvertraeglichkeit.*"
+      VALUE: "E2E Maestro Unvertraeglichkeit"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Alle"
+      ROW: ".*E2E Maestro Diagnose.*"
+      VALUE: "E2E Maestro Diagnose"

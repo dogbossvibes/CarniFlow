@@ -1,0 +1,21 @@
+# Gesundheitsakte: Tierarzttermin erfassen, im Verlauf öffnen und wieder löschen.
+# Setzt voraus, dass der Testhund sonst keine Tierarzttermine hat.
+appId: com.anyvo.app
+env:
+  VALUE: "E2E Maestro Praxis"
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Tierarzt"
+      FORM: "Tierarzttermin erfassen"
+      FIELD: "Optional"
+      VALUE: ${VALUE}
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Tierarzt"
+      ROW: "Tierarzt, lange drücken zum Löschen"
+      VALUE: ${VALUE}

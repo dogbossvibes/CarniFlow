@@ -1,0 +1,14 @@
+# Tastatur schliessen. iOS: Maestros hideKeyboard ist dort unzuverlässig, die
+# Eingabetaste schliesst einzeilige Felder sicher. Android: Systemfunktion.
+appId: com.anyvo.app
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter

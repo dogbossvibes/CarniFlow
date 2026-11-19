@@ -1,0 +1,31 @@
+# Gesundheitsakte: Impfung und Parasitenbehandlung erfassen, im Verlauf öffnen und löschen.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-health.yaml
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Impfung"
+      FORM: "Impfung erfassen"
+      FIELD: "z. B. Tollwut"
+      VALUE: "E2E Maestro Impfung"
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Parasiten"
+      FORM: "Parasitenbehandlung erfassen"
+      FIELD: "Optional"
+      VALUE: "E2E Maestro Wurmkur"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Impfungen"
+      ROW: ".*E2E Maestro Impfung.*"
+      VALUE: "E2E Maestro Impfung"
+- runFlow:
+    file: ../common/health-delete-entry.yaml
+    env:
+      FILTER: "Alle"
+      ROW: ".*E2E Maestro Wurmkur.*"
+      VALUE: "E2E Maestro Wurmkur"

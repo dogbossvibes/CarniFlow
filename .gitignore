@@ -89,3 +89,6 @@ _bmad/config.user.toml
 _bmad/custom/config.user.toml
 _bmad/render/
 **/__pycache__/
+
+# Maestro-UI-Tests: lokale Ausgaben (Screenshots, Logs) nicht versionieren
+.maestro/.output/

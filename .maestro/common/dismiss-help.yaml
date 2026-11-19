@@ -1,0 +1,8 @@
+# Kontexthilfe (erscheint beim ersten Besuch eines Bereichs) schliessen.
+appId: com.anyvo.app
+---
+- runFlow:
+    when:
+      visible: "Verstanden"
+    commands:
+      - tapOn: "Verstanden"
