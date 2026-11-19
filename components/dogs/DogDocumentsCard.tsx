@@ -43,21 +43,26 @@ export function DogDocumentsCard({
       {documents.map(d => {
         const date = fmtDate(d.issuedOn ?? d.createdAt);
         return (
-          <TouchableOpacity key={d.id} style={s.docCard} activeOpacity={onOpen ? 0.75 : 1} onPress={() => onOpen?.(d)} accessibilityRole="button" accessibilityLabel={d.title}>
-            <View style={s.docIcon}><Ionicons name={categoryIcon(d.category)} size={20} color={C.trackPrimary} /></View>
-            <View style={{ flex: 1, gap: 5 }}>
-              <Text style={s.docTitle} numberOfLines={1}>{d.title}</Text>
-              <View style={s.metaRow}>
-                <View style={s.badge}><Text style={s.badgeTxt}>{categoryLabel(d.category)}</Text></View>
-                <Text style={s.metaTxt}>{FILE_TYPE_LABEL[d.fileType]}{date ? ` · ${date}` : ''}</Text>
+          // Zeile = neutraler Container mit zwei Geschwister-Knöpfen. Läge der Papierkorb
+          // im Öffnen-Knopf, fasste iOS beide zu einem Element zusammen und der
+          // Papierkorb wäre für VoiceOver nicht erreichbar.
+          <View key={d.id} style={s.docCard}>
+            <TouchableOpacity style={s.docMain} hitSlop={8} activeOpacity={onOpen ? 0.75 : 1} onPress={() => onOpen?.(d)} accessibilityRole="button" accessibilityLabel={d.title}>
+              <View style={s.docIcon}><Ionicons name={categoryIcon(d.category)} size={20} color={C.trackPrimary} /></View>
+              <View style={{ flex: 1, gap: 5 }}>
+                <Text style={s.docTitle} numberOfLines={1}>{d.title}</Text>
+                <View style={s.metaRow}>
+                  <View style={s.badge}><Text style={s.badgeTxt}>{categoryLabel(d.category)}</Text></View>
+                  <Text style={s.metaTxt}>{FILE_TYPE_LABEL[d.fileType]}{date ? ` · ${date}` : ''}</Text>
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
             {onDelete ? (
               <TouchableOpacity hitSlop={8} onPress={() => onDelete(d)} style={s.trash} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('health.uxDeleteAction', { name: d.title })}>
                 <Ionicons name="trash-outline" size={17} color={C.trackTextMut} />
               </TouchableOpacity>
             ) : null}
-          </TouchableOpacity>
+          </View>
         );
       })}
       {onAdd ? <AnyvoButton label={t('docs.add')} icon="add" variant="secondary" onPress={onAdd} /> : null}
@@ -68,6 +73,7 @@ export function DogDocumentsCard({
 const s = StyleSheet.create({
   wrap:       { gap: 10 },
   docCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, padding: 13 },
+  docMain:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   docIcon:    { width: 42, height: 42, borderRadius: 13, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
   docTitle:   { fontSize: 15.5, color: C.trackText, fontWeight: '800' },
   metaRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
