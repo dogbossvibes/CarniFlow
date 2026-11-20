@@ -127,8 +127,21 @@ function readJson(path, fallback) {
   return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : fallback;
 }
 
+// Zeitlimit je EAS-Aufruf: ohne Limit blieb die Prüfung am 2026-11-20 über Stunden hängen.
+export const EAS_TIMEOUT_MS = Number(process.env.OTA_COVERAGE_EAS_TIMEOUT_MS) || 120_000;
+
 function eas(args, cwd) {
-  return execFileSync('eas', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    return execFileSync('eas', args, {
+      cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: EAS_TIMEOUT_MS, killSignal: 'SIGKILL',
+    });
+  } catch (e) {
+    if (e?.code === 'ETIMEDOUT' || e?.signal === 'SIGKILL') {
+      throw new Error(`EAS antwortet nicht innert ${Math.round(EAS_TIMEOUT_MS / 1000)} s (eas ${args.slice(0, 2).join(' ')}). Netz prüfen und erneut starten.`);
+    }
+    throw e;
+  }
 }
 
 /** Ergänzt das Verzeichnis um neue Production-OTA-Gruppen aus EAS (nur lesend gegenüber EAS). */
