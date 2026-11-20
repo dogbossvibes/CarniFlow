@@ -1,8 +1,9 @@
 // Kaltstart-Gate für OTA-Updates (Ablauf und Schutzregeln: lib/otaStartCheck.ts).
 //
-// Solange die kurze Nachfrage läuft (höchstens 1,5 s), zeigt das Gate dieselbe Fläche
-// wie der native Startbildschirm. Lädt eine neue OTA, erscheint «ANYVO wird aktualisiert …»
-// (höchstens 8 s), danach startet die App neu. Der App-Baum (Sync, Sitzung, Aufnahmen)
+// Das Gate schaut dem Start-Download von expo-updates zu (keine eigene Nachfrage, siehe
+// lib/otaStartCheck.ts). Solange unklar ist, ob eine neue OTA kommt (höchstens 1,5 s), zeigt
+// es dieselbe Fläche wie der native Startbildschirm. Lädt eine neue OTA, erscheint
+// «ANYVO wird aktualisiert …» mit Fortschritt (höchstens 8 s), danach startet die App neu. Der App-Baum (Sync, Sitzung, Aufnahmen)
 // wird erst nach der Entscheidung eingehängt, damit nichts mitten in der Arbeit neu lädt.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, StyleSheet, Text, View } from 'react-native';
@@ -10,7 +11,7 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import * as Location from 'expo-location';
-import { runStartCheck } from '@/lib/otaStartCheck';
+import { runStartCheck, type StartState } from '@/lib/otaStartCheck';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { listPendingDogIds } from '@/features/tracking/store/trackPersist';
 import { TRACK_LOCATION_TASK } from '@/features/tracking/native/backgroundLocationTask';
@@ -25,10 +26,29 @@ let decided = false;
 let devOverride: boolean | null = null;
 export function __resetOtaStartGateForTests(dev: boolean | null = false) { decided = false; devOverride = dev; }
 
+const ACTIVE_WAIT_MS = 1000;
+
+/**
+ * Im Vordergrund? Beim Kaltstart meldet iOS kurz «inactive», bevor die App aktiv wird; darauf
+ * wird kurz gewartet. «background» (z. B. iOS-Standort-Start) gilt sofort als nicht aktiv.
+ */
+function waitUntilActive(): Promise<boolean> {
+  if (AppState.currentState === 'active') return Promise.resolve(true);
+  if (AppState.currentState === 'background') return Promise.resolve(false);
+  return new Promise(resolve => {
+    const done = (v: boolean) => { clearTimeout(timer); sub.remove(); resolve(v); };
+    const sub = AppState.addEventListener('change', next => {
+      if (next === 'active') done(true);
+      else if (next === 'background') done(false);
+    });
+    const timer = setTimeout(() => done(AppState.currentState === 'active'), ACTIVE_WAIT_MS);
+  });
+}
+
 /** Gesperrt, solange eine Fährte aufgenommen wird oder eine unterbrochene Aufnahme wartet. */
 export async function isRecordingProtected(): Promise<boolean> {
   try {
-    if (AppState.currentState !== 'active') return true;       // Hintergrundstart (z. B. iOS-Standort)
+    if (!(await waitUntilActive())) return true;                // Hintergrundstart (z. B. iOS-Standort)
     if (await Location.hasStartedLocationUpdatesAsync(TRACK_LOCATION_TASK).catch(() => true)) return true;
     const reg = useActiveFaehrten.getState();
     if (!reg.hydrated) await reg.hydrate();
@@ -47,6 +67,7 @@ export function OtaStartGate({ children }: { children: ReactNode }) {
   const { t } = useT();
   const enabled = !(devOverride ?? __DEV__) && Updates.isEnabled && !Updates.isEmergencyLaunch;
   const [phase, setPhase] = useState<Phase>(enabled && !decided ? 'checking' : 'done');
+  const [progress, setProgress] = useState(0);
   const [pendingHint, setPendingHint] = useState(false);
   const mounted = useRef(true);
 
@@ -58,9 +79,13 @@ export function OtaStartGate({ children }: { children: ReactNode }) {
     void runStartCheck({
       enabled,
       isProtected: isRecordingProtected,
-      check: () => Updates.checkForUpdateAsync(),
-      fetch: () => Updates.fetchUpdateAsync(),
+      getState: () => Updates.latestContext as StartState,
+      subscribe: listener => {
+        const sub = Updates.addUpdatesStateChangeListener(e => listener(e.context as StartState));
+        return () => sub.remove();
+      },
       onFetching: () => { if (mounted.current) setPhase('fetching'); },
+      onProgress: p => { if (mounted.current) setProgress(p); },
     }, late).then(async outcome => {
       if (outcome === 'reload') {
         try { await Updates.reloadAsync(); return; } catch { /* normal weiter */ }
@@ -89,7 +114,7 @@ export function OtaStartGate({ children }: { children: ReactNode }) {
           <View style={s.textBox} accessible accessibilityLabel={`${t('updates.startTitle')} ${t('updates.startBody')}`}>
             <Text style={s.title}>{t('updates.startTitle')}</Text>
             <Text style={s.body}>{t('updates.startBody')}</Text>
-            <View style={s.bar}><View style={s.barFill} /></View>
+            <View style={s.bar}><View style={[s.barFill, { width: `${Math.round(Math.max(0.08, progress) * 100)}%` }]} /></View>
           </View>
         )}
       </View>
@@ -115,7 +140,7 @@ const s = StyleSheet.create({
   title:     { color: '#ffffff', fontSize: 17, fontWeight: '800', textAlign: 'center' },
   body:      { color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
   bar:       { width: 150, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 22, overflow: 'hidden' },
-  barFill:   { width: '55%', height: '100%', borderRadius: 2, backgroundColor: MINT },
+  barFill:   { height: '100%', borderRadius: 2, backgroundColor: MINT },
   toast:     { position: 'absolute', left: 14, right: 14, bottom: 96, backgroundColor: '#181a20', borderWidth: 1, borderColor: 'rgba(21,230,195,0.35)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   toastText: { color: '#ffffff', fontSize: 13, lineHeight: 18 },
   toastStrong: { color: MINT, fontWeight: '800' },
