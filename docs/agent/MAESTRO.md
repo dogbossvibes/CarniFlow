@@ -123,7 +123,15 @@ abwarten), `dismiss-logbox` (Dev-Hinweise wegräumen), `dismiss-help`
 
 - **LogBox** (nur Dev-Build) legt Warnungen über die Tab-Leiste, z. B. den
   harmlosen Keychain-Fehler von expo-notifications im unsignierten
-  Simulator-Build. `dismiss-logbox` räumt sie weg.
+  Simulator-Build. `dismiss-logbox` räumt sie weg. Das Banner beginnt mit «!»
+  oder, wenn dieselbe Meldung mehrfach auftrat, mit einem Zähler («36, …»).
+- **Android-Aussetzer «Tab-Tipp kommt nicht an»** (Befund 2026-11-20): Lädt der
+  Emulator die Symbolschrift nicht von Metro («Font file for ionicons is
+  empty», Symbole fehlen), liegt ein Zähler-Banner über der Tab-Leiste und
+  fängt die Tipps ab. `dismiss-logbox` erkennt seither auch Zähler-Banner. Tritt
+  der Schriftfehler auf, Emulator und Metro neu starten.
+- **App kommt nach `launchApp` nicht hoch** (Android, Emulator lange gelaufen):
+  `start` startet sie nach 60 Sekunden einmal neu.
 - **Formulare der Gesundheitsakte** lösen im Dev-Build den LogBox-Fehler «Text
   strings must be rendered within a <Text> component» aus; der Hinweis verdeckt
   «Speichern». `health-add-entry` räumt ihn vor dem Speichern weg.

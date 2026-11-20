@@ -1,13 +1,18 @@
-# Dev-Build: React-Native-LogBox legt Hinweise ("!, …") über die Tab-Leiste.
-# Hinweis antippen und im Detail «Dismiss» wählen, bis keiner mehr sichtbar ist.
+# Dev-Build: React-Native-LogBox legt Hinweise über die Tab-Leiste und fängt dort
+# Tipps ab. Hinweis antippen und im Detail «Dismiss» wählen, bis keiner mehr
+# sichtbar ist.
+# Das Banner beginnt mit «!» (Meldung trat einmal auf) oder mit einem Zähler
+# (dieselbe Meldung mehrfach, z. B. «36, Uncaught (in promise) Error: …»).
+# Die Zähler-Variante verlangt ein typisches Fehlerwort, damit Kennzahlen der
+# App («1, HUNDE») nie getroffen werden.
 appId: com.anyvo.app
 ---
 - repeat:
     times: 6
     while:
-      visible: "!, .*"
+      visible: "(?s)(!, .*|[0-9]+, .*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*)"
     commands:
-      - tapOn: "!, .*"
+      - tapOn: "(?s)(!, .*|[0-9]+, .*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*)"
       - tapOn:
           text: "Dismiss"
           optional: true

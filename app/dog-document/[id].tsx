@@ -8,8 +8,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
-import { addDogDocument } from '@/services/dogHub';
-import { uploadDogDocument } from '@/services/storage';
+import { saveDogDocument } from '@/services/dogDocumentSave';
 import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
 import { DOC_CATEGORIES, HEALTH_DOC_SUBTYPES } from '@/features/dogs/documentCategories';
@@ -49,17 +48,19 @@ export default function DogDocumentEditor() {
 
     setSaving(true);
     try {
-      const path = await uploadDogDocument(file.uri, dogId, file.name, file.mime);
-      const { error } = await addDogDocument(dogId, {
-        kind, title: title.trim() || null, file_url: path,
+      const result = await saveDogDocument(dogId, file, {
+        kind, title: title.trim() || null,
         issued_on: issuedOn ? toISODate(issuedOn) : null, note: note.trim() || null,
         ...(healthMode ? { category: 'health', subtype } : {}),
       });
-      if (error) throw error;
+      if (!result.ok) {
+        showToast(t(result.stage === 'upload' ? 'media.uploadFailed' : 'dog.documentSaveFailed'));
+        return;
+      }
       haptic.success();
       router.back();
     } catch {
-      showToast(t('media.uploadFailed'));
+      showToast(t('dog.documentSaveFailed'));
     } finally {
       setSaving(false);
     }
