@@ -35,6 +35,20 @@ describe('TrackRunScreen arming flow', () => {
     expect(armingOverlay).toContain("accessibilityLabel={t('track.searchStartNow')}");
   });
 
+  it('remembers the handler distance per dog and lets it change during the search (T-216)', () => {
+    const src = source();
+    const armingOverlay = src.slice(src.indexOf('{arming && ('), src.indexOf('{/* Steuerung */}'));
+
+    expect(armingOverlay).toContain('rememberHandlerDistance(d)');
+    // Der Merkwert darf eine ausdrückliche Wahl und eine unterbrochene Absuche nie überschreiben.
+    expect(src).toMatch(/dogLeadSetting\.load\(dogId\)[\s\S]{0,160}!handlerDistanceChosenRef\.current/);
+    const recoveryBranch = src.slice(src.indexOf("if (decision.kind === 'recovery') {"), src.indexOf('} else {', src.indexOf("if (decision.kind === 'recovery') {")));
+    expect(recoveryBranch).not.toContain('dogLeadSetting');
+    // Umschalten nur während der laufenden, nicht blinden Absuche.
+    expect(src).toMatch(/!arming && s\.recording && !blindSearch && \(\s*<Pressable\s*onPress=\{\(\) => \{ hapticTap\(\); const next = nextHandlerDistance\(searchHandlerDistanceM\)/);
+    expect(src).toContain("t('track.searchHandlerDistanceChange'");
+  });
+
   it('starts the search only from explicit user actions', () => {
     const src = source();
 

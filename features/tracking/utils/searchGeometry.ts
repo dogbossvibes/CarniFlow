@@ -255,3 +255,30 @@ export function pointAtDistance(points: LL[], cum: number[], d: number): LL | nu
   }
   return points[n - 1];
 }
+
+// T-217: Bereich des Hundes als Linienstück. Die App kennt die Hundeposition nicht;
+// ehrlich darstellbar ist nur «irgendwo zwischen Hundeführer:in und Leinenlänge».
+// Kürzere Bänder verschwinden unter dem Positionspunkt → dann bleibt die Pfote.
+export const DOG_RANGE_MIN_M = 2;
+
+/**
+ * Stück der gelegten Linie zwischen zwei Bogenlängen (inkl. interpolierter Enden).
+ * Leer, wenn das Stück kürzer als `DOG_RANGE_MIN_M` ist oder eine Lücke der
+ * Referenz (breakBefore) überspannen würde — über Lücken wird nie eine Linie gezogen.
+ * Reine Anzeigegeometrie: keine Wertung, kein Fortschritt, keine Speicherung.
+ */
+export function dogRangeLine(points: LL[], cum: number[], fromM: number, toM: number): LL[] {
+  if (points.length < 2 || cum.length !== points.length) return [];
+  const total = cum[cum.length - 1];
+  const lo = Math.max(0, Math.min(total, fromM)), hi = Math.max(0, Math.min(total, toM));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo < DOG_RANGE_MIN_M) return [];
+  const start = pointAtDistance(points, cum, lo), end = pointAtDistance(points, cum, hi);
+  if (!start || !end) return [];
+  const out: LL[] = [{ latitude: start.latitude, longitude: start.longitude }];
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].breakBefore && cum[i] >= lo && cum[i] <= hi) return [];
+    if (cum[i] > lo && cum[i] < hi) out.push({ latitude: points[i].latitude, longitude: points[i].longitude });
+  }
+  out.push({ latitude: end.latitude, longitude: end.longitude });
+  return out;
+}
