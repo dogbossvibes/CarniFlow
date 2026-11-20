@@ -8,9 +8,14 @@ jest.mock('@/lib/supabase', () => ({
       reauthenticate: jest.fn(() => Promise.resolve({ data: {}, error: null })),
       signInWithOAuth: jest.fn(() => Promise.resolve({ data: { url: 'https://google.test?code=abc' }, error: null })),
       exchangeCodeForSession: jest.fn(() => Promise.resolve({ data: {}, error: null })),
+      signInWithIdToken: jest.fn(() => Promise.resolve({ data: {}, error: null })),
     },
     functions: { invoke: jest.fn() },
   },
+}));
+
+jest.mock('@/services/googleNativeSignIn', () => ({
+  getNativeGoogleIdToken: jest.fn(() => Promise.resolve({ type: 'unavailable', reason: 'not-configured' })),
 }));
 
 jest.mock('expo-auth-session', () => ({
@@ -30,6 +35,7 @@ jest.mock('expo-apple-authentication', () => ({
 
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
+import { getNativeGoogleIdToken } from '@/services/googleNativeSignIn';
 import {
   getPasswordRecoveryRedirectTo,
   parseOAuthCallbackUrl,
@@ -42,6 +48,7 @@ import {
 
 const auth = supabase.auth as jest.Mocked<typeof supabase.auth>;
 const browser = WebBrowser as jest.Mocked<typeof WebBrowser>;
+const nativeGoogle = getNativeGoogleIdToken as jest.MockedFunction<typeof getNativeGoogleIdToken>;
 
 describe('Auth security service', () => {
   beforeEach(() => {
@@ -49,6 +56,8 @@ describe('Auth security service', () => {
     auth.signInWithOAuth.mockResolvedValue({ data: { url: 'https://google.test/oauth' }, error: null } as any);
     auth.exchangeCodeForSession.mockResolvedValue({ data: {}, error: null } as any);
     browser.openAuthSessionAsync.mockResolvedValue({ type: 'dismiss' } as any);
+    nativeGoogle.mockResolvedValue({ type: 'unavailable', reason: 'not-configured' });
+    auth.signInWithIdToken.mockResolvedValue({ data: {}, error: null } as any);
   });
 
   it('2. Reset verwendet resetPasswordForEmail mit Recovery-URL', async () => {
@@ -176,5 +185,40 @@ describe('Auth security service', () => {
       code:  null,
       error: 'access_denied',
     });
+  });
+  it('21. Nativer Google-Login meldet per ID-Token an und öffnet keinen Web-Dialog', async () => {
+    nativeGoogle.mockResolvedValueOnce({ type: 'success', idToken: 'id-token' });
+
+    await expect(signInWithGoogle()).resolves.toEqual({ error: null });
+    expect(auth.signInWithIdToken).toHaveBeenCalledWith({ provider: 'google', token: 'id-token' });
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+    expect(browser.openAuthSessionAsync).not.toHaveBeenCalled();
+  });
+
+  it('21. Abbruch im nativen Google-Login ist kein Fehler und öffnet keinen Web-Dialog', async () => {
+    nativeGoogle.mockResolvedValueOnce({ type: 'cancelled' });
+
+    await expect(signInWithGoogle()).resolves.toEqual({ error: null, cancelled: true });
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it('21. Lehnt Supabase das native Token ab, folgt der bisherige Web-Login', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    nativeGoogle.mockResolvedValueOnce({ type: 'success', idToken: 'id-token' });
+    auth.signInWithIdToken.mockResolvedValueOnce({ data: {}, error: new Error('Unacceptable audience') } as any);
+
+    await signInWithGoogle();
+
+    expect(auth.signInWithOAuth).toHaveBeenCalledTimes(1);
+    expect(browser.openAuthSessionAsync).toHaveBeenCalledWith('https://google.test/oauth', 'anyvo://auth/callback');
+    warn.mockRestore();
+  });
+
+  it('21. Ohne natives Modul (ältere Builds) bleibt der Web-Login unverändert', async () => {
+    await signInWithGoogle();
+
+    expect(nativeGoogle).toHaveBeenCalledTimes(1);
+    expect(auth.signInWithIdToken).not.toHaveBeenCalled();
+    expect(auth.signInWithOAuth).toHaveBeenCalledTimes(1);
   });
 });

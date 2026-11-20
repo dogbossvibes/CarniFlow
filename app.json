@@ -159,6 +159,7 @@
         }
       ],
       "./plugins/withAnyvoManifestCleanup",
+      "./plugins/withAnyvoGoogleSignIn",
       "expo-localization"
     ],
     "experiments": {
