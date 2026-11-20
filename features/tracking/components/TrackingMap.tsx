@@ -157,6 +157,8 @@ interface Props {
   currentPosition:  LatLng | null;
   showUserLocation?: boolean;
   dogPosition?:     LatLng | null;
+  /** T-217: möglicher Bereich des Hundes als Stück der gelegten Linie. Gesetzt → Band statt Pfote. */
+  dogRange?:        { latitude: number; longitude: number }[] | null;
   heading?:         number | null;
   // ── Smart Follow (navigationsartige Kartenansicht) ──
   // Aktiv nur während einer laufenden Aufnahme/Absuche; historische Karten
@@ -184,9 +186,11 @@ const EMPTY_MARKERS: MapMarker[] = [];
 const EMPTY_SEGMENTS: TrackSegment[] = [];
 const EMPTY_LINE: LL[] = [];
 const EMPTY_PLACED: Map<string, PlacedLabel> = new Map();
+/** Breite des Hundebereich-Bands (px): deutlich breiter als die Lay-Linie (4), schmaler als ein Winkel-Badge. */
+export const DOG_RANGE_STROKE_WIDTH = 16;
 
 export function TrackingMap({
-  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, heading,
   smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -445,6 +449,13 @@ export function TrackingMap({
         {referenceOverlays && referenceOverlays.length > 0 && (
           <TrackReferenceOverlayLayer overlays={referenceOverlays} Polyline={Polyline} Marker={Marker} />
         )}
+        {/* T-217: Bereich des Hundes — breites, durchscheinendes Band UNTER der gelegten Linie
+            (zIndex 1; Lay-Linie 2/3, Suchspur 4). Winkel, Gegenstände, Start/Ziel und Abrisse sind
+            Marker und liegen immer darüber; die Lay-Linie bleibt in der Bandmitte sichtbar. */}
+        {dogRange && dogRange.length > 1 && (
+          <Polyline coordinates={dogRange} strokeColor="rgba(21,230,195,0.30)" strokeWidth={DOG_RANGE_STROKE_WIDTH}
+            lineCap="round" lineJoin="round" zIndex={1} />
+        )}
         {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
@@ -585,7 +596,7 @@ export function TrackingMap({
             </View>
           </Marker>
         )}
-        {dogPosition && (
+        {dogPosition && !(dogRange && dogRange.length > 1) && (
           <Marker coordinate={{ latitude: dogPosition.lat, longitude: dogPosition.lng }} anchor={{ x: 0.5, y: 0.5 }} flat>
             <View style={s.dogGlow}>
               <View style={s.dogCore}>
