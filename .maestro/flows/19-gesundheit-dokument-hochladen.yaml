@@ -49,23 +49,17 @@ env:
 - assertVisible: ".*${DOC}.*"
 # Aufräumen: nur Testdokumente löschen (Papierkorb-Knopf «<Titel> löschen»; ein Tipp auf die
 # Zeile selbst öffnet die Datei). Schleife, damit auch Reste abgebrochener Läufe verschwinden.
-# Nur Android: Auf iOS ist der Papierkorb-Knopf nicht einzeln ansprechbar (er liegt in der
-# Zeile, die als ein Element gilt). Das iOS-Testdokument löscht der nächste Android-Lauf.
-- runFlow:
-    when:
-      platform: Android
+- repeat:
+    while:
+      visible: ".*${DOC}.* löschen"
+    times: 5
     commands:
-      - repeat:
-          while:
-            visible: ".*${DOC}.* löschen"
-          times: 5
-          commands:
-            - tapOn:
-                text: ".*${DOC}.* löschen"
-                index: 0
-            - assertVisible: "Dokument löschen\\?"
-            - tapOn:
-                text: "Löschen"
-                rightOf: "Abbrechen"
-            - waitForAnimationToEnd
-      - assertNotVisible: ".*${DOC}.*"
+      - tapOn:
+          text: ".*${DOC}.* löschen"
+          index: 0
+      - assertVisible: "Dokument löschen\\?"
+      - tapOn:
+          text: "Löschen"
+          rightOf: "Abbrechen"
+      - waitForAnimationToEnd
+- assertNotVisible: ".*${DOC}.*"

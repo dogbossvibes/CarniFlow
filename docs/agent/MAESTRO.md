@@ -1,6 +1,6 @@
 # Maestro – automatische UI-Tests (lokal, Staging)
 
-Stand: 2026-11-19. Die Abläufe liegen in `.maestro/` und bedienen die App so, wie
+Stand: 2026-11-20. Die Abläufe liegen in `.maestro/` und bedienen die App so, wie
 es bisher von Hand im iOS-Simulator und Android-Emulator geprüft wurde.
 
 ## Grenzen (zuerst lesen)
@@ -141,9 +141,6 @@ abwarten), `dismiss-logbox` (Dev-Hinweise wegräumen), `dismiss-help`
   scheitert ab der dritten Einheit im Kalendermonat am Trainings-Kontingent.
 - **Ablauf 05 hinterlässt eine Trainingseinheit:** Jeder Lauf speichert eine
   Einheit, die im Journal stehen bleibt (wird nicht gelöscht).
-- **Ablauf 19 räumt nur auf Android auf:** Auf iOS ist der Papierkorb-Knopf der
-  Dokumentzeile nicht einzeln ansprechbar. Das iOS-Testdokument löscht der
-  nächste Android-Lauf – deshalb iOS vor Android laufen lassen.
 - **Staging muss den Datenbankstand von Production haben:** Ablauf 05 braucht
   die Funktionen `training_document_v1`, `training_exercise_identity_v1` und
   `training_focus_v1`, Ablauf 19 die erweiterte Leseregel `dog_documents_select`
