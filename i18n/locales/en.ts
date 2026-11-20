@@ -1282,6 +1282,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "dog.file": "File",
   "dog.title": "title",
   "dog.selectFileFirst": "Please select a file first.",
+  "dog.documentSaveFailed": "The document could not be saved. Please try again.",
   "dog.selectPdfOrImage": "Select PDF or image",
   "dog.issuedOnOptional": "Issued on (optional)",
   "dog.noDate": "No date",
