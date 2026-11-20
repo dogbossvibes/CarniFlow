@@ -1,0 +1,66 @@
+# Hund anlegen. Ist das Hundekontingent des Plans erreicht (Newbie: 1 Hund),
+# führt spätestens «Hund speichern» zur Abo-Auswahl – dann wird diese geprüft und
+# kein Hund angelegt. Sonst wird ein Testhund angelegt und am Schluss wieder gelöscht.
+appId: com.anyvo.app
+env:
+  E2E_DOG: "E2E Maestro Hund"
+---
+- runFlow: ../common/start.yaml
+- scrollUntilVisible:
+    element: "Hund hinzufügen"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Hund hinzufügen"
+- extendedWaitUntil:
+    visible: "ANYVO wählen|NEUES PROFIL"
+    timeout: 15000
+- runFlow:
+    when:
+      visible: "NEUES PROFIL"
+    commands:
+      - tapOn: "z. B. Rex"
+      - inputText: ${E2E_DOG}
+      - runFlow: ../common/hide-keyboard.yaml
+      - scrollUntilVisible:
+          element: "Hund speichern"
+          direction: DOWN
+      - tapOn: "Hund speichern"
+      - extendedWaitUntil:
+          notVisible: "Hund speichern"
+          timeout: 20000
+- runFlow:
+    when:
+      visible: "ANYVO wählen"
+    commands:
+      - assertVisible: "Newbie"
+      - assertVisible: ".*Gratis starten.*"
+- runFlow:
+    when:
+      notVisible: "ANYVO wählen"
+    commands:
+      - runFlow: ../common/start.yaml
+      - tapOn: "(?-i)Hunde(, tab.*)?"
+      - assertVisible: "${E2E_DOG}(, .*)?"
+      # Aufräumen: nur Testhunde löschen. Schleife, damit auch Reste abgebrochener Läufe verschwinden.
+      - repeat:
+          while:
+            visible: "${E2E_DOG}(, .*)?"
+          times: 5
+          commands:
+            - tapOn:
+                text: "${E2E_DOG}(, .*)?"
+                index: 0
+            - runFlow: ../common/dismiss-help.yaml
+            - tapOn: ""
+            - assertVisible: "PROFIL BEARBEITEN"
+            - assertVisible: ${E2E_DOG}
+            - scrollUntilVisible:
+                element: ".*Hund löschen"
+                direction: DOWN
+            - tapOn: ".*Hund löschen"
+            - assertVisible: "Hund löschen\\?"
+            - tapOn: "Endgültig löschen"
+            - extendedWaitUntil:
+                visible: "Mit mir geteilt"
+                timeout: 20000
+      - assertNotVisible: "${E2E_DOG}(, .*)?"

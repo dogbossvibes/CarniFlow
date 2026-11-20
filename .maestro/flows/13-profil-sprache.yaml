@@ -1,0 +1,18 @@
+# Profil → Sprache: auf Englisch und zurück auf Deutsch stellen.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- tapOn: "(?-i)Profil(, tab.*)?"
+- assertVisible: "DEIN KONTO"
+- scrollUntilVisible:
+    element: ".*Sprache.*"
+    direction: DOWN
+    centerElement: true
+- tapOn: ".*Sprache.*"
+- assertVisible: "Sprache"
+- tapOn: "English.*"
+- assertVisible: "Language"
+- tapOn: "Deutsch.*"
+- assertVisible: "Sprache"
+- runFlow: ../common/back.yaml
+- assertVisible: ".*Sprache.*Deutsch.*|Deutsch"

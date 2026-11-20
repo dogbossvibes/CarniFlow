@@ -1,0 +1,13 @@
+# Dev-Build: React-Native-LogBox legt Hinweise ("!, …") über die Tab-Leiste.
+# Hinweis antippen und im Detail «Dismiss» wählen, bis keiner mehr sichtbar ist.
+appId: com.anyvo.app
+---
+- repeat:
+    times: 6
+    while:
+      visible: "!, .*"
+    commands:
+      - tapOn: "!, .*"
+      - tapOn:
+          text: "Dismiss"
+          optional: true

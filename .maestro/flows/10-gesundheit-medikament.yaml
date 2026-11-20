@@ -1,0 +1,60 @@
+# Gesundheitsakte: Medikament erfassen, bearbeiten, Gabe dokumentieren und wieder löschen.
+appId: com.anyvo.app
+env:
+  MED: "E2E Maestro Medikament"
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-dog.yaml
+- tapOn: ".*Gesundheitsakte, .*|Gesundheitsakte"
+- tapOn: ".*Gesundheitsakte öffnen.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "SCHNELLZUGRIFF"
+- assertVisible: "Verlauf"
+- assertVisible: "Dokumente"
+- runFlow:
+    file: ../common/health-add-entry.yaml
+    env:
+      QUICK: "Medikament"
+      FORM: "Medikament erfassen"
+      FIELD: "Medikament"
+      VALUE: ${MED}
+- scrollUntilVisible:
+    element: ".*${MED}.*"
+    direction: DOWN
+- tapOn: ".*${MED}.*"
+- assertVisible: "ZEITRAUM"
+- assertVisible: "Noch keine Gaben dokumentiert."
+# Bearbeiten: Dosierung ergänzen.
+- tapOn: "Bearbeiten"
+- tapOn:
+    text: "Optional"
+    index: 0
+- inputText: "1 Tablette"
+- runFlow: ../common/hide-keyboard.yaml
+- runFlow: ../common/dismiss-logbox.yaml
+- tapOn: "Speichern"
+- runFlow:
+    when:
+      notVisible: "ZEITRAUM"
+    commands:
+      - scrollUntilVisible:
+          element: ".*${MED}.*"
+          direction: DOWN
+      - tapOn: ".*${MED}.*"
+- assertVisible: "1 Tablette"
+# Gabe dokumentieren.
+- tapOn: "Gabe dokumentieren"
+- assertVisible: "UHRZEIT"
+- tapOn: "z. B. 1,5"
+- inputText: "1"
+- runFlow: ../common/hide-keyboard.yaml
+- runFlow: ../common/dismiss-logbox.yaml
+- tapOn: "Speichern"
+- assertNotVisible: "Noch keine Gaben dokumentiert."
+# Aufräumen: nur das eben erfasste Test-Medikament löschen.
+- tapOn: "Löschen"
+- assertVisible: "${MED} löschen\\?"
+- tapOn:
+    text: "Löschen"
+    rightOf: "Abbrechen"
+- assertNotVisible: ".*${MED}.*"

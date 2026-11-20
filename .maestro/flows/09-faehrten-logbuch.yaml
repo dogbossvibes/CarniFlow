@@ -1,0 +1,20 @@
+# Logbuch: Liste, Geländefilter, Eintrag öffnen.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-tracks.yaml
+- scrollUntilVisible:
+    element: "Logbuch.*"
+    direction: DOWN
+- tapOn: "Logbuch.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "LOGBUCH"
+- assertVisible: "Hund wählen.*"
+- tapOn: "Wiese"
+- tapOn: "Wald"
+- tapOn: "Alle"
+- tapOn:
+    text: ".* m · .* Winkel.*"
+    index: 0
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "AUSWERTUNG"

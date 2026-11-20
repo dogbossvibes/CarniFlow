@@ -1,0 +1,31 @@
+# Gesundheitseintrag über den Schnellzugriff erfassen.
+# Erwartet: QUICK (Knopf im Schnellzugriff), FORM (Formulartitel),
+# FIELD (Platzhalter des ersten Textfelds), VALUE (einzutragender Text).
+appId: com.anyvo.app
+---
+- tapOn: "Übersicht"
+- runFlow:
+    when:
+      notVisible: ${QUICK}
+    commands:
+      - scrollUntilVisible:
+          element: "Weiteren Eintrag hinzufügen"
+          direction: DOWN
+      - tapOn: "Weiteren Eintrag hinzufügen"
+- tapOn: ${QUICK}
+# Das Formular fährt als Blatt hoch; erst danach Felder antippen (Android reagiert
+# auf Tipps während der Animation unzuverlässig).
+- waitForAnimationToEnd
+- assertVisible: ${FORM}
+- tapOn:
+    text: ${FIELD}
+    index: 0
+- waitForAnimationToEnd
+- inputText: ${VALUE}
+- runFlow: hide-keyboard.yaml
+# Dev-Build: Das Formular löst einen LogBox-Hinweis aus, der «Speichern» verdeckt.
+- runFlow: dismiss-logbox.yaml
+- tapOn: "Speichern"
+- extendedWaitUntil:
+    notVisible: ${FORM}
+    timeout: 20000

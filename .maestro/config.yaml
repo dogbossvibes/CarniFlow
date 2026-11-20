@@ -1,0 +1,4 @@
+# Maestro-Arbeitsbereich für ANYVO. Anleitung: docs/agent/MAESTRO.md
+# Nur gegen Staging laufen lassen. Keine Zugangsdaten in diesem Ordner ablegen.
+flows:
+  - "flows/*"

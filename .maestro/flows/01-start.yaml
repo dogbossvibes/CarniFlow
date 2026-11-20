@@ -1,0 +1,21 @@
+# Start: App öffnet auf dem Startbildschirm, Schnellzugriffe und Tab-Leiste sind da.
+appId: com.anyvo.app
+tags:
+  - smoke
+---
+- runFlow: ../common/start.yaml
+- assertVisible: ".*Alle ansehen.*"
+- assertVisible: "Hunde(, tab.*)?"
+- assertVisible: "Training(, tab.*)?"
+- assertVisible: "Analyse(, tab.*)?"
+- assertVisible: "Profil(, tab.*)?"
+- scrollUntilVisible:
+    element: "Hund hinzufügen"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Schnell starten"
+- assertVisible: "Timer starten"
+- scrollUntilVisible:
+    element: "Letzte Einheiten"
+    direction: DOWN
+    centerElement: true

@@ -1,0 +1,23 @@
+# Kalender (Training Hub): Ansichten wechseln und Termin-Formular öffnen.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- tapOn: ".*Alle ansehen.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "Training Hub"
+- tapOn: "Woche"
+- tapOn: "Monat"
+- tapOn: "Timeline"
+# Der Plus-Knopf hat kein Accessibility-Label (nur Symbol).
+- tapOn: ""
+- assertVisible: "Neuer Termin"
+- assertVisible: "TITEL"
+- assertVisible: "DATUM.*"
+- tapOn: "z. B. Fährtentraining"
+- inputText: "E2E Maestro Termin"
+- runFlow: ../common/hide-keyboard.yaml
+- scrollUntilVisible:
+    element: "HUND"
+    direction: DOWN
+- assertVisible: ".*Termin erstellen"
+# Nicht gespeichert: Datum/Zeit laufen über native Auswahlräder (siehe MAESTRO.md).
