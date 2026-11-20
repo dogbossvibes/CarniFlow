@@ -35,7 +35,7 @@ import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracki
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
-import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, buildArc, dogRangeLine, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
 import { boundedPush, TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
 import type { QaApproachFixDiagnostics, QaEndConfirmationDiagnostics, QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
@@ -232,6 +232,13 @@ export default function TrackRunScreen() {
   const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects,
     level: snapData.level, sessionId: effectiveId, handlerDistanceM: searchHandlerDistanceM,
     angleArcM: laidAngleArcM });
+
+  // T-217: Bereich des Hundes (Hundeführer:in → virtuelle Hundeposition) als Stück der gelegten Linie.
+  // Nur Anzeige, erst nach dem Start. Die Blindsuche blendet es an der Karte aus (Linie bliebe sonst erkennbar).
+  const laidArc = useMemo(() => buildArc(snapData.laidPoints), [snapData.laidPoints]);
+  const dogRange = useMemo(() => (s.recording && s.estimatedDogPosition
+    ? dogRangeLine(snapData.laidPoints, laidArc.cum, s.progressM, s.dogProgressM) : []),
+  [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, snapData.laidPoints, laidArc]);
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
@@ -1369,6 +1376,7 @@ export default function TrackRunScreen() {
               runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
+              dogRange={blindSearch || arming ? null : dogRange}
               dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
