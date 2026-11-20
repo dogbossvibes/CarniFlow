@@ -609,6 +609,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.scale.progress": "{current} m / {total} m",
   "track.scale.nextObject": "Prossimo oggetto · {meters} m",
   "track.searchHandlerDistanceOption": "Distanza: {meters} metri",
+  "track.searchHandlerDistanceChange": "Distanza dal cane: {meters} metri. Tocca per modificare.",
   "track.searchStartNow": "Avvia ora",
   "track.searchStartHint": "La ricerca inizia solo dopo il tuo tocco. Fuori dall’area di partenza è richiesta una conferma.",
   "track.searchStartCandidate": "Rilevamento partenza pista …",

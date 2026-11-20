@@ -35,12 +35,13 @@ import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracki
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
-import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, buildArc, dogRangeLine, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
 import { boundedPush, TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
 import type { QaApproachFixDiagnostics, QaEndConfirmationDiagnostics, QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { dogLeadSetting, nextHandlerDistance } from '@/features/tracking/store/dogLeadSetting';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
@@ -216,6 +217,14 @@ export default function TrackRunScreen() {
   // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
   // persistiert (Store/PendingTrack) und bei Recovery wiederhergestellt (Default 5).
   const [searchHandlerDistanceM, setSearchHandlerDistanceM] = useState<SearchHandlerDistanceM>(DEFAULT_HANDLER_DISTANCE_M);
+  // T-216: Eine ausdrückliche Wahl gilt sofort (Store → PendingTrack) und wird je Hund gemerkt.
+  // Der Ref verhindert, dass der später geladene Merkwert eine frische Wahl überschreibt.
+  const handlerDistanceChosenRef = useRef(false);
+  const rememberHandlerDistance = useCallback((d: SearchHandlerDistanceM) => {
+    handlerDistanceChosenRef.current = true;
+    useTrackingStore.getState().setSearchHandlerDistanceM(d);
+    void dogLeadSetting.save(dogId, d);
+  }, [dogId]);
   const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
 
   const laidAngleArcM = useMemo(() => snapData.laidMarkers.filter(m => m.type === 'winkel')
@@ -223,6 +232,13 @@ export default function TrackRunScreen() {
   const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects,
     level: snapData.level, sessionId: effectiveId, handlerDistanceM: searchHandlerDistanceM,
     angleArcM: laidAngleArcM });
+
+  // T-217: Bereich des Hundes (Hundeführer:in → virtuelle Hundeposition) als Stück der gelegten Linie.
+  // Nur Anzeige, erst nach dem Start. Die Blindsuche blendet es an der Karte aus (Linie bliebe sonst erkennbar).
+  const laidArc = useMemo(() => buildArc(snapData.laidPoints), [snapData.laidPoints]);
+  const dogRange = useMemo(() => (s.recording && s.estimatedDogPosition
+    ? dogRangeLine(snapData.laidPoints, laidArc.cum, s.progressM, s.dogProgressM) : []),
+  [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, snapData.laidPoints, laidArc]);
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
@@ -384,6 +400,11 @@ export default function TrackRunScreen() {
         }
         setEffectiveId(id ?? null);
         setSnap(buildSnap());
+        // T-216: Frische Absuche → zuletzt für DIESEN Hund gewählten Abstand vorwählen.
+        // Eine unterbrochene Absuche (Zweig oben) behält ihren eigenen Wert.
+        void dogLeadSetting.load(dogId).then(remembered => {
+          if (alive && remembered != null && !handlerDistanceChosenRef.current) setSearchHandlerDistanceM(remembered);
+        });
       }
       setPhase('ready');
     })();
@@ -1290,6 +1311,17 @@ export default function TrackRunScreen() {
           )}
           <View className="flex-1" />
           <HelpButton topicId="track_search" autoShow tint={FT.text} size={18} />
+          {/* T-216: Abstand zum Hund während der Absuche umschalten (1 → 5 → 10 m). */}
+          {!arming && s.recording && !blindSearch && (
+            <Pressable
+              onPress={() => { hapticTap(); const next = nextHandlerDistance(searchHandlerDistanceM); setSearchHandlerDistanceM(next); rememberHandlerDistance(next); }}
+              hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('track.searchHandlerDistanceChange', { meters: String(searchHandlerDistanceM) })}
+              className="h-9 px-2.5 rounded-[11px] flex-row items-center gap-1 border bg-white/5 border-ft-line-strong">
+              <Ionicons name="paw" size={13} color={FT.acc} />
+              <Text className="text-[12px] font-extrabold text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>{searchHandlerDistanceM} m</Text>
+            </Pressable>
+          )}
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
             className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
@@ -1344,6 +1376,7 @@ export default function TrackRunScreen() {
               runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
+              dogRange={blindSearch || arming ? null : dogRange}
               dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
@@ -1564,7 +1597,7 @@ export default function TrackRunScreen() {
                       <Pressable
                         key={d}
                         accessibilityLabel={t('track.searchHandlerDistanceOption', { meters: String(d) })}
-                        onPress={() => { setSearchHandlerDistanceM(d); useTrackingStore.getState().setSearchHandlerDistanceM(d); }}
+                        onPress={() => { setSearchHandlerDistanceM(d); rememberHandlerDistance(d); }}
                         className={`px-6 py-2.5 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}
                       >
                         <Text className={`text-[14px] font-black ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{d} m</Text>
