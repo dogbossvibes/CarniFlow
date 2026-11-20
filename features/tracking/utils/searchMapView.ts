@@ -22,8 +22,8 @@ export const SEARCH_VIEW = {
   offTrackMinStepM: 9,
   /** Sichtbare Kartenhöhe (m) in der Absuche. */
   spanM: 70,
-  /** Sichtbare Kartenhöhe (m) kurz vor einem Winkel/Gegenstand. */
-  nearSpanM: 50,
+  /** Sichtbare Kartenhöhe (m) kurz vor einem Winkel/Gegenstand (T-218: 50 → 30, damit man das Ereignis erkennt). */
+  nearSpanM: 30,
   /** Unterhalb dieser Distanz (m) zum nächsten Ereignis wird näher gezoomt … */
   nearEnterM: 20,
   /** … und erst oberhalb dieser Distanz wieder zurück (Hysterese gegen Pumpen). */
@@ -48,6 +48,26 @@ export const SEARCH_VIEW = {
   /** Unterhalb dieser Distanz (m) wird der Hinweis «Nächstes Ereignis» hervorgehoben. */
   nextEventHighlightM: 6,
 } as const;
+
+// ── Wählbare Zoom-Stufe (T-218) ────────────────────────────────────────────
+// Die Karte führt in jeder Stufe weiter nach; die Stufe bestimmt nur die sichtbare
+// Kartenhöhe. Vor einem Winkel/Gegenstand geht jede Stufe näher heran (Hysterese
+// wie bisher). «normal» ist der bisherige Ausschnitt.
+export type SearchZoomLevel = 'near' | 'normal' | 'far';
+export const SEARCH_ZOOM_LEVELS: readonly SearchZoomLevel[] = ['near', 'normal', 'far'];
+export const DEFAULT_SEARCH_ZOOM_LEVEL: SearchZoomLevel = 'normal';
+export const SEARCH_ZOOM: Readonly<Record<SearchZoomLevel, { spanM: number; nearSpanM: number }>> = {
+  near:   { spanM: 30, nearSpanM: 22 },
+  normal: { spanM: SEARCH_VIEW.spanM, nearSpanM: SEARCH_VIEW.nearSpanM },
+  far:    { spanM: 120, nearSpanM: 50 },
+};
+export function isSearchZoomLevel(v: unknown): v is SearchZoomLevel {
+  return v === 'near' || v === 'normal' || v === 'far';
+}
+/** Nächste Stufe beim Antippen: normal → nah → weit → normal. */
+export function nextSearchZoomLevel(level: SearchZoomLevel): SearchZoomLevel {
+  return level === 'normal' ? 'near' : level === 'near' ? 'far' : 'normal';
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -109,10 +129,11 @@ export function distanceToNextEventM(eventArcsM: readonly number[], progressM: n
 
 /**
  * Zoomstufe als sichtbare Kartenhöhe (m): Standard ≈ 70 m, kurz vor einem
- * Winkel/Gegenstand ≈ 50 m, danach zurück. `prevSpanM` trägt die Hysterese.
+ * Winkel/Gegenstand ≈ 30 m, danach zurück; je nach gewählter Stufe (SEARCH_ZOOM). `prevSpanM` trägt die Hysterese.
  */
-export function searchViewSpanM(prevSpanM: number | null, distanceToNextM: number | null): number {
-  const { spanM, nearSpanM, nearEnterM, nearExitM } = SEARCH_VIEW;
+export function searchViewSpanM(prevSpanM: number | null, distanceToNextM: number | null, level: SearchZoomLevel = 'normal'): number {
+  const { nearEnterM, nearExitM } = SEARCH_VIEW;
+  const { spanM, nearSpanM } = SEARCH_ZOOM[level];
   if (distanceToNextM == null || !Number.isFinite(distanceToNextM)) return spanM;
   if (distanceToNextM < nearEnterM) return nearSpanM;
   if (prevSpanM === nearSpanM && distanceToNextM <= nearExitM) return nearSpanM;
