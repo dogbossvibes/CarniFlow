@@ -1,5 +1,23 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #207 – 2026-11-20 (Abend)
+
+**Erledigt:** Zoom-Stufen in der Absuche (#207, T-218, PR #203) auf iOS 60 und Android 53/54
+live. Release-Prüfskripte im Repo, OTA-Verzeichnis aufgefrischt (PR #208). PR #196, #200, #205,
+#206 gemergt; keine offenen PRs.
+
+**Offen:**
+- **Gerätenachkontrolle:** #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Nächste OTA von main:** main enthält den nativen Google-Login (PR #196). Vor einer OTA auf
+  iOS 60 / Android 53/54 belegen, dass die App ohne das native Modul startet und der Login
+  unverändert läuft; sonst STOP.
+- **Nativer Build:** Nutzerin wartet (2026-11-20). Vorher: Checkliste #195 und Abgleich
+  «OTA-Abdeckung gegen main» (Aufgaben-Sitzung, nur lesend, läuft).
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Folgeideen:** Jest nur einmal bei gleichem Stand; Quality Gate nicht abbrechen; #182, #178.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen.
+- **Issue #7** (P0, ACTIVE-Abo) offen: Stand klären.
+
 ## Stand nach OTA #197 und #204 – 2026-11-20
 
 **Erledigt:** Zwei OTA-Chargen auf iOS 60 und Android 53/54 live: Papierkorb in der Dokumentliste

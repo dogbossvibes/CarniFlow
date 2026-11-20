@@ -1,5 +1,73 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #207 – 2026-11-20 (Abend)
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #207, am 20.11. abends
+erneut frisch aus EAS gelesen (neueste Group je Runtime: iOS `6e8e1d29`, Android `1afbcbc3`).
+Ersetzt die Angaben «Aktiv» in den Abschnitten darunter. Karte #207 steht auf
+«Live – Nachkontrolle offen».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `bf23cae0` (aktive Production `fabff601` plus main `9f69f9cb`), Group
+  `6e8e1d29-a748-41bb-b68b-eecbc97da223`. Karte #207.
+- **Release-Quelle:** `release/ios60-main-9f69f9cb-20261120`. Jede weitere iOS-60-OTA muss
+  `bf23cae0` enthalten.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `dc8f756f` (aktive Production `6c0b6dc0` plus main `9f69f9cb`), Group
+  `1afbcbc3-92d5-4836-a8d8-d088cf6bb12e`. Karte #207.
+- **Release-Quelle:** `release/android53-main-9f69f9cb-20261120`. Jede weitere OTA auf dieser
+  Runtime muss `dc8f756f` enthalten.
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen am 20.11. (Übersicht)**
+
+| Karte | Inhalt | Ziele | Testweg / Board |
+|---|---|---|---|
+| #197 | Papierkorb in der Dokumentliste einzeln erreichbar (PR #194) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+| #204 | Absuche: Abstand je Hund (T-216, PR #201), Hundebereich als Band (T-217, PR #202); Dokument speichern (PR #198) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+| #207 | Absuche: Zoom-Stufen, stärkerer Zoom vor Winkel/Gegenstand (T-218, PR #203) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Prüfungen zu #207**
+- Tests iOS 6914 / Android 6928 bestanden, Typecheck/ESLint/Diff sauber, OTA-Abdeckung
+  vollständig, unabhängige Review PASS je Ziel (Recorder, Ansagen, Wertung, Persistenz nicht im
+  Diff), Ancestry PASS.
+- Quality Gate für `9f69f9cb` von GitHub abgebrochen (direkt folgender Merge), nicht rot; grün
+  waren der Lauf auf PR #203 und der Lauf für `47519d41` (derselbe Code plus Doku).
+- Nicht geprüft: echte Geräte, laufende Absuche, Android-Karte (Google Maps begrenzt bei Zoom 21).
+
+**main enthält jetzt native Änderungen (wichtig für die nächste OTA)**
+- Nach `9f69f9cb` gemergt: PR #200 (Start-Logo Android, `app.json`), PR #196 (nativer
+  Google-Login: `app.json`, Abhängigkeiten, Config-Plugin, `services/auth.ts`), PR #205
+  (Maestro-Tests), PR #206 (Doku), PR #208 (Release-Prüfskripte).
+- PR #196 und #200 wirken erst mit einem neuen nativen Build. Die Nutzerin wartet mit dem Build
+  (Aussage 2026-11-20); keine Build-Freigabe. Checkliste vor dem Build: Issue #195.
+- Vor jeder weiteren OTA von main auf die Runtimes von iOS 60 und Android 53/54 ausdrücklich
+  prüfen, dass die App ohne das native Google-Modul sauber startet und der bisherige Login
+  unverändert läuft. Bis das belegt ist: STOP für OTAs, die PR #196 enthalten.
+
+**Release-Ablauf** (PR #208)
+- Pflichtprüfungen und Nachweis liegen im Repo: `npm run release:check`,
+  `npm run release:receipt`, Ablauf in `docs/agent/RELEASE_CHECKS.md`. Noch keine OTA damit
+  veröffentlicht.
+- `ota-ledger.json` aufgefrischt (473 Einträge, Stand #207); EAS-Abfragen der
+  Abdeckungsprüfung mit Zeitlimit 120 s.
+
+**Offene Punkte**
+- Gerätenachkontrolle #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- OTA-Abdeckung gegen `main`: am 20.11. 12 frühere OTAs als fehlend gemeldet (Release-Stände
+  bestehen die Prüfung). Abgleich läuft als Aufgaben-Sitzung, nur lesend; vor dem nächsten
+  nativen Build klären.
+- Gesundheitsakte: Gewicht eintragen und speichern auf einem Gerät gegenprüfen (Maestro-Abläufe
+  14–17 im Emulator fehlgeschlagen, Ursache nicht abschliessend belegt).
+- Offene PRs: keine (Stand 20.11. abends).
+- Folgeideen: Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit
+  (#178); Jest nur einmal laufen lassen, wenn iOS- und Android-Stand gleich sind; Quality Gate
+  bei aufeinanderfolgenden Merges nicht abbrechen.
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen. Issue #7 (P0, ACTIVE-Abo) offen.
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #197 und #204 – 2026-11-20
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #204, am 20.11. erneut
