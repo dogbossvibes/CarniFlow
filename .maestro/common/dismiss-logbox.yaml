@@ -1,18 +1,21 @@
 # Dev-Build: React-Native-LogBox legt Hinweise über die Tab-Leiste und fängt dort
 # Tipps ab. Hinweis antippen und im Detail «Dismiss» wählen, bis keiner mehr
 # sichtbar ist.
-# Das Banner beginnt mit «!» (Meldung trat einmal auf) oder mit einem Zähler
-# (dieselbe Meldung mehrfach, z. B. «36, Uncaught (in promise) Error: …»).
-# Die Zähler-Variante verlangt ein typisches Fehlerwort, damit Kennzahlen der
-# App («1, HUNDE») nie getroffen werden.
+# Das Banner beginnt mit «!» (eine offene Meldung) oder mit einem Zähler
+# (mehrere offene Meldungen; angezeigt wird die jüngste, z. B.
+# «36, Uncaught (in promise) Error: …»). «Dismiss» schliesst jeweils eine
+# Meldung, darum bis zu 40 Durchgänge.
+# Die Zähler-Variante verlangt einen langen Text (ab 60 Zeichen) oder ein
+# typisches Fehlerwort, damit Kennzahlen der App («10, TRAININGS») nie getroffen
+# werden.
 appId: com.anyvo.app
 ---
 - repeat:
-    times: 6
+    times: 40
     while:
-      visible: "(?s)(!, .*|[0-9]+, .*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*)"
+      visible: "(?s)(!, .*|[0-9]+, (.{60,}|.*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*))"
     commands:
-      - tapOn: "(?s)(!, .*|[0-9]+, .*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*)"
+      - tapOn: "(?s)(!, .*|[0-9]+, (.{60,}|.*(Error|Warning|Uncaught|rejected|deprecated|Text strings).*))"
       - tapOn:
           text: "Dismiss"
           optional: true

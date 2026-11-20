@@ -76,7 +76,7 @@ Beide Geräte nutzen dasselbe Testkonto.
 | `02-tabs` | Jeder Haupt-Tab öffnet seinen Bereich |
 | `03-hund-anlegen` | Hund anlegen und wieder löschen; bei erreichtem Kontingent stattdessen die Abo-Auswahl |
 | `04-hund-bearbeiten` | Hundeprofil bearbeiten, speichern, zurücksetzen |
-| `05-training-dokumentieren` | Training erfassen: Übung wählen, speichern |
+| `05-training-dokumentieren` | Training erfassen: Übung wählen, Notiz, speichern, im Journal wieder löschen |
 | `06-trainingsjournal` | Journal, Zeitraumfilter, Suche |
 | `07-faehrten-uebersicht` | Fährten-Übersicht mit allen Einstiegen |
 | `08-faehrten-auswertung` | Auswertung der letzten Fährte |
@@ -124,12 +124,27 @@ abwarten), `dismiss-logbox` (Dev-Hinweise wegräumen), `dismiss-help`
 - **LogBox** (nur Dev-Build) legt Warnungen über die Tab-Leiste, z. B. den
   harmlosen Keychain-Fehler von expo-notifications im unsignierten
   Simulator-Build. `dismiss-logbox` räumt sie weg. Das Banner beginnt mit «!»
-  oder, wenn dieselbe Meldung mehrfach auftrat, mit einem Zähler («36, …»).
+  (eine offene Meldung) oder mit einem Zähler (mehrere offene Meldungen, gezeigt
+  wird die jüngste: «36, …»). Ein Zähler-Banner wird an einem langen Text (ab
+  60 Zeichen) oder einem typischen Fehlerwort erkannt.
 - **Android-Aussetzer «Tab-Tipp kommt nicht an»** (Befund 2026-11-20): Lädt der
   Emulator die Symbolschrift nicht von Metro («Font file for ionicons is
   empty», Symbole fehlen), liegt ein Zähler-Banner über der Tab-Leiste und
   fängt die Tipps ab. `dismiss-logbox` erkennt seither auch Zähler-Banner. Tritt
   der Schriftfehler auf, Emulator und Metro neu starten.
+- **Mehrere iOS-Simulatoren gestartet:** Der Wrapper rät nicht mehr, sondern
+  bricht ab und listet die Geräte; mit `--device <UDID>` den richtigen wählen.
+- **Nur ein Lauf pro Gerät:** Ein zweiter Maestro-Start auf demselben Emulator
+  oder Simulator (auch aus einer anderen Sitzung) und `adb shell uiautomator
+  dump` beenden den Maestro-Treiber; alle Abläufe schlagen dann in Millisekunden
+  fehl («Device server died»). Lauf einfach wiederholen.
+- **«Tap something to inspect it»:** Der Element Inspector des Dev-Builds ist
+  eingeschaltet und fängt Tipps ab. Im Entwicklermenü «Toggle element inspector»
+  wählen (Android: `adb shell input keyevent 82`).
+- **Knapper Arbeitsspeicher:** Emulator, Simulatoren und Metro gleichzeitig
+  bringen den Mac ans Limit (Metro wird beendet, Emulator hängt, Textfelder
+  nehmen Tipps nicht an). Plattformen nacheinander fahren und nicht benötigte
+  Simulatoren schliessen.
 - **App kommt nach `launchApp` nicht hoch** (Android, Emulator lange gelaufen):
   `start` startet sie nach 60 Sekunden einmal neu.
 - **Formulare der Gesundheitsakte** lösen im Dev-Build den LogBox-Fehler «Text
@@ -147,8 +162,12 @@ abwarten), `dismiss-logbox` (Dev-Hinweise wegräumen), `dismiss-help`
   (Abo-Zeile `staging_qa`, `user_capabilities.pro_member`). Im Newbie-Plan führt
   «Hund speichern» zur Abo-Auswahl (Ablauf 03 prüft dann diese) und Ablauf 05
   scheitert ab der dritten Einheit im Kalendermonat am Trainings-Kontingent.
-- **Ablauf 05 hinterlässt eine Trainingseinheit:** Jeder Lauf speichert eine
-  Einheit, die im Journal stehen bleibt (wird nicht gelöscht).
+- **Ablauf 05 räumt seine Trainingseinheit auf:** Die Einheit bekommt die
+  Kennnotiz `E2E Maestro Training` und wird am Ende über die Suche im
+  Trainingsjournal wieder gelöscht (auch Reste früherer abgebrochener Läufe mit
+  dieser Notiz). Im Journal löst das Aktionsmenü im Dev-Build die Warnung
+  «Encountered two children with the same key» aus; ihr Banner läge über
+  «Löschen» und wird vorher weggeräumt.
 - **Staging muss den Datenbankstand von Production haben:** Ablauf 05 braucht
   die Funktionen `training_document_v1`, `training_exercise_identity_v1` und
   `training_focus_v1`, Ablauf 19 die erweiterte Leseregel `dog_documents_select`

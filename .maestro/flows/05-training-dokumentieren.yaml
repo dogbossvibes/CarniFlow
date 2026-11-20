@@ -35,22 +35,27 @@ env:
           text: "Allgemeines Training"
           below: "Übungen · .*"
 # Kennnotiz in die allgemeine Trainingsnotiz (liegt unter den optionalen Angaben).
+# Zentrieren gelingt auf iOS nicht (Zeile steht schon am Listenende) – darum
+# optional, die Sichtbarkeit prüft der nächste Schritt.
 - scrollUntilVisible:
     element: "Dauer, Datum & weitere Angaben.*"
     direction: DOWN
     centerElement: true
+    optional: true
+- assertVisible: "Dauer, Datum & weitere Angaben.*"
 - runFlow:
     when:
       notVisible: "Allgemeine Trainingsnotiz.*"
     commands:
       - tapOn: "Dauer, Datum & weitere Angaben.*"
-- runFlow:
-    when:
-      notVisible: ".*${E2E_NOTE}.*"
-    commands:
-      - tapOn: "Was lief gut\\? Was möchtest du nächstes Mal verbessern\\?"
-      - inputText: ${E2E_NOTE}
-      - runFlow: ../common/hide-keyboard.yaml
+- scrollUntilVisible:
+    element: "Was lief gut\\? Was möchtest du nächstes Mal verbessern\\?"
+    direction: DOWN
+    centerElement: true
+    optional: true
+- tapOn: "Was lief gut\\? Was möchtest du nächstes Mal verbessern\\?"
+- inputText: ${E2E_NOTE}
+- runFlow: ../common/hide-keyboard.yaml
 - scrollUntilVisible:
     element: ".*Einheit speichern"
     direction: DOWN
@@ -67,18 +72,22 @@ env:
 - tapOn: "Suchen"
 - inputText: ${E2E_NOTE}
 - runFlow: ../common/hide-keyboard.yaml
-- assertVisible: ".*${E2E_NOTE}.*"
+# Die Suche zeigt nur noch Einheiten mit der Kennnotiz. Die Karte wird über die
+# Zeile «Hund · Datum» angesteuert: Android liefert die Notiz als eigenen Text
+# (wie das Suchfeld), iOS fasst die Karte zu einem Label ohne Notiz zusammen.
+- assertVisible: ".*Testhund · .*"
 - repeat:
     times: 5
     while:
-      visible:
-        text: ".*${E2E_NOTE}.*"
-        index: 1
+      visible: ".*Testhund · .*"
     commands:
       - longPressOn:
-          text: ".*${E2E_NOTE}.*"
-          index: 1
-      - tapOn: "Löschen"
+          text: ".*Testhund · .*"
+          index: 0
+      # Ein Fehlerbanner des Entwicklungsmodus läge über «Löschen».
+      - runFlow: ../common/dismiss-logbox.yaml
+      # iOS stellt dem Menüpunkt das Symbolzeichen voran («…, Löschen»).
+      - tapOn: "(.+, )?Löschen"
       - assertVisible: "Training löschen\\?"
       - tapOn: "Löschen"
       - waitForAnimationToEnd
