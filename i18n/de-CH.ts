@@ -1327,6 +1327,7 @@ export const deCH = {
   'dog.file': 'Datei',
   'dog.title': 'Titel',
   'dog.selectFileFirst': 'Bitte zuerst eine Datei auswählen.',
+  'dog.documentSaveFailed': 'Das Dokument konnte nicht gespeichert werden. Bitte versuche es erneut.',
   'dog.selectPdfOrImage': 'PDF oder Bild auswählen',
   'dog.issuedOnOptional': 'Ausgestellt am (optional)',
   'dog.noDate': 'Kein Datum',

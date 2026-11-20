@@ -1637,6 +1637,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "dog.file": "Fichier",
   "dog.title": "Titre",
   "dog.selectFileFirst": "Choisis d’abord un fichier.",
+  "dog.documentSaveFailed": "Le document n’a pas pu être enregistré. Réessaie.",
   "dog.selectPdfOrImage": "Sélectionner un PDF ou une image",
   "dog.issuedOnOptional": "Délivré le (facultatif)",
   "dog.noDate": "Aucune date",

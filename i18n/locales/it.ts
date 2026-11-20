@@ -1313,6 +1313,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "dog.file": "File",
   "dog.title": "Titolo",
   "dog.selectFileFirst": "Seleziona prima un file.",
+  "dog.documentSaveFailed": "Non è stato possibile salvare il documento. Riprova.",
   "dog.selectPdfOrImage": "Seleziona PDF o immagine",
   "dog.issuedOnOptional": "Data di emissione (facoltativa)",
   "dog.noDate": "Nessuna data",

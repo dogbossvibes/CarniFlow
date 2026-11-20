@@ -1305,6 +1305,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'dog.file': 'Datei',
   'dog.title': 'Titel',
   'dog.selectFileFirst': 'Bitte zerscht e Datei uswähle.',
+  'dog.documentSaveFailed': 'S Dokumänt het nöd chöne gspeicheret werde. Bitte versuechs nomol.',
   'dog.selectPdfOrImage': 'PDF oder Bild uswähle',
   'dog.issuedOnOptional': 'Usgstellt am (optional)',
   'dog.noDate': 'Kei Datum',
