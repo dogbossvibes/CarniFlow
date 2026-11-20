@@ -186,8 +186,8 @@ const EMPTY_MARKERS: MapMarker[] = [];
 const EMPTY_SEGMENTS: TrackSegment[] = [];
 const EMPTY_LINE: LL[] = [];
 const EMPTY_PLACED: Map<string, PlacedLabel> = new Map();
-/** Breite des Hundebereich-Bands (px): deutlich breiter als die Lay-Linie (4), schmaler als ein Winkel-Badge. */
-export const DOG_RANGE_STROKE_WIDTH = 16;
+/** Breite des Hundebereich-Bands (px). Im Simulator auf Satellitenbild geprüft: 16 px / 30 % war zu blass, 26 px / 40 % ist klar erkennbar. */
+export const DOG_RANGE_STROKE_WIDTH = 26;
 
 export function TrackingMap({
   comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, heading,
@@ -453,7 +453,7 @@ export function TrackingMap({
             (zIndex 1; Lay-Linie 2/3, Suchspur 4). Winkel, Gegenstände, Start/Ziel und Abrisse sind
             Marker und liegen immer darüber; die Lay-Linie bleibt in der Bandmitte sichtbar. */}
         {dogRange && dogRange.length > 1 && (
-          <Polyline coordinates={dogRange} strokeColor="rgba(21,230,195,0.30)" strokeWidth={DOG_RANGE_STROKE_WIDTH}
+          <Polyline coordinates={dogRange} strokeColor="rgba(21,230,195,0.40)" strokeWidth={DOG_RANGE_STROKE_WIDTH}
             lineCap="round" lineJoin="round" zIndex={1} />
         )}
         {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
