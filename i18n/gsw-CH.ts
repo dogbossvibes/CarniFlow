@@ -436,6 +436,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.saveError': 'Speichere isch fehlgschlage',
   'track.distance':  'Distanz',
   'track.objectsShort': 'Gegest.',
+  'track.deviationShort': 'Abweich.',
   'track.pause':     'Pause',
   'track.resume':    'Wiiter',
   'track.mapFollow.on': 'Charte folgt dim Standort',
