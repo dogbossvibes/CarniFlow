@@ -101,6 +101,9 @@
         {
           "image": "./assets/images/anyvologo.png",
           "imageWidth": 200,
+          "android": {
+            "imageWidth": 150
+          },
           "resizeMode": "contain",
           "backgroundColor": "#0F1115"
         }
