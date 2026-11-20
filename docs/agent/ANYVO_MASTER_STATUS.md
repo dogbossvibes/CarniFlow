@@ -1,5 +1,59 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #190 – 2026-11-18 (Abend)
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #190, am 18.11. erneut
+frisch aus EAS gelesen (neueste Group je Runtime: iOS `eb7308c6`, Android `9a4c1724`). Ersetzt die
+Angaben «Aktiv» in den Abschnitten darunter. Karte #190 steht auf «Live – Nachkontrolle offen».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `8da2418c` (aktive Production `f899b16f` plus main `d88044ad`), Group
+  `eb7308c6-2e43-4b78-89c3-46eb89320861`. Karte #190.
+- **Release-Quelle:** `release/ios60-main-d88044ad-20261118`. Jede weitere iOS-60-OTA muss
+  `8da2418c` enthalten.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `ba6fe4d9` (aktive Production `d62a842c` plus main `d88044ad`), Group
+  `9a4c1724-77d3-4f8e-8248-f38626a235cc`. Karte #190.
+- **Release-Quelle:** `release/android53-main-d88044ad-20261118`. Jede weitere OTA auf dieser
+  Runtime muss `ba6fe4d9` enthalten.
+- Enthält jetzt auch PR #179/#182 (Winkelerkennung); laut Review auf Android inaktiv
+  (Bewegungsmodul nur für Apple), es gilt die bisherige GPS-Logik.
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen am 18.11. (Übersicht)**
+
+| Karte | Inhalt | Ziele | Testweg / Board |
+|---|---|---|---|
+| #176 | Fährten-Übersicht aufgeräumt (PR #171) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+| #180 | Spitzwinkel-Hochstufung + «Fährtenverlust» (PR #175, #177) | iOS 60 + Android | Vorher, Nachkontrolle offen |
+| #186 | OTA-Startprüfung beim Kaltstart (PR #178) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+| #187 | Winkelerkennung (PR #179 + #182) | nur iOS 60 | Nachher, Nachkontrolle offen |
+| #190 | «Fährten gemeinsam» ins Gruppentraining (PR #188); Android + PR #179/#182 | iOS 60 + Android | Nachher, Simulator/Emulator bestanden, Gerät offen |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Prüfungen zu #190**
+- Vorher: Tests iOS 6881 / Android 6895 bestanden, Typecheck/ESLint/Diff sauber, OTA-Abdeckung
+  vollständig, unabhängige Review PASS je Ziel. Wrapper-Dry-Run vom Release-Guard gesperrt;
+  Preflight lief im echten Lauf (Ancestry PASS).
+- Nachher: iOS-Simulator (lokaler Dev-Build `8da2418c`) und Android-Emulator, beide auf Staging:
+  alle drei Punkte der Karte bestanden. Nicht geprüft: echte Geräte, Import einer echten Datei.
+
+**Staging-Datenbank nachgezogen** (Freigabe der Nutzerin 2026-11-18)
+- Staging stand auf Migration `20260929080000`; Gruppentraining zeigte deshalb «Diese Gruppe ist
+  nicht mehr verfügbar». 28 Repo-Migrationen ausgeführt, 3 nur in der Historie eingetragen
+  (`dog_registry`, `newbie_training_quota_two`, `track_markers_contract`; Endstand schon vorhanden).
+  Staging steht jetzt auf `20261116233000`, alle `training_group_*`-Funktionen vorhanden.
+- Production von der Nutzerin lesend geprüft: Gruppentraining-Funktionen vorhanden, nicht betroffen.
+
+**Offene Punkte**
+- Gerätenachkontrolle #190, #187, #186, #180, #176, dazu #163, #165, #167, #168.
+- Maestro-Grundgerüst für lokale UI-Tests läuft als eigene Aufgaben-Sitzung (ohne Kosten, nur lokal).
+- Folgeideen: Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit (#178).
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen. Issue #7 (P0, ACTIVE-Abo) offen.
+- `ota-ledger.json` vor dem nächsten nativen Build auffrischen.
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #186 und #187 – 2026-11-18 (Nachmittag)
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #187, am 18.11. erneut

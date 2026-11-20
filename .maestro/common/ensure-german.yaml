@@ -1,0 +1,15 @@
+# Die Abläufe prüfen deutsche Texte. Steht die App in einer anderen Sprache,
+# wird über den Sprach-Bildschirm auf «Deutsch» gestellt.
+appId: com.anyvo.app
+---
+- runFlow:
+    when:
+      notVisible: ".*Alle ansehen.*"
+    commands:
+      - openLink: anyvo://language
+      - tapOn:
+          text: "Öffnen|Open"
+          optional: true
+      - tapOn: "Deutsch.*"
+      - assertVisible: "Sprache"
+      - runFlow: back.yaml

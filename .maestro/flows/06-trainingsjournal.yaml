@@ -1,0 +1,23 @@
+# Trainingsjournal: Liste, Zeitraumfilter und Suche.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- tapOn: "(?-i)Training(, tab.*)?"
+- tapOn: ".*Trainingsjournal.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "Journal"
+- assertVisible: "Alle Trainings an einem Ort"
+- scrollUntilVisible:
+    element: ".*7 Tage"
+    direction: DOWN
+    centerElement: true
+- tapOn: ".*7 Tage"
+- assertVisible: ".* Trainings? angezeigt"
+- tapOn: ".*30 Tage"
+- assertVisible: ".* Trainings? angezeigt"
+- tapOn: "Suchen"
+- inputText: "zzz-kein-treffer"
+- runFlow: ../common/hide-keyboard.yaml
+- assertVisible: "Keine passenden Trainings gefunden"
+- tapOn: "Filter zurücksetzen"
+- assertVisible: ".* Trainings? angezeigt"

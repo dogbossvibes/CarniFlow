@@ -48,6 +48,7 @@
     "test:process": "node --test scripts/__tests__/developmentProcess.node.test.mjs scripts/__tests__/packagePreparation.node.test.mjs scripts/__tests__/agentGithubPush.node.test.mjs scripts/__tests__/otaCoverage.node.test.mjs scripts/__tests__/statusDocs.node.test.mjs",
     "verify:center": "node ./scripts/verify-center.mjs",
     "test:verify-center": "node --test scripts/__tests__/verifyCenter.node.test.mjs",
+    "test:e2e": "node scripts/e2e-maestro.mjs",
     "agent:snapshot": "node scripts/development-snapshot.mjs",
     "agent:github:push": "node scripts/agent-github-push.mjs"
   },

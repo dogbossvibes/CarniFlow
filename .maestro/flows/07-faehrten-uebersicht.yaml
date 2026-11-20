@@ -1,0 +1,16 @@
+# Fährten-Übersicht: Einstiege sind da (ohne GPS-Aufnahme).
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- runFlow: ../common/open-tracks.yaml
+- assertVisible: "Hund wählen.*"
+- assertVisible: "Fährte legen"
+- assertVisible: "Auswertung"
+- assertVisible: "Insights"
+- assertVisible: "Verleitungsfährte legen"
+- scrollUntilVisible:
+    element: ".*Gruppentraining.*"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "Logbuch.*"
+    direction: DOWN

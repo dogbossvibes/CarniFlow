@@ -1,0 +1,18 @@
+# Tab-Leiste: jeder Haupt-Tab öffnet seinen Bereich.
+appId: com.anyvo.app
+tags:
+  - smoke
+---
+- runFlow: ../common/start.yaml
+- tapOn: "(?-i)Hunde(, tab.*)?"
+- assertVisible: "Mit mir geteilt"
+- tapOn: "Start(, tab.*)?"
+- assertVisible: ".*Alle ansehen.*"
+- tapOn: "(?-i)Training(, tab.*)?"
+- assertVisible: ".*Trainingsjournal.*"
+- assertVisible: ".*Training dokumentieren.*"
+- tapOn: "(?-i)Analyse(, tab.*)?"
+- runFlow: ../common/dismiss-help.yaml
+- tapOn: "(?-i)Profil(, tab.*)?"
+- assertVisible: "DEIN KONTO"
+- assertVisible: ".*Mitgliedschaft.*"

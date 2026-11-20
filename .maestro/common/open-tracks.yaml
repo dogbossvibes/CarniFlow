@@ -1,0 +1,11 @@
+# Vom Startbildschirm in die Fährten-Übersicht (Training → Fährten).
+appId: com.anyvo.app
+---
+- tapOn: "(?-i)Training(, tab.*)?"
+# Erst warten, bis die Liste steht: Die Karten rücken beim Laden noch nach unten.
+- assertVisible: ".*Trainingsjournal.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: ".*Live legen & ausarbeiten.*"
+- runFlow: dismiss-help.yaml
+- assertVisible: "FÄHRTEN"

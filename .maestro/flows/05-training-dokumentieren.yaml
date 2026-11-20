@@ -1,0 +1,30 @@
+# Training nachträglich dokumentieren: Formular öffnen, Übung wählen, speichern.
+appId: com.anyvo.app
+---
+- runFlow: ../common/start.yaml
+- tapOn: "(?-i)Training(, tab.*)?"
+- tapOn: ".*Training dokumentieren.*"
+- runFlow: ../common/dismiss-help.yaml
+- assertVisible: "Training erfassen"
+- assertVisible: "Heute trainiert"
+# Ein wiederhergestellter Entwurf hat die Übung schon gewählt (dann steht «Weitere Übung auswählen»).
+- runFlow:
+    when:
+      visible: "Übung auswählen"
+    commands:
+      - tapOn: "Übung auswählen"
+      - assertVisible: "Allgemeines Training"
+      # Lädt die Übungsliste nicht, sind die Übungen gesperrt und es kann nicht gespeichert werden.
+      - assertNotVisible: "Historie nicht verfügbar.*"
+      # Die Karte «Letztes Mal» zeigt denselben Übungsnamen: die Zeile in der Übungsliste wählen.
+      - tapOn:
+          text: "Allgemeines Training"
+          below: "Übung auswählen"
+- scrollUntilVisible:
+    element: ".*Einheit speichern"
+    direction: DOWN
+- assertNotVisible: "Wähle mindestens eine Übung, um zu speichern"
+- tapOn: ".*Einheit speichern"
+- extendedWaitUntil:
+    notVisible: ".*Einheit speichern"
+    timeout: 20000

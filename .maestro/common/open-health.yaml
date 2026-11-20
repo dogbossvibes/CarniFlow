@@ -1,0 +1,8 @@
+# Vom Startbildschirm in die Gesundheitsakte des Testhundes.
+appId: com.anyvo.app
+---
+- runFlow: open-dog.yaml
+- tapOn: ".*Gesundheitsakte, .*|Gesundheitsakte"
+- tapOn: ".*Gesundheitsakte öffnen.*"
+- runFlow: dismiss-help.yaml
+- assertVisible: "SCHNELLZUGRIFF"
