@@ -1,5 +1,66 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #197 und #204 – 2026-11-20
+
+Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #204, am 20.11. erneut
+frisch aus EAS gelesen (neueste Group je Runtime: iOS `64143006`, Android `b48c0505`). Ersetzt die
+Angaben «Aktiv» in den Abschnitten darunter. Karten #197 und #204 stehen auf «Live – Nachkontrolle offen».
+
+**iOS 60** (1.0.8, Runtime `1.0.8-sdk58-v1`)
+- **Aktiv:** Source `fabff601` (aktive Production `574b56b6` plus main `fa2766af`), Group
+  `64143006-db3b-40c2-8959-9b9a1304a31e`. Karte #204.
+- **Release-Quelle:** `release/ios60-main-fa2766af-20261120`. Jede weitere iOS-60-OTA muss
+  `fabff601` enthalten.
+
+**Android Build 53/54** (1.0.8, Runtime `1.0.8-sdk58-android-v1`)
+- **Aktiv:** Source `6c0b6dc0` (aktive Production `ee05929b` plus main `fa2766af`), Group
+  `b48c0505-4b16-4491-a2e4-ef29d5a4aa92`. Karte #204.
+- **Release-Quelle:** `release/android53-main-fa2766af-20261120`. Jede weitere OTA auf dieser
+  Runtime muss `6c0b6dc0` enthalten.
+- Android 1.0.5 (49) und iOS 57: unverändert.
+
+**OTA-Chargen am 20.11. (Übersicht)**
+
+| Karte | Inhalt | Ziele | Testweg / Board |
+|---|---|---|---|
+| #197 | Papierkorb in der Dokumentliste einzeln erreichbar (PR #194) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+| #204 | Absuche: Abstand je Hund (T-216, PR #201), Hundebereich als Band (T-217, PR #202); Dokument speichern (PR #198) | iOS 60 + Android | Nachher, Nachkontrolle offen |
+
+Details, Platform Update IDs und Source-Commits stehen in den Karten.
+
+**Prüfungen**
+- #197: Tests iOS 6884 / Android 6898 bestanden, Typecheck/ESLint/Diff sauber, OTA-Abdeckung
+  vollständig, unabhängige Review PASS je Ziel, Ancestry PASS.
+- #204: Quality Gate für `fa2766af` grün; Tests iOS 6909 / Android 6923 bestanden,
+  Typecheck/ESLint/Diff sauber, OTA-Abdeckung vollständig, unabhängige Review PASS je Ziel
+  (Recorder, Sync und Persistenz der Fährten nicht im Diff), Ancestry PASS.
+- Vorher geprüft zu #204: PR #198 Gutfall (Dokument hochladen, wiederfinden, löschen) im
+  Android-Emulator auf Staging bestanden; PR #202 Sichtprüfung im iOS-Simulator mit Testdaten.
+  Nicht geprüft: echte Geräte, echte laufende Absuche, Fehlerfall von PR #198, iOS-Upload.
+
+**Maestro-UI-Tests** (PR #192, #199; lokal, Staging, ohne Kosten)
+- 19 Abläufe, `npm run test:e2e`, Anleitung `docs/agent/MAESTRO.md`.
+- PR #193: Production-Stand der Dokument-Leseregel und der Trainingsdoku-Funktionen als
+  Migration im Repo; auf Staging angewandt (Freigabe der Nutzerin 2026-11-19). Laut
+  Aufgaben-Sitzung auf Staging zusätzlich direkt angeglichen: Testkonto auf ACTIVE, drei
+  Quota-Funktionen textgleich mit Production. Production nur gelesen.
+- Gesamtläufe am 20.11.: Android 15/19, iOS 15/19. Fehlschläge der Gesundheitsformulare
+  (14–17) laut Aufgaben-Sitzung Testumgebung/Speichermangel, nicht abschliessend belegt;
+  der App-Diff berührt diese Formulare nicht.
+- Lehre: Emulator und Simulator nie von zwei Sitzungen gleichzeitig benutzen.
+
+**Offene Punkte**
+- Gerätenachkontrolle #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+  #186 (Hinweis «ANYVO wird aktualisiert …») lässt sich beim ersten Kaltstart nach #204 prüfen.
+- Gesundheitsakte: Gewicht eintragen und speichern auf einem Gerät gegenprüfen (siehe Maestro).
+- Offene PRs: #196 (nativer Google-Login, nächstes Build), #200 (Start-Logo Android),
+  #203 (T-218, Zoom-Stufen Absuche), #205 (Maestro-Tests).
+- Hinweise aus der Review zu #204: gespeicherter Abstand ist nur der zuletzt gewählte; Band auf
+  Android (Google Maps) und Kopfzeile auf schmalen Geräten ansehen.
+- Folgeideen: Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit (#178).
+- Build 54 weitergeben, Push prüfen, dann #141 schliessen. Issue #7 (P0, ACTIVE-Abo) offen.
+- `ota-ledger.json` vor dem nächsten nativen Build auffrischen.
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #190 – 2026-11-18 (Abend)
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #190, am 18.11. erneut
