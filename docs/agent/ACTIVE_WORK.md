@@ -1,5 +1,23 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #197 und #204 – 2026-11-20
+
+**Erledigt:** Zwei OTA-Chargen auf iOS 60 und Android 53/54 live: Papierkorb in der Dokumentliste
+(#197, PR #194) sowie Absuche mit Abstand je Hund und Hundebereich als Band plus Dokument
+speichern (#204, PR #201, #202, #198). Maestro-UI-Tests (PR #192, #199) und Migrationen für den
+Production-Stand (PR #193) gemergt; Staging entsprechend nachgezogen.
+
+**Offen:**
+- **Gerätenachkontrolle:** #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen (Maestro-Abläufe 14–17 im
+  Emulator fehlgeschlagen, Ursache laut Aufgaben-Sitzung Testumgebung, nicht abschliessend belegt).
+- **Offene PRs:** #196 (Google-Login, nächstes Build), #200 (Start-Logo Android), #203 (T-218,
+  Zoom-Stufen Absuche), #205 (Maestro-Tests).
+- **Folgeideen:** Bewegungs-Refs beim Aufnahmestart zurücksetzen (#182); `reloadAsync`-Zeitlimit (#178).
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen.
+- **Issue #7** (P0, ACTIVE-Abo) offen: Stand klären.
+- **OTA-Verzeichnis** (`ota-ledger.json`) vor dem nächsten nativen Build auffrischen.
+
 ## Stand nach OTA #190 – 2026-11-18 (Abend)
 
 **Erledigt:** PR #188 («Fährten gemeinsam» ins Gruppentraining) auf iOS 60 und Android 53/54 live
