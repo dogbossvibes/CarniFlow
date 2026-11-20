@@ -1,5 +1,42 @@
 # ANYVO Master Status
 
+## Android-Linie auf main nachgezogen – 2026-11-20 (Nacht)
+
+Kein neuer Production-Stand: Es gilt weiter der Abschnitt «nach OTA #207» darunter (iOS
+`bf23cae0`, Android `dc8f756f`). Dieser Abschnitt hält fest, was sich auf `main` geändert hat.
+
+**Befund** (Bericht `docs/agent/tasks/ota-abdeckung-main-20261120.md`, PR #210)
+- Die OTA-Abdeckungsprüfung meldete für `main` 16 frühere OTAs als fehlend. Keine davon ist ein
+  echter Verlust: gleiche Dateien wie live, nur später weiterentwickelt, oder Dateien ausserhalb
+  der App (`.maestro/`, Skript-Einträge). Fehlalarm der Methode (Vergleich Zeile für Zeile).
+- Echte Lücke ausserhalb der Meldungen: Drei Änderungen kamen mit dem nativen Android-Build
+  52/53 und fehlten auf `main`. Die Prüfung sieht per Build gelieferte Änderungen nicht.
+
+**Nachgezogen auf `main`** (Stand `029ff961`)
+- PR #211: `3612e810` T-209 (Android-Absuche bei ausgeschaltetem Bildschirm wach halten),
+  `8e55b3a2` (Beschriftungen der Absuche übersetzbar, `eas.json` `distribution: store`),
+  `ec897e6b` (GPS-Qualitätswort verkleinern statt abschneiden).
+- PR #212: zwei `eslint-disable`-Kommentarzeilen aus der Release-Linie.
+- PR #213 (MASTER) enthielt dieselben drei Cherry-Picks wie #211 und blieb nach dessen Merge
+  ohne zusätzliche Wirkung (leerer Unterschied). Doppelte Arbeit, kein Schaden.
+- Gegenprobe am 20.11.: In den App-Ordnern hat Android-Production `dc8f756f` nichts mehr, was
+  `main` fehlt; `main` ist nur neuer (nativer Google-Login, PR #196).
+
+**Offen vor dem nächsten nativen Build** (keine Build-Freigabe, Nutzerin wartet)
+- `app.json`: `versionCode` auf `main` 51, Android-Linie 53, Build 54 existiert. Wert für den
+  nächsten Build festlegen.
+- Checkliste Issue #195 (Google Cloud, Supabase-Provider, EAS-Variablen).
+- Abdeckungsprüfung: Verbesserung gegen die Fehlalarme ist in Arbeit (Aufgaben-Sitzung, PR
+  folgt). Bis dahin die 16 Meldungen für `main` anhand des Berichts einordnen, nicht pauschal
+  ausnehmen.
+- Per Build gelieferte Änderungen künftig sofort auch nach `main` bringen.
+
+**Hinweis für die nächste OTA**
+- `main` enthält jetzt in `app/track/run.tsx` die übersetzbaren Beschriftungen und das
+  verkleinerte GPS-Wort auch für iOS (bisher nur Android live). Vor einer iOS-OTA ansehen.
+- Unverändert: STOP für OTAs mit PR #196, bis belegt ist, dass die App ohne das native
+  Google-Modul startet und der Login unverändert läuft.
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #207 – 2026-11-20 (Abend)
 
 Aktueller Production-Stand laut Wrapper- und EAS-Nachkontrolle nach OTA #207, am 20.11. abends

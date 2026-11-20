@@ -1,5 +1,22 @@
 # ANYVO – Active Work
 
+## Android-Linie auf main nachgezogen – 2026-11-20 (Nacht)
+
+**Erledigt:** Bericht zur OTA-Abdeckung von `main` (PR #210): 16 Meldungen sind Fehlalarme.
+Echte Lücke geschlossen: T-209 (Absuche-Wachhalter), übersetzbare Beschriftungen und GPS-Wort
+aus den Android-Builds 52/53 sind auf `main` (PR #211, #212; #213 ohne zusätzliche Wirkung).
+Production unverändert (Stand #207).
+
+**Offen:**
+- **Gerätenachkontrolle:** #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195, Abdeckungsprüfung gegen `main` einordnen.
+- **Nächste OTA von main:** STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196);
+  iOS: neue Beschriftungen in der Absuche ansehen.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach OTA #207 – 2026-11-20 (Abend)
 
 **Erledigt:** Zoom-Stufen in der Absuche (#207, T-218, PR #203) auf iOS 60 und Android 53/54
