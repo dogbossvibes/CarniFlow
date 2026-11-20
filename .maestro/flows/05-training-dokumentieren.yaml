@@ -1,5 +1,9 @@
 # Training nachträglich dokumentieren: Formular öffnen, Übung wählen, speichern.
+# Die Einheit bekommt eine Kennnotiz und wird am Ende über das Trainingsjournal
+# wieder gelöscht, damit sich beim Testhund keine Einheiten ansammeln.
 appId: com.anyvo.app
+env:
+  E2E_NOTE: "E2E Maestro Training"
 ---
 - runFlow: ../common/start.yaml
 - tapOn: "(?-i)Training(, tab.*)?"
@@ -12,14 +16,41 @@ appId: com.anyvo.app
     when:
       visible: "Übung auswählen"
     commands:
-      - tapOn: "Übung auswählen"
-      - assertVisible: "Allgemeines Training"
+      # Der Knopf klappt die Übungsliste auf und zu. Direkt nach dem Öffnen des
+      # Formulars bleibt sie auf Android nicht immer offen: tippen, bis die
+      # Listenüberschrift («ÜBUNGEN · <Sparte>») steht.
+      - repeat:
+          times: 4
+          while:
+            notVisible: "Übungen · .*"
+          commands:
+            - waitForAnimationToEnd
+            - tapOn: "Übung auswählen"
+            - waitForAnimationToEnd
+      - assertVisible: "Übungen · .*"
       # Lädt die Übungsliste nicht, sind die Übungen gesperrt und es kann nicht gespeichert werden.
       - assertNotVisible: "Historie nicht verfügbar.*"
       # Die Karte «Letztes Mal» zeigt denselben Übungsnamen: die Zeile in der Übungsliste wählen.
       - tapOn:
           text: "Allgemeines Training"
-          below: "Übung auswählen"
+          below: "Übungen · .*"
+# Kennnotiz in die allgemeine Trainingsnotiz (liegt unter den optionalen Angaben).
+- scrollUntilVisible:
+    element: "Dauer, Datum & weitere Angaben.*"
+    direction: DOWN
+    centerElement: true
+- runFlow:
+    when:
+      notVisible: "Allgemeine Trainingsnotiz.*"
+    commands:
+      - tapOn: "Dauer, Datum & weitere Angaben.*"
+- runFlow:
+    when:
+      notVisible: ".*${E2E_NOTE}.*"
+    commands:
+      - tapOn: "Was lief gut\\? Was möchtest du nächstes Mal verbessern\\?"
+      - inputText: ${E2E_NOTE}
+      - runFlow: ../common/hide-keyboard.yaml
 - scrollUntilVisible:
     element: ".*Einheit speichern"
     direction: DOWN
@@ -28,3 +59,27 @@ appId: com.anyvo.app
 - extendedWaitUntil:
     notVisible: ".*Einheit speichern"
     timeout: 20000
+# Aufräumen: die eben gespeicherte Einheit im Trainingsjournal suchen und löschen.
+- runFlow: ../common/start.yaml
+- tapOn: "(?-i)Training(, tab.*)?"
+- tapOn: ".*Trainingsjournal.*"
+- runFlow: ../common/dismiss-help.yaml
+- tapOn: "Suchen"
+- inputText: ${E2E_NOTE}
+- runFlow: ../common/hide-keyboard.yaml
+- assertVisible: ".*${E2E_NOTE}.*"
+- repeat:
+    times: 5
+    while:
+      visible:
+        text: ".*${E2E_NOTE}.*"
+        index: 1
+    commands:
+      - longPressOn:
+          text: ".*${E2E_NOTE}.*"
+          index: 1
+      - tapOn: "Löschen"
+      - assertVisible: "Training löschen\\?"
+      - tapOn: "Löschen"
+      - waitForAnimationToEnd
+- assertVisible: "Keine passenden Trainings gefunden"
