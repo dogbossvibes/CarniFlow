@@ -39,6 +39,11 @@ function iosDevice() {
   const out = capture('xcrun', ['simctl', 'list', 'devices', 'booted', '--json']).stdout;
   let booted = [];
   try { booted = Object.values(JSON.parse(out).devices).flat().filter(d => d.state === 'Booted'); } catch { /* unten gemeldet */ }
+  // Mehrere gestartete Simulatoren: nicht raten (der erste ist oft der falsche).
+  if (booted.length > 1) {
+    return fail(`Mehrere iOS-Simulatoren gestartet – bitte einen mit --device <UDID> wählen:\n${
+      booted.map(d => `  ${d.udid}  ${d.name}`).join('\n')}`);
+  }
   return booted[0]?.udid ?? fail('Kein gestarteter iOS-Simulator gefunden. Simulator starten und App öffnen.');
 }
 
