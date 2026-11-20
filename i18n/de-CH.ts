@@ -574,6 +574,7 @@ export const deCH = {
   'track.scale.progress': '{current} m / {total} m',
   'track.scale.nextObject': 'Nächster Gegenstand · {meters} m',
   'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
+  'track.searchHandlerDistanceChange': 'Abstand zum Hund: {meters} Meter. Antippen zum Ändern.',
   'track.searchStartNow': 'Jetzt starten',
   'track.searchStartHint': 'Startet die Absuche erst nach deinem Tippen. Ausserhalb des Startbereichs wird eine Bestätigung verlangt.',
   'track.searchStartCandidate': 'Fährtenansatz wird erkannt …',

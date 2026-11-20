@@ -608,6 +608,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.scale.progress": "{current} m / {total} m",
   "track.scale.nextObject": "Next article · {meters} m",
   "track.searchHandlerDistanceOption": "distance {meters} Meter",
+  "track.searchHandlerDistanceChange": "Distance to dog: {meters} metres. Tap to change.",
   "track.searchStartNow": "Now start",
   "track.searchStartHint": "The search starts only after you tap. Outside the start area, confirmation is required.",
   "track.searchStartCandidate": "Detecting track start …",
