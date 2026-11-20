@@ -5,6 +5,7 @@ import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
 import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
   lookAheadFractionForInsets, nextSearchEvents, placeSearchLabels, searchLaidStroke, searchViewSpanM,
+  SEARCH_ZOOM, SEARCH_ZOOM_LEVELS, nextSearchZoomLevel, isSearchZoomLevel,
   trackHeadingAtProgress, type LabelFeature,
 } from '@/features/tracking/utils/searchMapView';
 
@@ -92,6 +93,42 @@ describe('A — Laufrichtung aus der gelegten Fährte', () => {
     trackHeadingAtProgress(L_TRACK, L_ARC.cum, 50, corners);
     expect(corners).toEqual([60, 40]);
     expect(JSON.stringify(L_TRACK)).toBe(snapshot);
+  });
+});
+
+describe('Zoom-Stufen (T-218)', () => {
+  it('normal ist der bisherige Ausschnitt; nah zeigt weniger, weit mehr', () => {
+    expect(SEARCH_ZOOM.normal.spanM).toBe(SEARCH_VIEW.spanM);
+    expect(SEARCH_ZOOM.near.spanM).toBeLessThan(SEARCH_ZOOM.normal.spanM);
+    expect(SEARCH_ZOOM.far.spanM).toBeGreaterThan(SEARCH_ZOOM.normal.spanM);
+    expect(searchViewSpanM(null, null, 'near')).toBe(SEARCH_ZOOM.near.spanM);
+    expect(searchViewSpanM(null, 60, 'far')).toBe(SEARCH_ZOOM.far.spanM);
+    expect(searchViewSpanM(null, 60)).toBe(SEARCH_VIEW.spanM);
+  });
+
+  it('vor einem Ereignis geht jede Stufe näher heran, mit Hysterese', () => {
+    for (const level of SEARCH_ZOOM_LEVELS) {
+      const { spanM, nearSpanM } = SEARCH_ZOOM[level];
+      expect(nearSpanM).toBeLessThan(spanM);
+      expect(searchViewSpanM(spanM, 19.9, level)).toBe(nearSpanM);
+      expect(searchViewSpanM(spanM, 22, level)).toBe(spanM);
+      expect(searchViewSpanM(nearSpanM, 22, level)).toBe(nearSpanM);
+      expect(searchViewSpanM(nearSpanM, 40, level)).toBe(spanM);
+    }
+  });
+
+  it('im Nah-Zoom bleibt das Ereignis im Bild: 20 m voraus passen in den Ausschnitt vor der Position', () => {
+    // Die Position liegt bei 78 % der Kartenhöhe → so viel Karte liegt voraus.
+    expect(SEARCH_ZOOM.normal.nearSpanM * SEARCH_VIEW.positionFraction).toBeGreaterThanOrEqual(SEARCH_VIEW.nearEnterM);
+  });
+
+  it('Antippen schaltet normal → nah → weit → normal; ungültige Werte werden nicht als Stufe gelesen', () => {
+    expect(nextSearchZoomLevel('normal')).toBe('near');
+    expect(nextSearchZoomLevel('near')).toBe('far');
+    expect(nextSearchZoomLevel('far')).toBe('normal');
+    expect(isSearchZoomLevel('near')).toBe(true);
+    expect(isSearchZoomLevel('gross')).toBe(false);
+    expect(isSearchZoomLevel(null)).toBe(false);
   });
 });
 

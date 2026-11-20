@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useToast } from '@/components/ui/Toast';
 import { useT } from '@/i18n';
+import { useSearchZoomLevel } from '@/features/tracking/hooks/useSearchZoomLevel';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleClassify';
@@ -26,6 +27,7 @@ import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
 import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
   lookAheadFractionForInsets, placeSearchLabels, searchLaidStroke, searchViewSpanM, trackHeadingAtProgress,
+  SEARCH_ZOOM, nextSearchZoomLevel,
   type LabelFeature, type PlacedLabel,
 } from '@/features/tracking/utils/searchMapView';
 
@@ -227,8 +229,10 @@ export function TrackingMap({
   // Zoomstufe mit Hysterese: der vorherige Ausschnitt ist State (kein Ref im Render);
   // die Anpassung während des Renderns ist das von React vorgesehene Muster.
   const [prevSearchSpanM, setPrevSearchSpanM] = useState<number | null>(null);
+  // T-218: wählbare Zoom-Stufe (nah/normal/weit); die Karte führt in jeder Stufe weiter nach.
+  const [searchZoomLevel, setSearchZoomLevel] = useSearchZoomLevel();
   const searchSpanM = searchView && searchActive
-    ? searchViewSpanM(prevSearchSpanM, distanceToNextEventM(searchEventArcs.all, searchView.handlerProgressM))
+    ? searchViewSpanM(prevSearchSpanM, distanceToNextEventM(searchEventArcs.all, searchView.handlerProgressM), searchZoomLevel)
     : null;
   if (searchSpanM !== prevSearchSpanM) setPrevSearchSpanM(searchSpanM);
   // Erst mit bekannter Kartenhöhe zoomen (Android braucht sie für die Zoomstufe).
@@ -332,8 +336,9 @@ export function TrackingMap({
       if (m.type !== 'winkel' && !numberedObject) return;
       features.push({ key: `marker:${index}`, kind: m.type === 'winkel' ? 'angle' : 'object', lat: m.lat!, lng: m.lng!, arcM: m.arcM });
     });
-    return placeSearchLabels(searchLine, features, SEARCH_VIEW.spanM / mapHeightPt);
-  }, [searchActive, markerList, searchLine, mapHeightPt]);
+    // Massstab der gewählten Stufe (nicht des kurzzeitigen Nah-Zooms) → Kürzel springen nur beim Umschalten.
+    return placeSearchLabels(searchLine, features, SEARCH_ZOOM[searchZoomLevel].spanM / mapHeightPt);
+  }, [searchActive, markerList, searchLine, mapHeightPt, searchZoomLevel]);
   const labelLeaders = useMemo(() => [...placedLabels.values()].map(p => {
     const anchor = { latitude: p.anchor.lat, longitude: p.anchor.lng };
     return { key: p.key, anchor, coordinates: [anchor, { latitude: p.label.lat, longitude: p.label.lng }] };
@@ -648,6 +653,20 @@ export function TrackingMap({
                   onPress={() => setViewMenuOpen(open => !open)}
                 />
               </View>
+              {/* T-218: Zoom-Stufe umschalten (normal → nah → weit). Holt ein pausiertes Nachführen zurück,
+                  weil die Stufe nur beim Nachführen wirkt. */}
+              <Fab
+                icon={searchZoomLevel === 'near' ? 'add-circle' : searchZoomLevel === 'far' ? 'remove-circle' : 'search'}
+                active={searchZoomLevel !== 'normal'}
+                testID="track-search-zoom"
+                accessibilityLabel={t('track.mapZoom.a11y', { level: t(`track.mapZoom.${searchZoomLevel}`) })}
+                onPress={() => {
+                  const next = nextSearchZoomLevel(searchZoomLevel);
+                  setSearchZoomLevel(next);
+                  if (camera.mode !== 'free' && (camera.paused || !follow)) resumeCamera();
+                  showToast(t('track.mapZoom.toast', { level: t(`track.mapZoom.${next}`) }));
+                }}
+              />
               {camera.mode !== 'free' && (camera.paused || !follow) && (
                 <Fab
                   icon="locate"
@@ -755,7 +774,8 @@ function ViewMenuRow({ icon, label, selected, onPress }: {
   );
 }
 
-function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
+function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint, testID }: {
+  testID?: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
   active?: boolean;
@@ -765,6 +785,7 @@ function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
   return (
     <TouchableOpacity
       style={[s.fab, active && s.fabActive]}
+      testID={testID}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"

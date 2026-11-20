@@ -61,9 +61,9 @@ const markerWithLabel = (label: string) => host('marker').find(m => m.props.mark
 afterEach(() => { act(() => tree?.unmount()); jest.clearAllMocks(); });
 
 describe('TrackingMap — Absuche-Kartenansicht', () => {
-  it('zeigt EINEN Button «Kartenansicht» statt der Spalte; die Auswahl schaltet die Modi', () => {
+  it('zeigt «Kartenansicht» und den Zoom-Knopf statt der Spalte; die Auswahl schaltet die Modi', () => {
     render(view());
-    expect(labels()).toEqual(['track.mapView.title']);
+    expect(labels()).toEqual(['track.mapView.title', 'track.mapZoom.a11y']);
     expect(host('track-map-view-menu')).toHaveLength(0);
 
     press('track.mapView.title');
@@ -97,10 +97,25 @@ describe('TrackingMap — Absuche-Kartenansicht', () => {
     expect(ahead).toBeLessThan(70 * 0.35 + 0.5);
   });
 
-  it('näher als 20 m am nächsten Ereignis wird etwas näher gezoomt', () => {
+  it('näher als 20 m am nächsten Ereignis wird deutlich näher gezoomt (T-218: 30 m)', () => {
     render(view({ handlerProgressM: 30, dogProgressM: 35 }));                 // 10 m vor dem Winkel
     const zoomCall = mockMapApi.animateCamera.mock.calls.map(c => c[0]).find(c => c.altitude != null);
-    expect(zoomCall.altitude).toBeCloseTo(50 / (2 * Math.tan(15 * Math.PI / 180)), 3);
+    expect(zoomCall.altitude).toBeCloseTo(30 / (2 * Math.tan(15 * Math.PI / 180)), 3);
+  });
+
+  it('Zoom-Knopf schaltet normal → nah → weit und merkt sich die Stufe (T-218)', () => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage');
+    render(view());
+    const altitudes = () => mockMapApi.animateCamera.mock.calls.map(c => c[0]).filter(c => c.altitude != null).map(c => c.altitude);
+    const altitudeFor = (spanM: number) => spanM / (2 * Math.tan(15 * Math.PI / 180));
+    press('track.mapZoom.a11y');
+    expect(altitudes().at(-1)).toBeCloseTo(altitudeFor(30), 3);                // nah
+    expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('track_search_zoom_level', 'near');
+    press('track.mapZoom.a11y');
+    expect(altitudes().at(-1)).toBeCloseTo(altitudeFor(120), 3);               // weit
+    press('track.mapZoom.a11y');
+    expect(altitudes().at(-1)).toBeCloseTo(altitudeFor(70), 3);                // normal
+    expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('track_search_zoom_level', 'normal');
   });
 
   it('Kürzel stehen NEBEN der Linie mit Punkt und Verbindungsstrich; Text «90 R»', () => {
