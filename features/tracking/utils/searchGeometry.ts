@@ -256,6 +256,41 @@ export function pointAtDistance(points: LL[], cum: number[], d: number): LL | nu
   return points[n - 1];
 }
 
+/**
+ * Stücke der gelegten Linie zwischen zwei Bogenlängen, an Lücken (breakBefore)
+ * getrennt — über eine Lücke wird nie eine Linie gezogen. Jedes Stück hat
+ * mindestens zwei Punkte; die Enden sind interpoliert. Reine Anzeigegeometrie
+ * (abgesuchter Teil, Stück bis zum nächsten Ereignis): keine Wertung, kein
+ * Fortschritt, keine Speicherung.
+ */
+export function laidLineParts(points: LL[], cum: number[], fromM: number, toM: number): LL[][] {
+  if (points.length < 2 || cum.length !== points.length) return [];
+  const total = cum[cum.length - 1];
+  const lo = Math.max(0, Math.min(total, fromM)), hi = Math.max(0, Math.min(total, toM));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo <= 0) return [];
+  const parts: LL[][] = [];
+  let current: LL[] = [];
+  const close = () => { if (current.length > 1) parts.push(current); current = []; };
+  const lerp = (i: number, d: number): LL => {
+    const segLen = cum[i] - cum[i - 1];
+    const t = segLen > 0 ? (d - cum[i - 1]) / segLen : 0;
+    return {
+      latitude: points[i - 1].latitude + (points[i].latitude - points[i - 1].latitude) * t,
+      longitude: points[i - 1].longitude + (points[i].longitude - points[i - 1].longitude) * t,
+    };
+  };
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].breakBefore) { close(); continue; }
+    const a = cum[i - 1], b = cum[i];
+    if (b <= lo || a >= hi) continue;
+    const from = Math.max(a, lo), to = Math.min(b, hi);
+    if (current.length === 0) current.push(from === a ? { latitude: points[i - 1].latitude, longitude: points[i - 1].longitude } : lerp(i, from));
+    current.push(to === b ? { latitude: points[i].latitude, longitude: points[i].longitude } : lerp(i, to));
+  }
+  close();
+  return parts;
+}
+
 // T-217: Bereich des Hundes als Linienstück. Die App kennt die Hundeposition nicht;
 // ehrlich darstellbar ist nur «irgendwo zwischen Hundeführer:in und Leinenlänge».
 // Kürzere Bänder verschwinden unter dem Positionspunkt → dann bleibt die Pfote.
