@@ -1,5 +1,35 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA #220 – 2026-11-21 (Abend)
+
+Frisch aus EAS gelesen am 21.11.2026. Einzelheiten stehen auf der Release-Karte #220.
+Android ist unverändert (Abschnitt «nach OTA #216 und #217» darunter).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `3612a99079e278a023f5b4ff8222a43e4704daba`,
+  Update Group `bf42efe0-de53-425a-a9f0-4ddae42f36eb`, Branch
+  `release/ios60-qa-mitschrift-20261121`, Karte #220. Vorher: `666179ff` (#217).
+- **Android 53/54**: unverändert `03ca16d1` (#216).
+- Die nächste OTA muss `3612a990` (iOS) bzw. `03ca16d1` (Android) enthalten.
+
+**Inhalt**
+- **#220 (nur iOS):** PR #219 als Cherry-Pick. Die Zeile «AUTO …» der Kandidaten-Mitschrift in
+  der Fährten-Diagnose (Testmodus) zeigt die Motion-Evidenz, mit der die Winkelerkennung
+  gerechnet hat, auch aus einem benachbarten Zeitfenster. Rein lesend; keine Änderung an
+  Erkennung, Bewertung, Markern oder gespeicherten Daten. Für Kundinnen nichts Sichtbares.
+- Auf `main` ist PR #219 gemergt; Android hat die Änderung noch nicht (nur Testmodus).
+
+**Befund aus der Testfährte vom 21.11.** (Start, drei Rechtswinkel, Ende; nur Analyse)
+- Erkennung richtig: drei Rechtswinkel, kein falscher vierter. Der dritte Winkel wurde nur dank
+  Motion-Zuschlag angenommen (0,565 + 0,12; Schwelle 0,62).
+- Offen, nicht geändert: Winkelmarken sitzen bis 1,2 m neben der gespeicherten Linie. Die Marke
+  nimmt den Detektor-Punkt, die ausgedünnte Linie schneidet die Ecke ab. Entscheid der Nutzerin
+  ausstehend (Linie behält Eckpunkt oder Marke nur in der Anzeige auf die Linie), nach weiteren
+  Testfährten.
+
+**Geräteprüfung**
+- Offen: #220 (App startet, Mitschrift im Testmodus). Karte auf «Live – Nachkontrolle offen».
+
 ## Stand iOS 60 und Android Build 53/54 nach OTA #216 und #217 – 2026-11-21
 
 Frisch aus EAS gelesen am 21.11.2026. Einzelheiten stehen auf den Release-Karten #216 und #217.
