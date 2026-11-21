@@ -1,5 +1,22 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #216 und #217 – 2026-11-21
+
+**Erledigt:** Startprüfung für OTAs korrigiert (PR #215, #216) auf iOS 60 und Android 53/54
+live; Aktualisierungs-Bildschirm auf dem iPhone bestätigt. Beschriftungen der Absuche und
+GPS-Wort auf iOS nachgezogen (#217). Production: iOS `666179ff`, Android `03ca16d1`.
+
+**Offen:**
+- **Gerätenachkontrolle:** #217 (Absuche-Beschriftungen), #216 auf Android (erst bei der
+  nächsten Android-OTA), #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
+  weiter STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196).
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Android-Linie auf main nachgezogen – 2026-11-20 (Nacht)
 
 **Erledigt:** Bericht zur OTA-Abdeckung von `main` (PR #210): 16 Meldungen sind Fehlalarme.

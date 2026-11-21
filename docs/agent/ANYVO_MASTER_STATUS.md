@@ -1,5 +1,42 @@
 # ANYVO Master Status
 
+## Stand iOS 60 und Android Build 53/54 nach OTA #216 und #217 – 2026-11-21
+
+Frisch aus EAS gelesen am 21.11.2026. Einzelheiten stehen auf den Release-Karten #216 und #217.
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `666179ffc99be6c2a500e002e00ea679a330c04d`,
+  Update Group `ff2fad44-2410-46a4-bd61-ec58e2adbf31`, Branch
+  `release/ios60-absuche-beschriftungen-20261121`, Karte #217. Vorher: `49572cf0` (#216).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit
+  `03ca16d14bdd83d485252e78c2893a8c52ca1f59`, Update Group
+  `0e7866a6-327c-4e9c-a0d3-b1171c88f479`, Branch `release/android53-pr215-20261121`, Karte #216.
+  Vorher: `dc8f756f` (#207).
+- Die nächste OTA muss `666179ff` (iOS) bzw. `03ca16d1` (Android) enthalten.
+
+**Inhalt**
+- **#216 (iOS + Android):** PR #215, Startprüfung für OTAs korrigiert. Ursache des fehlenden
+  Hinweises «ANYVO wird aktualisiert …»: expo-updates arbeitet seine Aufgaben nacheinander ab;
+  die eigene Nachfrage beim Start wartete hinter dem Hintergrund-Download und lief in die
+  Zeitgrenze von 1,5 s. Neu schaut die App dem Start-Download zu (`lib/otaStartCheck.ts`,
+  `components/OtaStartGate.tsx`). Schutz bei laufender oder unterbrochener Fährte unverändert.
+- **#217 (nur iOS):** Beschriftungen der Absuche übersetzbar (`94d9f5e1`) und GPS-Qualitätswort
+  verkleinern statt abschneiden (`ce045f3c`). Auf Android seit Build 52/53 schon enthalten.
+
+**Release-Linien weichen von `main` ab**
+- #216 und #217 sind Cherry-Picks auf die Live-Commits, kein Merge von `main`. Auf `main`, aber
+  in keiner OTA: PR #196 (nativer Google-Login), PR #200 (Startbild, `app.json`), PR #205,
+  PR #208 (Release-Prüfskripte), Doku. iOS-Linie ohne T-209 (dort ohne Wirkung).
+- Unverändert: STOP für OTAs von `main`, bis belegt ist, dass die App ohne das native
+  Google-Modul startet und der Login unverändert läuft.
+
+**Geräteprüfung**
+- iPhone, 21.11.: Aktualisierungs-Bildschirm erscheint beim ersten Öffnen nach #217 (Nutzerin
+  bestätigt; vermerkt auf #216, #217, #186).
+- Offen: Aktualisierungs-Bildschirm auf Android (erst bei der nächsten Android-OTA sichtbar);
+  #217 Beschriftungen in der laufenden Absuche ansehen. Alle Karten bleiben auf
+  «Live – Nachkontrolle offen».
+
 ## Android-Linie auf main nachgezogen – 2026-11-20 (Nacht)
 
 Kein neuer Production-Stand: Es gilt weiter der Abschnitt «nach OTA #207» darunter (iOS
