@@ -441,13 +441,18 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       // Ecke, weshalb akzeptierte Winkel bisher gar nicht protokolliert wurden.
       if (qaRef.current) {
         const d = diagnostics.find(x => x.apexIndex === c.apexIndex) ?? null;
-        const ev = motionActiveRef.current && d?.t != null ? motionBufRef.current.evidenceForTrailing(d.t) : null;
+        const dir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
+        // Dieselbe Motion-Evidenz zeigen, mit der der Detektor gerechnet hat (inkl.
+        // benachbarter Zeitfenster) – sonst widerspricht «turnEvidence» dem Zuschlag.
+        // Nur lesend: der Zwischenspeicher wird hier nicht verändert.
+        const ev = motionActiveRef.current && d?.t != null
+          ? (turnEvidenceForDirection?.(d.t, dir) ?? turnEvidenceRef.current.get(d.t) ?? motionBufRef.current.evidenceForTrailing(d.t))
+          : null;
         const before = d?.confidenceBeforeMotion ?? null;
         const adj = d?.motionAdjustment ?? null;
         const trail = before != null && adj != null
           ? `conf ${before.toFixed(2)} ${adj >= 0 ? '+' : '−'} motion ${Math.abs(adj).toFixed(2)} = ${(d?.confidence ?? 0).toFixed(2)}`
           : `conf ${(d?.confidence ?? 0).toFixed(2)}`;
-        const dir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
         pushQaCandidateLine(
           `AUTO ${new Date(d?.t ?? Date.now()).toISOString().slice(11, 19)} ` +
           `idx=${c.apexIndex} ${c.kind} (${dir}) src=${fused?.source ?? 'gps'} sharp=${fused?.sharpness ?? '—'} ` +
