@@ -19,6 +19,12 @@ Android ist unverändert (Abschnitt «nach OTA #216 und #217» darunter).
   Erkennung, Bewertung, Markern oder gespeicherten Daten. Für Kundinnen nichts Sichtbares.
 - Auf `main` ist PR #219 gemergt; Android hat die Änderung noch nicht (nur Testmodus).
 
+**Auf `main`, in keiner OTA**
+- PR #222 (`8776b69e`): Absuche-Karte zeigt die gelegte Linie abhängig vom Fortschritt
+  (abgesucht blass, Stück bis zum nächsten Ereignis betont, Pfote als Punkt nur noch in der
+  Blindsuche). Reine Anzeige. Nicht auf Gerät oder Simulator angesehen; vor einer OTA ansehen
+  (Testweg Vorher). Für iOS/Android nur als Cherry-Pick möglich, solange `main` gestoppt ist.
+
 **Befund aus der Testfährte vom 21.11.** (Start, drei Rechtswinkel, Ende; nur Analyse)
 - Erkennung richtig: drei Rechtswinkel, kein falscher vierter. Der dritte Winkel wurde nur dank
   Motion-Zuschlag angenommen (0,565 + 0,12; Schwelle 0,62).

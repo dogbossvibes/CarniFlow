@@ -8,6 +8,8 @@ auf iOS 60 live (#220). Production: iOS `3612a990`, Android unverändert `03ca16
 **Offen:**
 - **Gerätenachkontrolle:** #220, #217 (Absuche-Beschriftungen), #216 auf Android (erst bei der
   nächsten Android-OTA), #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Absuche-Linie dynamisch (PR #222):** auf `main`, in keiner OTA. Vor einer OTA auf Gerät oder
+  Simulator ansehen (Farben auf Satellitenbild), dann Freigabe der Nutzerin einholen.
 - **Winkelmarken neben der Linie** (bis 1,2 m): Entscheid der Nutzerin ausstehend, nach
   weiteren Testfährten. Greift in die Aufzeichnung ein, braucht Simulator- und Feldprüfung.
 - **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
