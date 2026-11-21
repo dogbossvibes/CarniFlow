@@ -293,6 +293,15 @@ describe('QA-Logging: AUTO und MANUAL vollständig und getrennt', () => {
     expect(block).toContain("(c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links'");
   });
 
+  it('AUTO-Zeile zeigt die Motion-Evidenz, mit der der Detektor gerechnet hat', () => {
+    // Feldbefund 2026-11-21: Zuschlag +0,12 neben «turnEvidence=0.000», weil die Zeile
+    // nur das Fenster am Scheitel druckte, der Detektor aber Nachbarfenster nutzt.
+    const loop = rec.indexOf('for (const c of corners)');
+    const start = rec.indexOf('const d = diagnostics.find(x => x.apexIndex === c.apexIndex)', loop);
+    const block = rec.slice(start, rec.indexOf('`AUTO ${', start));
+    expect(block).toMatch(/turnEvidenceForDirection\?\.\(d\.t, dir\) \?\? turnEvidenceRef\.current\.get\(d\.t\) \?\? motionBufRef\.current\.evidenceForTrailing\(d\.t\)/);
+  });
+
   it('AUTO-Zeile steht genau einmal je bestätigter Ecke — in der Commit-Schleife', () => {
     const loop = rec.slice(rec.indexOf('for (const c of corners) {'));
     const body = loop.slice(0, loop.indexOf('onAngleRef.current?.(c.kind);'));
