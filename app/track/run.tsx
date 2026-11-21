@@ -1,7 +1,7 @@
 import { isScoredObject, isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners, projectAngleMarkers, specialAngleBadge } from '@/features/tracking/utils/specialAngleGeometry';
 import { ANGLE_LABEL, ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
-import { nextSearchEvents, type SearchEvent } from '@/features/tracking/utils/searchMapView';
+import { nextSearchEvents, nextEventArcM, type SearchEvent } from '@/features/tracking/utils/searchMapView';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
@@ -35,7 +35,7 @@ import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracki
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
-import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, buildArc, dogRangeLine, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, buildArc, dogRangeLine, laidLineParts, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
 import { boundedPush, TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
 import type { QaApproachFixDiagnostics, QaEndConfirmationDiagnostics, QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
@@ -727,6 +727,17 @@ export default function TrackRunScreen() {
     });
     return events;
   }, [mapMarkers]);
+
+  // Absuche-Linie «dynamisch» (nur Anzeige): der abgesuchte Teil wird blass, das Stück von der
+  // Hundeführerin bis zum nächsten Ereignis (sonst bis zum Fährtenende) dünn betont.
+  const laidDone = useMemo(() => (s.recording && s.estimatedDogPosition
+    ? laidLineParts(snapData.laidPoints, laidArc.cum, 0, s.progressM) : []),
+  [s.recording, s.estimatedDogPosition, s.progressM, snapData.laidPoints, laidArc]);
+  const laidNext = useMemo(() => {
+    if (!s.recording || !s.estimatedDogPosition) return [];
+    const toM = nextEventArcM(searchEvents, s.progressM, s.dogProgressM, laidArc.total);
+    return laidLineParts(snapData.laidPoints, laidArc.cum, s.progressM, toM);
+  }, [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, searchEvents, snapData.laidPoints, laidArc]);
   const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
@@ -1377,7 +1388,11 @@ export default function TrackRunScreen() {
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
               dogRange={blindSearch || arming ? null : dogRange}
-              dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
+              laidDone={blindSearch || arming ? null : laidDone}
+              laidNext={blindSearch || arming ? null : laidNext}
+              // Pfote als Punkt nur noch in der Blindsuche (dort gibt es weder Linie noch Band).
+              // Sonst zeigt das Band den Hundebereich; bei 1 m, am Gegenstand und am Ziel steht nichts davor.
+              dogPosition={!arming && blindSearch && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}

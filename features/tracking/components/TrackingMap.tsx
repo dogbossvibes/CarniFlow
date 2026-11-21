@@ -161,6 +161,10 @@ interface Props {
   dogPosition?:     LatLng | null;
   /** T-217: möglicher Bereich des Hundes als Stück der gelegten Linie. Gesetzt → Band statt Pfote. */
   dogRange?:        { latitude: number; longitude: number }[] | null;
+  /** Absuche: bereits abgesuchter Teil der gelegten Linie (blasse Überlagerung). Nur Anzeige. */
+  laidDone?:        { latitude: number; longitude: number }[][] | null;
+  /** Absuche: Stück von der Hundeführerin bis zum nächsten Ereignis (dünne Betonung). Nur Anzeige. */
+  laidNext?:        { latitude: number; longitude: number }[][] | null;
   heading?:         number | null;
   // ── Smart Follow (navigationsartige Kartenansicht) ──
   // Aktiv nur während einer laufenden Aufnahme/Absuche; historische Karten
@@ -190,9 +194,12 @@ const EMPTY_LINE: LL[] = [];
 const EMPTY_PLACED: Map<string, PlacedLabel> = new Map();
 /** Breite des Hundebereich-Bands (px). Im Simulator auf Satellitenbild geprüft: 16 px / 30 % war zu blass, 26 px / 40 % ist klar erkennbar. */
 export const DOG_RANGE_STROKE_WIDTH = 26;
+// Absuche: abgesuchter Teil blass über der gelegten Linie, Stück bis zum nächsten Ereignis dünn betont.
+export const LAID_DONE_STROKE = { color: 'rgba(150,156,152,0.92)', width: 6 } as const;
+export const LAID_NEXT_STROKE = { color: '#FAC775', width: 3 } as const;
 
 export function TrackingMap({
-  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, heading,
+  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, laidNext, heading,
   smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -502,6 +509,16 @@ export function TrackingMap({
             </Fragment>
           );
         }))}
+        {/* Absuche: abgesuchter Teil der gelegten Linie blass, Stück bis zum nächsten Ereignis betont.
+            Über der Lay-Linie (zIndex 2/3), unter der Suchspur (später gezeichnet) und allen Markern. */}
+        {!comparison && laidDone?.map((part, index) => (
+          <Polyline key={`laid-done-${index}`} coordinates={part} strokeColor={LAID_DONE_STROKE.color} strokeWidth={LAID_DONE_STROKE.width}
+            lineCap="round" lineJoin="round" zIndex={4} />
+        ))}
+        {!comparison && laidNext?.map((part, index) => (
+          <Polyline key={`laid-next-${index}`} coordinates={part} strokeColor={LAID_NEXT_STROKE.color} strokeWidth={LAID_NEXT_STROKE.width}
+            lineCap="round" lineJoin="round" zIndex={4} />
+        ))}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={4} />
