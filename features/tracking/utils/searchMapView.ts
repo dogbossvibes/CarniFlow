@@ -199,6 +199,18 @@ export function nextSearchEvents(events: readonly SearchEvent[], dogProgressM: n
   };
 }
 
+/**
+ * Bogenlänge, bis zu der die gelegte Linie vor der Hundeführerin betont wird: das nächste
+ * Ereignis ab der virtuellen Hundeposition (ein Gegenstand, an dem der Hund gerade liegt,
+ * zählt mit), sonst das Fährtenende. Reine Anzeige.
+ */
+export function nextEventArcM(events: readonly SearchEvent[], handlerProgressM: number, dogProgressM: number, trackTotalM: number): number {
+  const ahead = events.map(e => e.arcM)
+    .filter(arcM => Number.isFinite(arcM) && arcM > handlerProgressM && arcM >= dogProgressM)
+    .sort((a, b) => a - b);
+  return ahead.length ? Math.min(ahead[0], trackTotalM) : trackTotalM;
+}
+
 /** Bereits passiert (→ blasses Kürzel)? Ohne Bogenlänge nie blass. */
 export function isEventPassed(arcM: number | null | undefined, dogProgressM: number): boolean {
   return arcM != null && Number.isFinite(arcM) && Number.isFinite(dogProgressM)
