@@ -1,6 +1,6 @@
 import type { SketchPoint } from '@/features/tracking/utils/trackSketchGeometry';
 import { useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '@/constants/colors';
@@ -191,9 +191,13 @@ export function StatTriple({ total, avg, streak }: { total: number; avg: number 
   );
 }
 
-export function TrackRow({ h, onPress, onLongPress, points, accent }: { points?: readonly SketchPoint[]; accent?: string; h: TrackRowData; onPress: () => void; onLongPress?: () => void }) {
+export function TrackRow({ h, onPress, onLongPress, points, accent, accessibilityActions, onAccessibilityAction }: {
+  points?: readonly SketchPoint[]; accent?: string; h: TrackRowData; onPress: () => void; onLongPress?: () => void;
+  accessibilityActions?: readonly AccessibilityActionInfo[]; onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+}) {
   return (
-    <TouchableOpacity style={s.row} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}>
+    <TouchableOpacity style={s.row} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}
+      accessibilityActions={accessibilityActions} onAccessibilityAction={onAccessibilityAction}>
       <View style={s.rowSketch}>
         <TrackSketch points={points} accent={accent} size={56} />
       </View>

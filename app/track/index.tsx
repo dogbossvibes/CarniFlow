@@ -27,6 +27,9 @@ import { GlobalActiveFaehrtenBar } from '@/features/tracking/components/GlobalAc
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { resolveAutoResume } from '@/features/tracking/store/activeFaehrtenModel';
 import { useToast } from '@/components/ui/Toast';
+import { AnyvoActionMenu, type AnyvoMenuAction } from '@/components/ui/AnyvoActionMenu';
+
+const TRACK_A11Y_ACTIONS = ['open', 'delete'] as const;
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -154,6 +157,19 @@ export default function TrackOverviewScreen() {
     if (h.syncState && h.syncState !== 'synced') void retryFailedSync().catch(() => {});
     router.push(`/track/${h.id}` as never);
   }, [router]);
+  // Schnellmenü (langer Druck) im Verlauf: Öffnen wie Antippen, Löschen über
+  // die bestehende Rückfrage (confirmDelete). Vorher löste der lange Druck
+  // direkt die Lösch-Rückfrage aus.
+  const [menuTrack, setMenuTrack] = useState<TrackRowData | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const runTrackAction = (h: TrackRowData, key: string) => {
+    if (key === 'open') openTrack(h);
+    else if (key === 'delete') confirmDelete(h.id);
+  };
+  const menuActions: AnyvoMenuAction[] = menuTrack ? [
+    { key: 'open', label: t('common.open'), icon: 'open-outline', onPress: () => runTrackAction(menuTrack, 'open') },
+    { key: 'delete', label: t('common.delete'), icon: 'trash-outline', destructive: true, onPress: () => runTrackAction(menuTrack, 'delete') },
+  ] : [];
   const stats = useMemo(() => ({
     total:  rows.length,
     avg:    averageScore(rows),
@@ -260,13 +276,19 @@ export default function TrackOverviewScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} points={scopedPreviews[h.id]?.lay} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
+              <TrackRow key={h.id} h={h} points={scopedPreviews[h.id]?.lay} accent={layColor} onPress={() => openTrack(h)}
+                onLongPress={() => { setMenuTrack(h); setMenuOpen(true); }}
+                accessibilityActions={TRACK_A11Y_ACTIONS.map(k => ({ name: k, label: t(`common.${k}`) }))}
+                onAccessibilityAction={e => runTrackAction(h, e.nativeEvent.actionName)} />
             ))}
           </View>
         )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      <AnyvoActionMenu visible={menuOpen} onClose={() => setMenuOpen(false)}
+        title={menuTrack ? `${menuTrack.surface} · ${menuTrack.date}` : undefined}
+        actions={menuActions} />
       {toast}
     </SafeAreaView>
   );
