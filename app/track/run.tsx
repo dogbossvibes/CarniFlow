@@ -35,6 +35,7 @@ import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracki
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { cornerDisplayLine, cornerPointsFromMarkers } from '@/features/tracking/utils/cornerDisplayLine';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, buildArc, dogRangeLine, laidLineParts, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
 import { boundedPush, TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
@@ -236,9 +237,16 @@ export default function TrackRunScreen() {
   // T-217: Bereich des Hundes (Hundeführer:in → virtuelle Hundeposition) als Stück der gelegten Linie.
   // Nur Anzeige, erst nach dem Start. Die Blindsuche blendet es an der Karte aus (Linie bliebe sonst erkennbar).
   const laidArc = useMemo(() => buildArc(snapData.laidPoints), [snapData.laidPoints]);
+  // Nur Anzeige: Band, abgesuchtes und nächstes Stück folgen derselben Eckenführung wie die gelegte
+  // Linie auf der Karte (cornerDisplayLine), sonst läge an Winkeln eine Abkürzung über der scharfen Ecke.
+  // Die Bogenlängen bleiben die der gespeicherten Linie, der Fortschritt wird unverändert gemessen.
+  const laidDisplay = useMemo(() => {
+    const line = cornerDisplayLine(snapData.laidPoints, cornerPointsFromMarkers(snapData.laidMarkers), laidArc.cum);
+    return { points: line.points, cum: line.cum ?? laidArc.cum };
+  }, [snapData.laidPoints, snapData.laidMarkers, laidArc]);
   const dogRange = useMemo(() => (s.recording && s.estimatedDogPosition
-    ? dogRangeLine(snapData.laidPoints, laidArc.cum, s.progressM, s.dogProgressM) : []),
-  [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, snapData.laidPoints, laidArc]);
+    ? dogRangeLine(laidDisplay.points, laidDisplay.cum, s.progressM, s.dogProgressM) : []),
+  [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, laidDisplay]);
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
@@ -731,13 +739,13 @@ export default function TrackRunScreen() {
   // Absuche-Linie «dynamisch» (nur Anzeige): der abgesuchte Teil wird blass, das Stück von der
   // Hundeführerin bis zum nächsten Ereignis (sonst bis zum Fährtenende) dünn betont.
   const laidDone = useMemo(() => (s.recording && s.estimatedDogPosition
-    ? laidLineParts(snapData.laidPoints, laidArc.cum, 0, s.progressM) : []),
-  [s.recording, s.estimatedDogPosition, s.progressM, snapData.laidPoints, laidArc]);
+    ? laidLineParts(laidDisplay.points, laidDisplay.cum, 0, s.progressM) : []),
+  [s.recording, s.estimatedDogPosition, s.progressM, laidDisplay]);
   const laidNext = useMemo(() => {
     if (!s.recording || !s.estimatedDogPosition) return [];
     const toM = nextEventArcM(searchEvents, s.progressM, s.dogProgressM, laidArc.total);
-    return laidLineParts(snapData.laidPoints, laidArc.cum, s.progressM, toM);
-  }, [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, searchEvents, snapData.laidPoints, laidArc]);
+    return laidLineParts(laidDisplay.points, laidDisplay.cum, s.progressM, toM);
+  }, [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, searchEvents, laidDisplay, laidArc]);
   const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
