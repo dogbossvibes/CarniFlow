@@ -13,7 +13,7 @@ export interface CornerLinePoint { latitude: number; longitude: number; breakBef
 export interface CornerPoint { latitude: number; longitude: number }
 
 /** Winkelpunkte weiter weg von der Linie gehören nicht zu ihr (alte Daten, fremde Marken). */
-export const CORNER_MAX_SNAP_M = 3;
+export const CORNER_MAX_SNAP_M = 2;
 /** Darunter lohnt sich keine Korrektur. */
 export const CORNER_MIN_SNAP_M = 0.3;
 /** Liegt der Lotfuss so nah an einem Linienpunkt, wird dieser versetzt statt ein Punkt eingefügt. */
@@ -74,14 +74,39 @@ export function cornerDisplayLine<T extends CornerLinePoint>(
   return { points: out, cum: outCum, changed };
 }
 
-/** Winkelmarken, die als Eckpunkte in Frage kommen (kein Abriss, mit Position). */
-export function cornerPointsFromMarkers(
-  markers: readonly { type: string; angleKind?: string | null; lat: number | null; lng: number | null }[],
-): CornerPoint[] {
+// Nur die geometrischen Winkel (links/rechts, normal/spitz) sind Ecken der Linie. Abriss, Absatz und
+// die von Hand gesetzten Fach-Winkel (Bogen-, Offen-, Gegenwinkel) stehen an der Tippstelle, nicht am Eckpunkt.
+const CORNER_KINDS = new Set(['links', 'rechts', 'spitz_links', 'spitz_rechts']);
+
+type CornerMarker = { type: string; angleKind?: string | null; lat: number | null; lng: number | null };
+
+/** Winkelmarken, die als Eckpunkte in Frage kommen (geometrische Winkel mit Position). */
+export function cornerPointsFromMarkers(markers: readonly CornerMarker[]): CornerPoint[] {
   const corners: CornerPoint[] = [];
   for (const m of markers) {
-    if (m.type !== 'winkel' || m.angleKind === 'abriss' || m.lat == null || m.lng == null) continue;
+    if (m.type !== 'winkel' || !CORNER_KINDS.has(m.angleKind ?? '') || m.lat == null || m.lng == null) continue;
+    if (!Number.isFinite(m.lat) || !Number.isFinite(m.lng)) continue;
     corners.push({ latitude: m.lat, longitude: m.lng });
   }
   return corners;
+}
+
+/**
+ * Inhalts-Schlüssel der Eckpunkte. Karten bekommen `markers` oft bei jedem Render als neues Array
+ * (z. B. beim Legen bei jeder Kompass-Änderung). Über den Schlüssel bleibt die Eckpunkt-Liste stabil,
+ * solange sich kein Winkel ändert, und die Linie wird nicht bei jedem Render neu berechnet.
+ */
+export function cornerKeyFromMarkers(markers: readonly CornerMarker[]): string {
+  return cornerPointsFromMarkers(markers).map(c => `${c.latitude},${c.longitude}`).join('|');
+}
+
+const NO_CORNERS: CornerPoint[] = [];
+
+/** Gegenstück zu cornerKeyFromMarkers (Zahl → Text → Zahl ist in JavaScript verlustfrei). */
+export function cornerPointsFromKey(key: string): CornerPoint[] {
+  if (!key) return NO_CORNERS;
+  return key.split('|').map(part => {
+    const [latitude, longitude] = part.split(',').map(Number);
+    return { latitude, longitude };
+  });
 }

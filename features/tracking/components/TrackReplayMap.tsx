@@ -1,5 +1,5 @@
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
-import { cornerDisplayLine, cornerPointsFromMarkers } from '@/features/tracking/utils/cornerDisplayLine';
+import { cornerDisplayLine, cornerKeyFromMarkers, cornerPointsFromKey } from '@/features/tracking/utils/cornerDisplayLine';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,7 +64,9 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
   const { t } = useT();
 
   // Nur Anzeige: die gelegte Linie läuft durch die erkannten Winkelpunkte (wie in TrackingMap).
-  const cornerPoints = useMemo(() => cornerPointsFromMarkers(markers), [markers]);
+  // Über den Inhalts-Schlüssel stabil: ein neues `markers`-Array mit gleichen Winkeln rechnet die Linie nicht neu.
+  const cornerKey = cornerKeyFromMarkers(markers);
+  const cornerPoints = useMemo(() => cornerPointsFromKey(cornerKey), [cornerKey]);
   const layParts = useMemo(
     () => splitContinuousPoints(layPoints).map(part => cornerDisplayLine(removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng })), cornerPoints).points),
     [layPoints, cornerPoints],

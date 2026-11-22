@@ -23,7 +23,7 @@ import { TrackReferenceOverlayLayer } from '@/features/tracking/components/Track
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 import type { ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
 import { pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
-import { cornerDisplayLine, cornerPointsFromMarkers } from '@/features/tracking/utils/cornerDisplayLine';
+import { cornerDisplayLine, cornerKeyFromMarkers, cornerPointsFromKey } from '@/features/tracking/utils/cornerDisplayLine';
 import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
 import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
@@ -303,7 +303,9 @@ export function TrackingMap({
   // Die gespeicherte Linie ist ausgedünnt und schneidet Ecken ab, die Winkel-Marker sitzen am
   // erkannten Winkelpunkt daneben. Nur für die Anzeige läuft die Linie durch diese Winkelpunkte
   // (cornerDisplayLine); gespeicherte Punkte und alle Messwerte bleiben unberührt.
-  const cornerPoints = useMemo(() => cornerPointsFromMarkers(markers), [markers]);
+  // Über den Inhalts-Schlüssel stabil: ein neues `markers`-Array mit gleichen Winkeln rechnet die Linie nicht neu.
+  const cornerKey = cornerKeyFromMarkers(markers);
+  const cornerPoints = useMemo(() => cornerPointsFromKey(cornerKey), [cornerKey]);
   const layParts = useMemo(
     () => splitContinuousPoints(layPoints).map(part => cornerDisplayLine(removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng })), cornerPoints).points),
     [layPoints, cornerPoints],
