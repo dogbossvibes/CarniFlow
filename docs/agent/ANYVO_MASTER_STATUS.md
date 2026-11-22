@@ -1,5 +1,43 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA #224 – 2026-11-22
+
+Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #224.
+Android ist unverändert (Abschnitt «nach OTA #216 und #217» darunter).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `e9b79f43766881a98de7949b4726cacd1a0f74e0`,
+  Update Group `4d60eefa-8385-4107-875d-ed12afd5880c`, Branch
+  `release/ios60-absuche-linie-dynamisch-20261121`, Karte #224. Vorher: `3612a990` (#220).
+- **Android 53/54**: unverändert `03ca16d1` (#216).
+- Die nächste OTA muss `e9b79f43` (iOS) bzw. `03ca16d1` (Android) enthalten.
+
+**Inhalt**
+- **#224 (nur iOS):** PR #222 als Cherry-Pick. Die Absuche-Karte zeigt die gelegte Linie
+  abhängig vom Fortschritt (abgesucht blass, Stück bis zum nächsten Ereignis betont); die Pfote
+  als Punkt erscheint nur noch in der Blindsuche. Reine Anzeige; keine Änderung an Aufzeichnung,
+  Erkennung, Bewertung oder gespeicherten Daten.
+- Von der Nutzerin ohne vorherige Geräte- oder Simulatoransicht freigegeben (Testweg Nachher).
+- Android hat weder PR #219 noch PR #222.
+
+**Bekannte optische Risiken von #224** (aus der Review, am Bildschirm ungeprüft)
+- Apple Maps hält die Reihenfolge von Linien nicht zuverlässig ein: Die graue Linie kann die
+  blaue Suchspur zeitweise verdecken.
+- Im abgesuchten Teil bleibt von farbigen Teilstrecken nur ein schmaler Rand sichtbar.
+
+**Fährten-Simulator** (Testcode, keine OTA)
+- PR #225 (`16f401e9` auf `main`): Wiedergabe von Feldaufnahmen. Ein QA-Export läuft durch die
+  echte Lege-Verarbeitung, mit und ohne Bewegungssensor und mit Zusatzrauschen
+  (`FAEHRTEN_FELD=<export.json>`, siehe README im Sim-Ordner).
+- Testfährte vom 21.11. wiedergegeben: mit Sensor 3 von 3 Rechtswinkeln wie im Feld, ohne
+  Sensor 2 (der dritte fehlt). Mit Zusatzrauschen bricht die Erkennung rasch ein; die Fährte ist
+  mit knapp 19 m und Schenkeln von 4 bis 7 m sehr kurz, die Zahlen zeigen die Reserve, keine Feldquote.
+
+**Geräteprüfung**
+- Offen: #224 (App startet; Absuche mit 1 m ohne Pfote; Linie grau/betont; blaue Suchspur
+  sichtbar; 5 m und 10 m; Blindsuche unverändert). Karte auf «Live – Nachkontrolle offen».
+- Weiter offen: #220.
+
 ## Stand iOS 60 nach OTA #220 – 2026-11-21 (Abend)
 
 Frisch aus EAS gelesen am 21.11.2026. Einzelheiten stehen auf der Release-Karte #220.
