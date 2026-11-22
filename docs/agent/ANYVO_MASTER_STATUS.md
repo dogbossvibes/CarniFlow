@@ -1,5 +1,49 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA #233 – 2026-11-22 (Nacht)
+
+Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #233.
+Android ist unverändert (Abschnitt «nach OTA #216 und #217» weiter unten).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `1b3fd4915c8199d0a097057f40e829a318d5f3e0`,
+  Update Group `c4a59ad6-9edd-43a7-85c7-fa764a0b59f2`, Branch
+  `release/ios60-suchspur-aufbau-20261122`, Karte #233. Vorher: `92527528` (#229).
+- **Android 53/54**: unverändert `03ca16d1` (#216).
+- Die nächste OTA muss `1b3fd491` (iOS) bzw. `03ca16d1` (Android) enthalten.
+
+**Inhalt**
+- **#233 (nur iOS):** PR #231 und PR #232 als Cherry-Picks. In der Vergleichsansicht der Fährte
+  (Auswertung, Karte im Detail und im Vollbild) ist die gelaufene Absuche hell auf dunkel, gleich
+  breit wie die gelegte Linie, und baut sich von Start bis Ende auf
+  (`features/tracking/components/TrackComparisonLines.tsx`). Der Aufbau hält an, solange die Karte
+  nicht sichtbar ist, und steht bei «Bewegung reduzieren» still. Reine Anzeige.
+- Anlass: Die Suchspur war fest blau und 2 pt breit; bei blauer Fährtenfarbe eines Hundes war sie
+  nicht von der gelegten Linie zu trennen. Die Nutzerin wählte aus Mockups die Variante «Aufbau».
+- Bewusst unverändert: laufende Absuche, Replay-Bildschirm und PDF-Bericht (dort bleibt Blau).
+- Android hat weder PR #219 noch PR #222, #227, #228, #231, #232.
+
+**Bekannt zu #233** (nur Optik, am Gerät ungeprüft)
+- Flackern und Akkuverbrauch des Aufbaus sind auf einem echten iPhone nicht gemessen
+  (Simulator: kein Flackern gesehen).
+- Beim Öffnen steht die helle Linie kurz in voller Länge; beim Schliessen des Vollbilds laufen
+  kurz zwei Timer.
+- Auf iOS (Apple Maps) wirkt `zIndex` bei Linien nicht; die Reihenfolge ist die Einfüge-Reihenfolge.
+
+**In Arbeit (Aufgaben-Sitzung, kein Ergebnis)**
+- Glättung der gelegten Linie im Simulator prüfen. Vorbefund des MASTER an zwei Feldaufnahmen:
+  Nicht die Punktzahl, sondern die Glättung (`LINE_GATE.emaAlpha`) rundet die Ecken der
+  gespeicherten Linie (Abstand Winkelpunkt zur Linie 0,85 m und 1,09 m; mit weniger Glättung 0,13 m
+  und 0,27 m, dafür längere, unruhigere Linie). Greift in Aufzeichnung und Winkelerkennung ein;
+  Entscheid erst nach der Matrix.
+
+**Geräteprüfung**
+- Offen: #233 (Suchspur hell und gleich breit, Aufbau ruhig, Vollbild, Rückkehr vom Replay).
+  Karte auf «Live – Nachkontrolle offen».
+- #229: Die Nutzerin hat am 22.11. ein Bildschirmfoto geschickt, die Ecken liegen an den
+  Winkelmarken. Karte noch nicht auf «Veröffentlicht» gesetzt (keine ausdrückliche Abnahme).
+- Weiter offen: #224, #220.
+
 ## Stand iOS 60 nach OTA #229 – 2026-11-22 (Abend)
 
 Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #229.
