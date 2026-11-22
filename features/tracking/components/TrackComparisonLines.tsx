@@ -1,16 +1,49 @@
-import { Fragment, memo, useMemo } from 'react';
+import { Fragment, memo, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import type { ComponentType } from 'react';
 import type { MapPolylineProps } from 'react-native-maps';
-import { C } from '@/constants/colors';
 import { removeGpsJitter, type LatLng } from '../utils/gpsFilter';
 import { splitContinuousPoints } from '../utils/trackContinuity';
 import { buildTrackSegmentPolylines, type TrackSegment } from '../utils/trackSegments';
 import { cornerDisplayLine, type CornerPoint } from '../utils/cornerDisplayLine';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 
 const NO_CORNERS: readonly CornerPoint[] = [];
 
 const OUTLINE = '#F5F7FA';
 const SEPARATOR = '#101820';
+
+// Gelaufene Absuche in der Vergleichsansicht: dunkler Körper so breit wie die gelegte Linie, darauf
+// helle Striche, die in Laufrichtung wandern («Laufband»). Hell auf dunkel hebt sich von jeder
+// Fährtenfarbe eines Hundes ab (auch von Blau). Reine Anzeige.
+export const SEARCH_RUN_COLOR = '#FFFFFF';
+export const SEARCH_RUN_WIDTH = 6;          // = Breite der gelegten Linie (normaler Abschnitt)
+export const SEARCH_RUN_FLOW = { width: 3.5, dash: [10, 14] as number[], stepPt: 3, tickMs: 110 } as const;
+const FLOW_CYCLE = SEARCH_RUN_FLOW.dash[0] + SEARCH_RUN_FLOW.dash[1];
+
+type Coordinates = { latitude: number; longitude: number }[];
+
+/**
+ * Die wandernden Striche. Eigene Komponente, damit pro Schritt nur diese schmale Linie neu gezeichnet
+ * wird (MapKit setzt eine Linie bei jeder Stiländerung neu ein). `lineDashPhase` gibt es nur auf iOS
+ * (Apple Maps); auf Android und bei «Bewegung reduzieren» stehen die Striche still.
+ */
+const SearchRunFlow = memo(function SearchRunFlow({ Polyline, parts }: { Polyline: ComponentType<MapPolylineProps>; parts: Coordinates[] }) {
+  const reduceMotion = useReduceMotion();
+  const animate = Platform.OS === 'ios' && !reduceMotion && parts.length > 0;
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    if (!animate) return undefined;
+    // Kleinere Phase = Striche rücken in Zeichenrichtung (Start → Ende) vor.
+    const timer = setInterval(() => setPhase(current => (current - SEARCH_RUN_FLOW.stepPt + FLOW_CYCLE) % FLOW_CYCLE), SEARCH_RUN_FLOW.tickMs);
+    return () => clearInterval(timer);
+  }, [animate]);
+  return <>
+    {parts.map((part, i) => <Polyline key={`run-flow-${i}`} testID="track-comparison-run-flow" coordinates={part}
+      strokeColor={SEARCH_RUN_COLOR} strokeWidth={SEARCH_RUN_FLOW.width} lineDashPattern={SEARCH_RUN_FLOW.dash}
+      lineDashPhase={animate ? phase : 0} zIndex={13} lineCap="butt" lineJoin="round" />)}
+  </>;
+});
 
 /** Saved-view comparison only; recording/live line styles are deliberately unchanged. */
 export const TrackComparisonLines = memo(function TrackComparisonLines({ Polyline, layPoints, runPoints, segments, layColor, cornerPoints = NO_CORNERS }: {
@@ -35,9 +68,8 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
       strokeColor={OUTLINE} strokeWidth={part.width + 2} zIndex={10} lineCap="round" lineJoin="round" />)}
     {snapshot.lay.map((part, i) => <Polyline key={`lay-${i}`} testID="track-comparison-lay" coordinates={part.coordinates}
       strokeColor={part.color} strokeWidth={part.width} zIndex={11} lineCap="round" lineJoin="round" />)}
-    {snapshot.run.map((part, i) => <Polyline key={`run-outline-${i}`} coordinates={part}
-      strokeColor={SEPARATOR} strokeWidth={4} zIndex={12} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-${i}`} testID="track-comparison-run" coordinates={part}
-      strokeColor={C.trackBlue} strokeWidth={2} zIndex={13} lineCap="round" lineJoin="round" />)}
+      strokeColor={SEPARATOR} strokeWidth={SEARCH_RUN_WIDTH} zIndex={12} lineCap="round" lineJoin="round" />)}
+    <SearchRunFlow Polyline={Polyline} parts={snapshot.run} />
   </Fragment>;
 });
