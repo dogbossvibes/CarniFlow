@@ -1,4 +1,4 @@
-import { cornerDisplayLine, cornerPointsFromMarkers, CORNER_MAX_SNAP_M } from '../cornerDisplayLine';
+import { cornerDisplayLine, cornerKeyFromMarkers, cornerPointsFromKey, cornerPointsFromMarkers, CORNER_MAX_SNAP_M } from '../cornerDisplayLine';
 
 const LAT0 = 47.3, LNG0 = 8.5, M = 111320, KX = M * Math.cos((LAT0 * Math.PI) / 180);
 const at = (x: number, y: number, breakBefore?: boolean) => ({ latitude: LAT0 + y / M, longitude: LNG0 + x / KX, ...(breakBefore ? { breakBefore: true } : {}) });
@@ -24,10 +24,10 @@ describe('cornerDisplayLine', () => {
   test('abgeschnittene Ecke ohne nahen Linienpunkt: Winkelpunkt wird eingefügt, Bogenlängen bleiben die der Linie', () => {
     const line = [at(0, 0), at(0, 8), at(8, 10), at(16, 10)];
     const cum = [0, 8, 16.25, 24.25];
-    const r = cornerDisplayLine(line, [at(2, 11)], cum);
+    const r = cornerDisplayLine(line, [at(1.5, 10.2)], cum);
     expect(r.changed).toBe(1);
     expect(r.points).toHaveLength(5);
-    expect(xy(r.points[2])).toEqual({ x: 2, y: 11 });
+    expect(xy(r.points[2])).toEqual({ x: 1.5, y: 10.2 });
     expect(r.cum).toHaveLength(5);
     expect(r.cum![2]).toBeGreaterThan(8);
     expect(r.cum![2]).toBeLessThan(16.25);
@@ -75,12 +75,35 @@ describe('cornerDisplayLine', () => {
     expect(xy(r.points[1])).toEqual({ x: -1, y: 10.5 });
   });
 
-  test('cornerPointsFromMarkers: nur Winkel mit Position, kein Abriss', () => {
+  test('cornerPointsFromMarkers: nur geometrische Winkel mit Position', () => {
     expect(cornerPointsFromMarkers([
       { type: 'winkel', angleKind: 'rechts', lat: 1, lng: 2 },
+      { type: 'winkel', angleKind: 'spitz_links', lat: 7, lng: 8 },
       { type: 'winkel', angleKind: 'abriss', lat: 3, lng: 4 },
+      { type: 'winkel', angleKind: 'absatz', lat: 3, lng: 4 },
+      { type: 'winkel', angleKind: 'gw', lat: 3, lng: 4 },
+      { type: 'winkel', angleKind: null, lat: 3, lng: 4 },
       { type: 'winkel', angleKind: 'links', lat: null, lng: 4 },
+      { type: 'winkel', angleKind: 'links', lat: NaN, lng: 4 },
       { type: 'gegenstand', lat: 5, lng: 6 },
-    ])).toEqual([{ latitude: 1, longitude: 2 }]);
+    ])).toEqual([{ latitude: 1, longitude: 2 }, { latitude: 7, longitude: 8 }]);
+  });
+
+  test('Grenze: Winkelpunkte weiter als 2 m von der Linie ändern nichts', () => {
+    expect(CORNER_MAX_SNAP_M).toBe(2);
+    const line = [at(0, 0), at(0, 10), at(10, 10)];
+    expect(cornerDisplayLine(line, [at(-1.5, 11.5)]).changed).toBe(0);
+    expect(cornerDisplayLine(line, [at(-1, 11)]).changed).toBe(1);
+  });
+
+  test('Schlüssel: gleicher Inhalt ergibt gleichen Schlüssel, die Punkte kommen verlustfrei zurück', () => {
+    const corner = at(5.2, 0.9);
+    const a = [{ type: 'winkel', angleKind: 'rechts', lat: corner.latitude, lng: corner.longitude }];
+    const b = [{ type: 'winkel', angleKind: 'rechts', lat: corner.latitude, lng: corner.longitude }, { type: 'gegenstand', lat: 1, lng: 2 }];
+    expect(cornerKeyFromMarkers(a)).toBe(cornerKeyFromMarkers(b));
+    expect(cornerPointsFromKey(cornerKeyFromMarkers(a))).toEqual([corner]);
+    expect(cornerKeyFromMarkers([])).toBe('');
+    expect(cornerPointsFromKey('')).toBe(cornerPointsFromKey(''));
+    expect(cornerPointsFromKey('')).toEqual([]);
   });
 });

@@ -131,6 +131,9 @@ describe('TrackReplayMap — Referenz vs. Absuche', () => {
     expect(withCorner).toHaveLength(5);
     expect(withCorner[2]).toEqual(apex);
     expect(withCorner[1]).toEqual(ll(0, 5));
+    // Neues markers-Array mit gleichem Inhalt: die Linie wird nicht neu berechnet (gleiches Array).
+    act(() => { node.update(<TrackReplayMap layPoints={lay} markers={[{ id: 'w1', type: 'winkel', angleKind: 'rechts', lat: apex.latitude, lng: apex.longitude }]} heatmapParts={[]} puckPosition={null} />); });
+    expect(reference(polylines(node))[0].coordinates).toBe(withCorner);
     act(() => { node.update(<TrackReplayMap layPoints={lay} markers={[]} heatmapParts={[]} puckPosition={null} />); });
     expect(reference(polylines(node))[0].coordinates[2]).toEqual(ll(0.8, 9.2));
   });
