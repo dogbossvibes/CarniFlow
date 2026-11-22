@@ -9,12 +9,13 @@ import {
   type HelpTopic,
 } from '@/features/help/helpRegistry';
 import { useT } from '@/i18n';
-import { resetHelpSeen } from '@/stores/helpSeen';
+import { resetHelpSeenDeferred } from '@/stores/helpSeen';
+import { useUndoToast } from '@/components/ui/UndoToast';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, ScrollView, StyleSheet, Text,
+  ScrollView, StyleSheet, Text,
   TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,16 +28,12 @@ export default function HelpCenterScreen() {
   const { t } = useT();
   const [topic, setTopic] = useState<HelpTopic | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  const showUndo = useUndoToast();
 
   const onReset = () => {
-    Alert.alert(
-      t('help.resetAll'),
-      t('help.resetAllBody'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHelpSeen() },
-      ],
-    );
+    // Sofort zurücksetzen, gespeichert wird erst nach der Rückgängig-Frist.
+    const reset = resetHelpSeenDeferred();
+    showUndo({ message: t('undo.helpReset'), onCommit: reset.commit, onUndo: reset.undo });
   };
 
   return (

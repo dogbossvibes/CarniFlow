@@ -27,6 +27,7 @@ import { LiveShareProvider } from '@/features/tracking-exchange/live/LiveSharePr
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
 import { OtaStartGate } from '@/components/OtaStartGate';
+import { UndoToastHost } from '@/components/ui/UndoToast';
 import { useT } from '@/i18n';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
@@ -116,6 +117,8 @@ export default function RootLayout() {
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
       </LiveShareProvider>
+      {/* Gemeinsamer «Erledigt · Rückgängig»-Hinweis (unter der App-Sperre). */}
+      <UndoToastHost />
       <AppLockGate />
     </SessionProvider>
     </QueryClientProvider>
