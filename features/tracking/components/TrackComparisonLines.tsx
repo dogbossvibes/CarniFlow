@@ -5,17 +5,22 @@ import { C } from '@/constants/colors';
 import { removeGpsJitter, type LatLng } from '../utils/gpsFilter';
 import { splitContinuousPoints } from '../utils/trackContinuity';
 import { buildTrackSegmentPolylines, type TrackSegment } from '../utils/trackSegments';
+import { cornerDisplayLine, type CornerPoint } from '../utils/cornerDisplayLine';
+
+const NO_CORNERS: readonly CornerPoint[] = [];
 
 const OUTLINE = '#F5F7FA';
 const SEPARATOR = '#101820';
 
 /** Saved-view comparison only; recording/live line styles are deliberately unchanged. */
-export const TrackComparisonLines = memo(function TrackComparisonLines({ Polyline, layPoints, runPoints, segments, layColor }: {
+export const TrackComparisonLines = memo(function TrackComparisonLines({ Polyline, layPoints, runPoints, segments, layColor, cornerPoints = NO_CORNERS }: {
   Polyline: ComponentType<MapPolylineProps>; layPoints: LatLng[]; runPoints: LatLng[]; segments: TrackSegment[]; layColor: string;
+  /** Erkannte Winkelpunkte: die gelegte Linie läuft in der Anzeige durch sie (reine Darstellung). */
+  cornerPoints?: readonly CornerPoint[];
 }) {
   const snapshot = useMemo(() => {
     const lay = buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments).map(part => ({
-      coordinates: part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })),
+      coordinates: cornerDisplayLine(part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })), cornerPoints).points,
       color: part.kind === 'normal' ? layColor : part.color, width: part.kind === 'normal' ? 6 : 8,
     }));
     const run = splitContinuousPoints(runPoints).map(part => removeGpsJitter(part))
@@ -24,7 +29,7 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
     // Reinstall this small, immutable comparison as ONE ordered snapshot if either
     // line changes. Unrelated region/marker renders keep all native props stable.
     return { lay, run, key: JSON.stringify({ lay, run }) };
-  }, [layPoints, runPoints, segments, layColor]);
+  }, [layPoints, runPoints, segments, layColor, cornerPoints]);
   return <Fragment key={snapshot.key}>
     {snapshot.lay.map((part, i) => <Polyline key={`lay-outline-${i}`} coordinates={part.coordinates}
       strokeColor={OUTLINE} strokeWidth={part.width + 2} zIndex={10} lineCap="round" lineJoin="round" />)}
