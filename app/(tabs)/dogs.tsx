@@ -1,5 +1,6 @@
 import { resolveTrackOverlayColorKey, trackOverlayColor, trackOverlayColorNameKey } from '@/features/tracking/utils/trackOverlayColors';
 import { DogCompactCard } from "@/components/dogs/DogCompactCard";
+import { AnyvoActionMenu, type AnyvoMenuAction } from "@/components/ui/AnyvoActionMenu";
 import { dogToIdentity } from "@/components/dogs/types";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { DogIcon } from "@/components/ui/DogIcon";
@@ -118,6 +119,7 @@ export default function HundeScreen() {
                   onTrainingPage={() => router.push({ pathname: '/unit/progress', params: { dogId: hund.id } })}
                   onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
                   onStats={() => router.push(`/dog/${hund.id}` as never)}
+                  onEdit={() => router.push({ pathname: '/edit-dog', params: { id: hund.id } } as never)}
                 />
               ))}
             </View>
@@ -287,10 +289,35 @@ const s = StyleSheet.create({
 
 // T-184 Etappe 2: Hundekarte zeigt das letzte Training und den offenen Hinweis
 // (nur lesend). Ladefehler lassen die Karte unverändert.
-function DogCardWithLastTraining({ dogId, onTrainingFor, ...props }: Omit<React.ComponentProps<typeof DogCompactCard>, 'lastTrainingLabel' | 'openHintLabel' | 'onTraining'> & { dogId: string; onTrainingFor: (discipline?: string) => void }) {
+//
+// Schnellmenü (langer Druck): dieselben Wege wie die sichtbaren Knöpfe der Karte
+// plus «Bearbeiten» (sonst über das Profil erreichbar). Kein Löschen.
+function DogCardWithLastTraining({ dogId, onTrainingFor, onEdit, ...props }: Omit<React.ComponentProps<typeof DogCompactCard>, 'lastTrainingLabel' | 'openHintLabel' | 'onTraining' | 'onLongPress' | 'extraAccessibilityActions' | 'onExtraAccessibilityAction'> & { dogId: string; onTrainingFor: (discipline?: string) => void; onEdit: () => void }) {
   const { t } = useT();
   const { data } = useDogTrainingSummary(dogId);
-  return <DogCompactCard {...props} onTraining={() => onTrainingFor(data?.last?.disciplines[0])}
-    lastTrainingLabel={data?.last ? lastTrainingText(t, data.last.daysAgo, data.last.disciplines) : null}
-    openHintLabel={data?.openHint ? t('continueTraining.openHint', { text: data.openHint.text }) : null} />;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const onTraining = () => onTrainingFor(data?.last?.disciplines[0]);
+  const lastTrainingLabel = data?.last ? lastTrainingText(t, data.last.daysAgo, data.last.disciplines) : null;
+  const name = props.identity.name;
+  const actions: AnyvoMenuAction[] = [
+    { key: 'open', label: t('common.open'), icon: 'open-outline', onPress: props.onOpen },
+    ...(props.onTrainingPage ? [{ key: 'trainingPage', label: t('dogTraining.open', { name }), icon: 'list-outline' as const, onPress: props.onTrainingPage }] : []),
+    { key: 'training', label: lastTrainingLabel ? t('continueTraining.next') : 'Training', icon: 'barbell-outline', onPress: onTraining },
+    { key: 'faehrte', label: 'Fährte', icon: 'footsteps-outline', onPress: props.onFaehrte },
+    { key: 'stats', label: 'Statistik', icon: 'stats-chart-outline', onPress: props.onStats },
+    { key: 'edit', label: t('common.edit'), icon: 'create-outline', onPress: onEdit },
+  ];
+  return (
+    <>
+      <DogCompactCard {...props} onTraining={onTraining}
+        lastTrainingLabel={lastTrainingLabel}
+        openHintLabel={data?.openHint ? t('continueTraining.openHint', { text: data.openHint.text }) : null}
+        onLongPress={() => setMenuOpen(true)}
+        // Nur was der Vorlese-Funktion sonst fehlt: die übrigen Punkte sind
+        // als eigene Knöpfe der Karte bereits einzeln erreichbar.
+        extraAccessibilityActions={[{ name: 'edit', label: t('common.edit') }]}
+        onExtraAccessibilityAction={n => { if (n === 'edit') onEdit(); }} />
+      <AnyvoActionMenu visible={menuOpen} onClose={() => setMenuOpen(false)} title={name} actions={actions} />
+    </>
+  );
 }

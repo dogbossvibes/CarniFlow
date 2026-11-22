@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View, type AccessibilityActionInfo } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { DogAvatar } from './DogAvatar';
@@ -12,7 +12,13 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 // (Training/Fährte/Statistik). Tap → Dog Hub.
 export function DogCompactCard({
   identity, lastTrainingLabel, openHintLabel, onOpen, onTraining, onTrainingPage, onFaehrte, onStats, trackColor, trackColorLabel,
+  onLongPress, extraAccessibilityActions, onExtraAccessibilityAction,
 }: {
+  /** Langer Druck auf die Karte (Schnellmenü). Ohne Angabe wie bisher. */
+  onLongPress?: () => void;
+  /** Zusätzliche Bedienhilfen-Aktionen des oberen Bereichs (Schnellmenü-Punkte). */
+  extraAccessibilityActions?: readonly AccessibilityActionInfo[];
+  onExtraAccessibilityAction?: (name: string) => void;
   trackColor?: string;
   trackColorLabel?: string;
   identity: DogIdentity;
@@ -33,9 +39,10 @@ export function DogCompactCard({
     // Karte selbst nicht als ein Element zusammenfassen, damit VoiceOver/TalkBack die
     // Zeile „Training von …“ und die Schnellknöpfe einzeln erreicht; das Profil
     // öffnet der obere Bereich per Bedienhilfen-Aktion.
-    <Pressable onPress={onOpen} accessible={false} style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]}>
+    <Pressable onPress={onOpen} onLongPress={onLongPress} delayLongPress={350} accessible={false} style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]}>
       <View style={s.top} accessible accessibilityRole="button" accessibilityLabel={[identity.name, meta, lastTrainingLabel, openHintLabel].filter(Boolean).join(', ')}
-        accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'activate') onOpen(); }}>
+        accessibilityActions={[{ name: 'activate' }, ...(extraAccessibilityActions ?? [])]}
+        onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'activate') onOpen(); else onExtraAccessibilityAction?.(e.nativeEvent.actionName); }}>
         <DogAvatar photoUrl={identity.photoUrl} size={58} />
         <View style={s.info}>
           <View style={s.nameRow}>

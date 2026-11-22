@@ -12,6 +12,8 @@ import { FaehrtenHeader, fmtAge, relDate } from '@/features/tracking/components/
 import { trackScore } from '@/features/tracking/utils/trackScore';
 import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
 import { useToast } from '@/components/ui/Toast';
+import { AnyvoActionMenu, actionMenuA11y, type AnyvoMenuAction } from '@/components/ui/AnyvoActionMenu';
+import { useT } from '@/i18n';
 import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
 import { useActiveFaehrtenList } from '@/features/tracking/hooks/useActiveFaehrte';
 import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
@@ -42,13 +44,23 @@ export default function TrackHistorieScreen() {
     else showToast('Training gelöscht');
   }, [rows, showToast]);
 
-  // Long-Press: erst bestätigen, dann löschen (Swipe löscht weiterhin direkt).
+  // Löschen aus dem Schnellmenü: dieselbe Rückfrage wie beim Wischen, dann löschen.
   const confirmDelete = useCallback((id: string) => {
     Alert.alert(DEL_TITLE, DEL_MSG, [
       { text: 'Abbrechen', style: 'cancel' },
       { text: 'Löschen', style: 'destructive', onPress: () => handleDelete(id) },
     ]);
   }, [handleDelete]);
+
+  // Schnellmenü (langer Druck): Öffnen wie Antippen, Löschen mit Rückfrage.
+  // Vorher löste der lange Druck direkt die Lösch-Rückfrage aus.
+  const { t } = useT();
+  const [menuRow, setMenuRow] = useState<any | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rowActions = (r: any): AnyvoMenuAction[] => [
+    { key: 'open', label: t('common.open'), icon: 'open-outline', onPress: () => router.push(`/track/${r.id}` as never) },
+    { key: 'delete', label: t('common.delete'), icon: 'trash-outline', destructive: true, onPress: () => confirmDelete(r.id) },
+  ];
 
   const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
   const effectiveDogId = activeDog?.id ?? null;
@@ -126,7 +138,8 @@ export default function TrackHistorieScreen() {
                 <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0} confirmTitle={DEL_TITLE} confirmMessage={DEL_MSG}>
                 <TouchableOpacity style={s.row} activeOpacity={0.85}
                   onPress={() => router.push(`/track/${r.id}` as never)}
-                  onLongPress={() => confirmDelete(r.id)} delayLongPress={350}>
+                  onLongPress={() => { setMenuRow(r); setMenuOpen(true); }} delayLongPress={350}
+                  {...actionMenuA11y(rowActions(r))}>
                   <View style={s.sketch}>
                     <TrackSketch legs={angles} objects={objects} size={64} progress={1} />
                   </View>
@@ -167,6 +180,9 @@ export default function TrackHistorieScreen() {
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+      <AnyvoActionMenu visible={menuOpen} onClose={() => setMenuOpen(false)}
+        title={menuRow ? `${menuRow.surface_types?.[0] ?? 'Fährte'} · ${relDate(menuRow.session_date ?? menuRow.created_at)}` : undefined}
+        actions={menuRow ? rowActions(menuRow) : []} />
       {toast}
     </SafeAreaView>
   );

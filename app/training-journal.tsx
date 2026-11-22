@@ -15,7 +15,7 @@ import { DISCIPLINES, disciplineColor } from '@/constants/disciplines';
 import type { FeedItem } from '@/services/trainingFeed';
 import { deleteFeedItem } from '@/services/deleteTraining';
 import { AnyvoSwipeRow, type AnyvoSwipeAction } from '@/components/ui/AnyvoSwipeRow';
-import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { AnyvoActionMenu, type AnyvoMenuAction } from '@/components/ui/AnyvoActionMenu';
 import { buildReportModel } from '@/features/training/report';
 import { shareTrainingReport } from '@/services/reportShare';
 import {
@@ -539,12 +539,26 @@ function JournalCard({
     </>
   );
 
+  // Einheitliches Schnellmenü (langer Druck): nur Abkürzungen zu den Wegen,
+  // die diese Karte schon hat. Löschen ruft den bestehenden Weg samt Rückfrage.
+  const menuActions: AnyvoMenuAction[] = [
+    { key: 'open', label: t('common.open'), icon: 'open-outline', onPress, testID: 'journal-action-menu-open' },
+    ...(onEdit ? [{ key: 'edit', label: t('common.edit'), icon: 'create-outline' as const, onPress: onEdit, testID: 'journal-action-menu-edit' }] : []),
+    ...(onDelete ? [{ key: 'delete', label: t('common.delete'), icon: 'trash-outline' as const, destructive: true, onPress: onDelete, testID: 'journal-action-menu-delete' }] : []),
+  ];
+  const menu = <AnyvoActionMenu visible={actionsOpen} onClose={() => setActionsOpen(false)} title={discipline} actions={menuActions} />;
+
   if (isTrack) {
-    // Legacy path — byte-identical to pre-Gesture-UX-v1 behavior.
+    // Fährteneintrag: Karte und sichtbarer Löschen-Knopf unverändert, kein
+    // Wischen. Neu nur der lange Druck auf das gemeinsame Schnellmenü.
     return (
-      <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={a11y}>
-        {cardInner}
-      </TouchableOpacity>
+      <>
+        <TouchableOpacity style={s.card} onPress={onPress} onLongPress={() => setActionsOpen(true)} delayLongPress={350}
+          activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={a11y}>
+          {cardInner}
+        </TouchableOpacity>
+        {menu}
+      </>
     );
   }
 
@@ -563,29 +577,7 @@ function JournalCard({
       >
         <View style={s.card}>{cardInner}</View>
       </AnyvoSwipeRow>
-
-      {/* Long-Press-Aktionsmenü — dasselbe Muster wie
-          app/dog-command/[id].tsx's Pilot (ein Sheet pro Row). */}
-      <AnyvoBottomSheet visible={actionsOpen} onClose={() => setActionsOpen(false)} title={discipline}>
-        <View style={{ gap: 8, paddingBottom: 6 }}>
-          <TouchableOpacity testID="journal-action-menu-open" style={s.menuAction} onPress={() => { setActionsOpen(false); onPress(); }} activeOpacity={0.85} accessibilityRole="button">
-            <Ionicons name="open-outline" size={19} color={C.trackText} />
-            <Text style={s.menuActionTxt}>{t('common.open')}</Text>
-          </TouchableOpacity>
-          {onEdit ? (
-            <TouchableOpacity testID="journal-action-menu-edit" style={s.menuAction} onPress={() => { setActionsOpen(false); onEdit(); }} activeOpacity={0.85} accessibilityRole="button">
-              <Ionicons name="create-outline" size={19} color={C.trackText} />
-              <Text style={s.menuActionTxt}>{t('common.edit')}</Text>
-            </TouchableOpacity>
-          ) : null}
-          {onDelete ? (
-            <TouchableOpacity testID="journal-action-menu-delete" style={s.menuAction} onPress={() => { setActionsOpen(false); onDelete(); }} activeOpacity={0.85} accessibilityRole="button">
-              <Ionicons name="trash-outline" size={19} color={C.trackDanger} />
-              <Text style={[s.menuActionTxt, { color: C.trackDanger }]}>{t('common.delete')}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </AnyvoBottomSheet>
+      {menu}
     </>
   );
 }
@@ -632,8 +624,6 @@ const s = StyleSheet.create({
   cardNote:  { fontSize: 12, color: C.trackTextMut, fontWeight: '500', marginTop: 2 },
   cardRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardDelete:{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  menuAction:   { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 14, paddingVertical: 13 },
-  menuActionTxt:{ fontSize: 14.5, color: C.trackText, fontWeight: '700' },
   pill:      { borderRadius: 9, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, paddingHorizontal: 9, paddingVertical: 4 },
   pillTxt:   { fontSize: 12, color: C.trackPrimary, fontWeight: '800' },
 

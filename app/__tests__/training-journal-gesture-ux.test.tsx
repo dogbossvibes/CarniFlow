@@ -296,15 +296,23 @@ describe('Trainingsjournal Gesture UX v1 — 11. Fährteneintrag im Journal blei
     expect(swipeableCount(node)).toBe(0);
   });
 
-  it('ein track-Eintrag hat weiterhin nur den bestehenden inline Löschen-Button — kein Bearbeiten-Swipe, kein Long-Press-Menü', () => {
+  it('ein track-Eintrag behält den inline Löschen-Button, bekommt kein Bearbeiten; langer Druck öffnet das Schnellmenü nur mit Öffnen und Löschen', () => {
     mockFeed = [mkTrack({ id: 't1' })];
     const node = render();
     const del = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string } }[] })
       .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'journal.deleteTrackA11y');
     expect(del).toBeTruthy();
     expect(findAction(node, 'common.edit')).toBeUndefined();
-    act(() => { findRow(node, 'Fährte')!.props.onLongPress?.(); });
     expect(findMenuAction(node, 'journal-action-menu-open')).toBeUndefined();
+    act(() => { findRow(node, 'Fährte')!.props.onLongPress?.(); });
+    expect(findMenuAction(node, 'journal-action-menu-open')).toBeTruthy();
+    expect(findMenuAction(node, 'journal-action-menu-delete')).toBeTruthy();
+    expect(findMenuAction(node, 'journal-action-menu-edit')).toBeUndefined();
+    // Löschen im Menü führt in dieselbe Fährten-Rückfrage wie der sichtbare Knopf.
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    act(() => { findMenuAction(node, 'journal-action-menu-delete')!.props.onPress?.(); });
+    expect(spy).toHaveBeenCalledWith('journal.deleteTrackTitle', 'journal.deleteTrackBody', expect.any(Array));
+    spy.mockRestore();
   });
 
   it('gemischter Feed: nur der unit-Eintrag bekommt Gesture-Actions, der track-Eintrag bleibt exakt Legacy', () => {

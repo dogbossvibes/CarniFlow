@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Pressable, StyleProp, ViewStyle, type AccessibilityRole, type AccessibilityState } from 'react-native';
+import { Pressable, StyleProp, ViewStyle, type AccessibilityActionEvent, type AccessibilityActionInfo, type AccessibilityRole, type AccessibilityState } from 'react-native';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import Animated, {
   useSharedValue,
@@ -16,11 +16,15 @@ interface Props {
   accessibilityLabel?: string;
   accessibilityRole?: AccessibilityRole;
   accessibilityState?: AccessibilityState;
+  onLongPress?: () => void;
+  delayLongPress?: number;
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }
 
 const AnimatedPressable2 = Animated.createAnimatedComponent(Pressable);
 
-export function AnimatedPressable({ children, onPress, style, scale = 0.98, disabled, accessibilityLabel, accessibilityRole, accessibilityState }: Props) {
+export function AnimatedPressable({ children, onPress, style, scale = 0.98, disabled, accessibilityLabel, accessibilityRole, accessibilityState, onLongPress, delayLongPress, accessibilityActions, onAccessibilityAction }: Props) {
   const pressed = useSharedValue(false);
   const reduceMotion = useReduceMotion();
 
@@ -42,6 +46,10 @@ export function AnimatedPressable({ children, onPress, style, scale = 0.98, disa
       // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       onPressOut={() => { pressed.value = false; }}
       onPress={() => { if (!disabled) onPress?.(); }}
+      onLongPress={onLongPress && !disabled ? onLongPress : undefined}
+      delayLongPress={delayLongPress}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       disabled={disabled}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
