@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { SEARCH_RUN_COLOR } from '@/features/tracking/components/TrackComparisonLines';
@@ -270,6 +270,10 @@ export default function TrackAuswertungScreen() {
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
+  // Der Aufbau der Suchspur läuft nur auf einer sichtbaren Karte: nicht, wenn ein anderer Bildschirm
+  // über der Auswertung liegt, und in der Karte hinter dem Vollbild auch nicht.
+  const [screenFocused, setScreenFocused] = useState(true);
+  useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
   const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenFitToken, setFullscreenFitToken] = useState(0);
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
@@ -785,6 +789,7 @@ export default function TrackAuswertungScreen() {
               {map?.hasGps ? (
                 <TrackingMap
                   comparison
+                  comparisonPaused={!screenFocused || fullscreenMap}
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
@@ -979,6 +984,7 @@ export default function TrackAuswertungScreen() {
             {map?.hasGps && (
               <TrackingMap
                   comparison
+                  comparisonPaused={!screenFocused}
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}

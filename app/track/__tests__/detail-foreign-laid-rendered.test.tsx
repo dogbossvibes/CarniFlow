@@ -14,7 +14,7 @@ const mockRemote = jest.fn(), mockLocalDetail = jest.fn(), mockRunSupplement = j
 const mockShareTrack = jest.fn(), mockRefresh = jest.fn(), mockBackfill = jest.fn();
 const mockShares = jest.fn(), mockTrainers = jest.fn();
 
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '11111111-1111-4111-8111-111111111111' }), useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useFocusEffect: () => {}, useLocalSearchParams: () => ({ id: '11111111-1111-4111-8111-111111111111' }), useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }) }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeArea', useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));

@@ -65,9 +65,10 @@ export function searchRunBuildParts(parts: Coordinates[], fraction: number): Coo
  * gezeichnet wird (MapKit setzt eine Linie bei jeder Änderung neu ein). Bei «Bewegung reduzieren»
  * steht die Linie in voller Länge still. Nur iOS: auf Android ist das Verhalten nicht geprüft.
  */
-const SearchRunBuild = memo(function SearchRunBuild({ Polyline, parts }: { Polyline: ComponentType<MapPolylineProps>; parts: Coordinates[] }) {
+const SearchRunBuild = memo(function SearchRunBuild({ Polyline, parts, paused }: { Polyline: ComponentType<MapPolylineProps>; parts: Coordinates[]; paused: boolean }) {
   const reduceMotion = useReduceMotion();
-  const animate = Platform.OS === 'ios' && !reduceMotion && parts.length > 0;
+  // `paused`: die Karte ist nicht sichtbar (anderer Bildschirm darüber, Vollbild offen) – kein Timer.
+  const animate = Platform.OS === 'ios' && !reduceMotion && !paused && parts.length > 0;
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (!animate) return undefined;
@@ -83,10 +84,12 @@ const SearchRunBuild = memo(function SearchRunBuild({ Polyline, parts }: { Polyl
 });
 
 /** Saved-view comparison only; recording/live line styles are deliberately unchanged. */
-export const TrackComparisonLines = memo(function TrackComparisonLines({ Polyline, layPoints, runPoints, segments, layColor, cornerPoints = NO_CORNERS }: {
+export const TrackComparisonLines = memo(function TrackComparisonLines({ Polyline, layPoints, runPoints, segments, layColor, cornerPoints = NO_CORNERS, paused = false }: {
   Polyline: ComponentType<MapPolylineProps>; layPoints: LatLng[]; runPoints: LatLng[]; segments: TrackSegment[]; layColor: string;
   /** Erkannte Winkelpunkte: die gelegte Linie läuft in der Anzeige durch sie (reine Darstellung). */
   cornerPoints?: readonly CornerPoint[];
+  /** Aufbau der Suchspur anhalten, solange die Karte nicht sichtbar ist (spart Akku). */
+  paused?: boolean;
 }) {
   const snapshot = useMemo(() => {
     const lay = buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments).map(part => ({
@@ -107,6 +110,6 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
       strokeColor={part.color} strokeWidth={part.width} zIndex={11} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-${i}`} testID="track-comparison-run" coordinates={part}
       strokeColor={SEPARATOR} strokeWidth={SEARCH_RUN_WIDTH} zIndex={12} lineCap="round" lineJoin="round" />)}
-    <SearchRunBuild Polyline={Polyline} parts={snapshot.run} />
+    <SearchRunBuild Polyline={Polyline} parts={snapshot.run} paused={paused} />
   </Fragment>;
 });
