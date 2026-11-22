@@ -39,7 +39,7 @@ jest.mock('@/stores/activeTraining', () => ({
 jest.mock('@/services/trainingUnitService', () => ({
   createTrainingUnit: (ownerId: string, dogId: string) => mockCreateTrainingUnit(ownerId, dogId),
 }));
-jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), haptic: { medium: jest.fn(), error: jest.fn(), success: jest.fn() } }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 
 jest.mock('@/components/training/HeroImage', () => {

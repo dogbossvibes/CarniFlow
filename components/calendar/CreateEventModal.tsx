@@ -20,6 +20,7 @@ import { DateField } from '@/components/ui/DateField';
 import { useT } from '@/i18n';
 import { canEditOwnEvent, eventEditPatch, eventFormInstant } from '@/features/calendar/eventEditing';
 import type { CalendarEvent, EventType } from '@/types/calendar';
+import { haptic } from '@/lib/haptics';
 
 const ACCENT = '#00F5D4';
 
@@ -88,10 +89,12 @@ function EventForm({ visible, event, onClose, onCreated, ownerId }: Props & { ow
         : await createOwnEvent(ownerId, draft);
       if (!alive.current) return;
       if (result.error || !result.data) {
+        haptic.error();
         Alert.alert(t('common.error'), t(event ? 'calendar.editFailed' : 'calendar.saveFailed'));
         return;
       }
       const data = result.data as CalendarEvent;
+      haptic.success();   // Termin gespeichert
       // A notification failure must not turn a committed update into a duplicate create.
       const reminderEvent = data.status === 'cancelled' || data.status === 'completed' ? { ...data, reminder_minutes: [] } : data;
       await scheduleEventReminders(reminderEvent).catch(() => {});
@@ -104,7 +107,7 @@ function EventForm({ visible, event, onClose, onCreated, ownerId }: Props & { ow
       onCreated(data);
       onClose();
     } catch {
-      if (alive.current) Alert.alert(t('common.error'), t(event ? 'calendar.editFailed' : 'calendar.saveFailed'));
+      if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t(event ? 'calendar.editFailed' : 'calendar.saveFailed')); }
     } finally {
       lock.current = false;
       if (alive.current) setSaving(false);

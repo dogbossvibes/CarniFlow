@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTabScrollToTop } from '@/hooks/useTabScrollToTop';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -13,11 +14,12 @@ import { ContinueTrainingSection } from '@/components/training/ContinueTrainingS
 // entfernt — Verlauf gibt es nur noch als Mini-Vorschau auf Home.
 export default function TrainingScreen() {
   const router = useRouter();
+  const scrollRef = useTabScrollToTop();
   const { t } = useT();
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
           <View>
             <Text style={s.eyebrow}>ANYVO</Text>

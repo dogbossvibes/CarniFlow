@@ -111,3 +111,19 @@ describe('Trainer-Hub als Fullscreen-Modal mit sicherer Rücknavigation', () => 
     expect(hubModalSrc).toContain('testID="trainer-hub-close"');
   });
 });
+
+describe('Tab nochmals antippen → nach oben scrollen', () => {
+  it.each(['home', 'dogs', 'training', 'analytics', 'profile'])(
+    'Tab %s hängt seine Hauptliste an useTabScrollToTop',
+    (tab) => {
+      const src = readFileSync(join(__dirname, '..', `${tab}.tsx`), 'utf8');
+      expect(src).toMatch(/const scrollRef\s+= useTabScrollToTop\(\);/);
+      expect(src.match(/ref=\{scrollRef\}/g)).toHaveLength(1);
+    },
+  );
+
+  it('der Hook nutzt das mitgelieferte useScrollToTop von expo-router', () => {
+    const hookSrc = readFileSync(join(__dirname, '..', '..', '..', 'hooks', 'useTabScrollToTop.ts'), 'utf8');
+    expect(hookSrc).toMatch(/import \{ useScrollToTop \} from 'expo-router'/);
+  });
+});

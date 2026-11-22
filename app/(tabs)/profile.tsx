@@ -35,6 +35,7 @@ import { useT, NATIVE_NAME } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
 import {
     Alert,
     Image,
@@ -87,6 +88,7 @@ function EinstellungZeile({
 
 export default function ProfilScreen() {
   const router = useRouter();
+  const scrollRef = useTabScrollToTop();
   const { user } = useSession();
   const { dogs } = useDogs();
   const { sessions } = useTrainingSessions();
@@ -270,6 +272,7 @@ export default function ProfilScreen() {
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         contentContainerStyle={s.inhalt}
         showsVerticalScrollIndicator={false}

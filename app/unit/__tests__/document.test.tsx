@@ -80,7 +80,7 @@ jest.mock('@/features/training/trackLinks/components/TrackLinkPicker', () => ({ 
 const mockApplyTrackChoice = jest.fn(async (..._args: unknown[]) => false);
 jest.mock('@/features/training/trackLinks/apply', () => ({ applyTrackChoice: (...args: unknown[]) => mockApplyTrackChoice(...args) }));
 jest.mock('@/lib/queryClient', () => ({ queryClient: { invalidateQueries: jest.fn() } }));
-jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), successHaptic: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), successHaptic: jest.fn(), haptic: { medium: jest.fn(), error: jest.fn(), success: jest.fn() } }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 
 jest.mock('@/components/ui/AnimatedPressable', () => ({

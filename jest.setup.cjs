@@ -26,3 +26,10 @@ afterAll(() => {
     void globalThis[name];
   }
 });
+
+// Tab nochmals antippen → nach oben scrollen: der Hook braucht einen echten
+// Tab-Navigator. In Screen-Tests (expo-router ist dort meist teilweise gemockt)
+// genügt eine leere Ref; das Verhalten selbst liefert expo-router.
+jest.mock('@/hooks/useTabScrollToTop', () => ({
+  useTabScrollToTop: () => require('react').useRef(null),
+}));
