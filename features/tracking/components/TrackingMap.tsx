@@ -23,6 +23,7 @@ import { TrackReferenceOverlayLayer } from '@/features/tracking/components/Track
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 import type { ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
 import { pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
+import { cornerDisplayLine, cornerPointsFromMarkers } from '@/features/tracking/utils/cornerDisplayLine';
 import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
 import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
@@ -297,20 +298,21 @@ export function TrackingMap({
   // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
   // Hooks stehen bewusst VOR dem Fallback-Return (rules-of-hooks); die .length-Deps
   // sind ebenfalls Absicht (Re-Memo nur bei neuem Punkt, nicht bei Fix-Update).
-  // Die Punkte sind bereits im Recorder geglättet (EMA + Distanz-Gate) und die
-  // Winkel-Marker sitzen exakt auf diesen Punkten. Hier NICHT noch einmal glätten:
-  // ein gleitendes Mittel würde Ecken abrunden, sodass die Linie neben den
-  // Winkel-Markern verläuft. Nur grobe Ausreisser entfernen → Linie folgt dem
-  // echten Weg und trifft die Winkel.
+  // Die Punkte sind bereits im Recorder geglättet (EMA + Distanz-Gate). Hier NICHT noch
+  // einmal glätten: ein gleitendes Mittel würde Ecken abrunden. Nur grobe Ausreisser entfernen.
+  // Die gespeicherte Linie ist ausgedünnt und schneidet Ecken ab, die Winkel-Marker sitzen am
+  // erkannten Winkelpunkt daneben. Nur für die Anzeige läuft die Linie durch diese Winkelpunkte
+  // (cornerDisplayLine); gespeicherte Punkte und alle Messwerte bleiben unberührt.
+  const cornerPoints = useMemo(() => cornerPointsFromMarkers(markers), [markers]);
   const layParts = useMemo(
-    () => splitContinuousPoints(layPoints).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
-    [layPoints],
+    () => splitContinuousPoints(layPoints).map(part => cornerDisplayLine(removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng })), cornerPoints).points),
+    [layPoints, cornerPoints],
   );
   const laySegmentParts = useMemo(
     () => buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments).map(part => ({
-      ...part, mapCoordinates: part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })),
+      ...part, mapCoordinates: cornerDisplayLine(part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })), cornerPoints).points,
     })),
-    [layPoints, segments],
+    [layPoints, segments, cornerPoints],
   );
   const runParts = useMemo(
     () => splitContinuousPoints(runPoints ?? []).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
@@ -477,7 +479,7 @@ export function TrackingMap({
             Stil zentral über laidTrackStroke() (rein/testbar). */}
         {/* The native saved-map host must be ready before its overlay children mount.
             Live recording maps deliberately keep their existing render lifecycle. */}
-        {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
+        {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} cornerPoints={cornerPoints} />}
         {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const base = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           // Absuche: breitere Linie mit dunkler Kontur — weiterhin solide, nie gedimmt.

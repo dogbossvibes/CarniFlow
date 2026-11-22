@@ -121,6 +121,19 @@ describe('TrackReplayMap — Referenz vs. Absuche', () => {
     expect(byColor(polys, SEARCH_ROUTE_FULL_STROKE)).toHaveLength(0);
     expect(reference(polys)).toHaveLength(1);
   });
+  it('gelegte Linie läuft in der Anzeige durch den Winkelpunkt; ohne Winkelmarke bleibt sie unverändert', () => {
+    // Ecke bei (0,10) abgeschnitten gespeichert; die Winkelmarke sitzt am echten Eckpunkt.
+    const lay = [ll(0, 0), ll(0, 5), ll(0.8, 9.2), ll(5, 10), ll(10, 10)].map(p => ({ lat: p.latitude, lng: p.longitude }));
+    const apex = ll(0, 10);
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<TrackReplayMap layPoints={lay} markers={[{ id: 'w1', type: 'winkel', angleKind: 'rechts', lat: apex.latitude, lng: apex.longitude }]} heatmapParts={[]} puckPosition={null} />); });
+    const withCorner = reference(polylines(node))[0].coordinates;
+    expect(withCorner).toHaveLength(5);
+    expect(withCorner[2]).toEqual(apex);
+    expect(withCorner[1]).toEqual(ll(0, 5));
+    act(() => { node.update(<TrackReplayMap layPoints={lay} markers={[]} heatmapParts={[]} puckPosition={null} />); });
+    expect(reference(polylines(node))[0].coordinates[2]).toEqual(ll(0.8, 9.2));
+  });
 });
 
 
