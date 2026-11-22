@@ -17,6 +17,7 @@ sehen würde, schickt das Ergebnis durch die **echte Lege-Verarbeitung der App**
 | `motionModel.ts` | Drehung und Schritte, wie das Handy sie liefert (baut auf `utils/__tests__/helpers/motionScenarioSim.ts` auf). |
 | `layRunner.ts` | Speist alles in die echte Engine und sammelt Linie, Winkel, Distanz, Rechenzeit. |
 | `scoring.ts` | Bewertung gegen die Wahrheit. |
+| `feldReplay.ts` | Wiedergabe einer Feldaufnahme (QA-Export) durch die echte Lege-Verarbeitung, mit und ohne Zusatzrauschen. |
 | `scenario.ts`, `matrix.ts` | Einzelszenario, Matrixgruppen, Bericht. |
 | `searchTruth.ts` | Wahre Absuche: Hund (Pendeln, Überlaufen, Kreisen, Verweisen) und Hundeführer an der Leine. |
 | `searchMocks.ts`, `searchBridge.ts`, `searchRunner.tsx` | Betreibt den echten `useSearchRecorder` ohne Gerät und wertet mit `computeTrackAnalyticsV3` aus, verdrahtet wie `app/track/run.tsx`. |
@@ -89,6 +90,24 @@ Werte sind begründete **Annahmen**, viele Quellen wurden nur als Kurzfassung ge
 Abgleich mit eigenen Feldaufnahmen (20 QA-Exporte, alle 20–68 s, vermutlich ein
 iPhone): Sprung von Sekunde zu Sekunde rund 0,2 m bei 2–17 m gemeldeter
 Genauigkeit. Das passt zum langsam wandernden Fehlermodell.
+
+## Feldaufnahme wiedergeben
+
+`feldReplay.ts` spielt den QA-Export einer im Testmodus gelegten Fährte durch die echte
+Lege-Verarbeitung: einmal unverändert mit Bewegungssensor, einmal ohne (wie Android), und
+je Rauschstufe mehrfach mit zusätzlich verschlechtertem GPS. Der Bericht vergleicht die
+Winkelfolge (Anzahl und Richtung) mit den im Feld gesetzten Winkeln.
+
+```
+FAEHRTEN_FELD=/pfad/zum/export.json FAEHRTEN_SIM_OUT=<ordner> npx jest features/tracking/__tests__/sim/feldReplay
+```
+
+Mehrere Dateien mit Komma trennen. `FAEHRTEN_FELD_SEEDS` setzt die Läufe je Rauschstufe
+(Standard 60, 0 = nur die unveränderte Aufnahme). Ohne `FAEHRTEN_FELD` laufen nur die Selbsttests.
+
+Grenzen: Das Rauschen kommt zum echten GPS-Fehler der Aufnahme dazu, die Zahlen sind
+deshalb streng und zeigen die Reserve, keine Feldquote. Die Sensorwerte bleiben unverändert.
+Feldaufnahmen nicht ins Repository legen.
 
 ## Grenzen
 
