@@ -53,5 +53,5 @@ export function runScenario(s: Scenario): ScenarioOutcome {
     truth, motionProfile(s.platform, s.carry, s.device === 'ideal' ? 'dual' : s.device),
     makeRng(seedFrom(key, 'motion')), seedFrom(key, 'motion-chain'), SIM_T0_MS);
   const run = runLay({ fixes, motion, motionActive: s.motion !== false, t0Ms: SIM_T0_MS });
-  return { scenario: s, truth, fixes, motion, run, score: scoreLay(truth, run, SIM_T0_MS) };
+  return { scenario: s, truth, fixes, motion, run, score: scoreLay(truth, run, SIM_T0_MS, fixes) };
 }
