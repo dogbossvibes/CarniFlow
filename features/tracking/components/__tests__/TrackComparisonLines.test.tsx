@@ -53,6 +53,12 @@ describe('Aufbau',()=>{
   setOs('android');mockReduceMotion=false;render();tick(5);
   expect(build()[0].coordinates).toBe(tagged('track-comparison-run')[0].coordinates);expect(jest.getTimerCount()).toBe(0);
  });
+ it('pausiert (Karte nicht sichtbar): volle Länge, kein Timer; läuft nach dem Fortsetzen wieder',()=>{
+  setOs('ios');mockReduceMotion=false;act(()=>{view=TestRenderer.create(<TrackComparisonLines {...props} paused/>);});tick(5);
+  expect(build()[0].coordinates).toBe(tagged('track-comparison-run')[0].coordinates);expect(jest.getTimerCount()).toBe(0);
+  act(()=>view.update(<TrackComparisonLines {...props}/>));expect(jest.getTimerCount()).toBe(1);
+  act(()=>view.update(<TrackComparisonLines {...props} paused/>));expect(jest.getTimerCount()).toBe(0);
+ });
  it('nach dem Schliessen läuft kein Timer weiter',()=>{
   setOs('ios');mockReduceMotion=false;render();expect(jest.getTimerCount()).toBe(1);act(()=>view.unmount());expect(jest.getTimerCount()).toBe(0);
   render();

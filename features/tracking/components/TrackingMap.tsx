@@ -130,6 +130,8 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 
 interface Props {
   comparison?: boolean;
+  /** Vergleichsansicht: Aufbau der Suchspur anhalten, solange diese Karte nicht sichtbar ist. */
+  comparisonPaused?: boolean;
   layColor?: string;
   layPoints:        LatLng[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
@@ -200,7 +202,7 @@ export const LAID_DONE_STROKE = { color: 'rgba(150,156,152,0.92)', width: 6 } as
 export const LAID_NEXT_STROKE = { color: '#FAC775', width: 3 } as const;
 
 export function TrackingMap({
-  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, laidNext, heading,
+  comparison = false, comparisonPaused = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, laidNext, heading,
   smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -481,7 +483,7 @@ export function TrackingMap({
             Stil zentral über laidTrackStroke() (rein/testbar). */}
         {/* The native saved-map host must be ready before its overlay children mount.
             Live recording maps deliberately keep their existing render lifecycle. */}
-        {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} cornerPoints={cornerPoints} />}
+        {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} cornerPoints={cornerPoints} paused={comparisonPaused} />}
         {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const base = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           // Absuche: breitere Linie mit dunkler Kontur — weiterhin solide, nie gedimmt.
