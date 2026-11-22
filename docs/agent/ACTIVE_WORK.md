@@ -1,5 +1,28 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #224 – 2026-11-22
+
+**Erledigt:** Dynamische Linie der Absuche (PR #222) als Cherry-Pick auf iOS 60 live (#224).
+Feld-Wiedergabe im Fährten-Simulator gemergt (PR #225). Production: iOS `e9b79f43`, Android
+unverändert `03ca16d1`.
+
+**Offen:**
+- **Gerätenachkontrolle:** #224 (vor allem: bleibt die blaue Suchspur über der grauen Linie
+  sichtbar?), #220, #217, #216 auf Android (erst bei der nächsten Android-OTA), #207, #204,
+  #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Falls die Suchspur verdeckt wird:** graue Linie schmaler oder durchscheinend machen
+  (Mockup, PR, neue iOS-OTA mit Freigabe).
+- **Winkelmarken neben der Linie** (bis 1,2 m): Entscheid der Nutzerin ausstehend, nach
+  weiteren Testfährten. Weitere QA-Exporte können über die Feld-Wiedergabe geprüft werden.
+- **Android:** PR #219 und PR #222 fehlen dort; nur als Cherry-Pick möglich.
+- **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
+  weiter STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196).
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach OTA #220 – 2026-11-21 (Abend)
 
 **Erledigt:** Testmodus-Mitschrift der Fährten-Diagnose korrigiert (PR #219), als Cherry-Pick
