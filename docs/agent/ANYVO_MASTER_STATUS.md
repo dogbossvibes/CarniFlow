@@ -1,5 +1,47 @@
 # ANYVO Master Status
 
+## Stand iOS 60 nach OTA #229 – 2026-11-22 (Abend)
+
+Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #229.
+Android ist unverändert (Abschnitt «nach OTA #216 und #217» weiter unten).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `92527528d6be89c9f2b6a09c4ea94c01e7214472`,
+  Update Group `76b76398-d634-49b2-a939-922894671aa4`, Branch
+  `release/ios60-ecken-anzeige-20261122`, Karte #229. Vorher: `e9b79f43` (#224).
+- **Android 53/54**: unverändert `03ca16d1` (#216).
+- Die nächste OTA muss `92527528` (iOS) bzw. `03ca16d1` (Android) enthalten.
+
+**Inhalt**
+- **#229 (nur iOS):** PR #227 und PR #228 als Cherry-Picks. Die gelegte Linie läuft in der Anzeige
+  durch die erkannten Winkelpunkte (`features/tracking/utils/cornerDisplayLine.ts`): beim Legen,
+  in der Absuche (auch Band, abgesuchtes und nächstes Stück), im Detail, im Vergleich und im Replay.
+  Nur geometrische Winkel (links, rechts, spitz) gelten als Ecke, Grenze 2 m. Reine Anzeige;
+  gespeicherte Punkte, Messung, Fortschritt und Wertung unverändert.
+- Anlass: Feldaufnahmen vom 21.11. und 22.11. Die gespeicherte Linie ist ausgedünnt (etwa ein
+  Punkt je 2 m) und schnitt Ecken ab; die Winkelmarke lag rund 1,1 m neben dem Knick.
+- Android hat weder PR #219 noch PR #222, #227, #228.
+
+**Bekannte Grenzen von #229** (nur Optik, am Gerät ungeprüft)
+- Die Absuche misst weiter an der gespeicherten Linie; an einer Ecke kann die gezeichnete Linie
+  bis etwa 1 m davon abweichen.
+- Schenkel näher als 2 m oder sich kreuzende Fährten: Eine Marke kann den falschen Schenkel verbiegen.
+- Nahe am Fährtenende kann ein Linienpunkt selten bis etwa 3,5 m wandern.
+- Rechenzeit auf dem Gerät nicht gemessen. Simulator: App mit PR #227 lief fehlerfrei, sichtbare
+  Wirkung dort nicht belegt (Staging-Fährte ohne Versatz).
+
+**Befund aus der Testfährte vom 22.11.** (27 m, Schenkel 3 bis 7 m; nur Analyse)
+- Alle drei Winkel richtig erkannt. Absuche im Mittel 0,5 m, höchstens 1,2 m neben der gelegten Linie.
+- Offen, nicht geändert: Die blaue Suchspur hält während der Absuche nur etwa alle 3 s einen
+  Punkt (10 Punkte auf 27 m) und schneidet Ecken ab. Dichter aufzeichnen greift in die
+  Aufzeichnung der Absuche ein (Simulator- und Feldprüfung nötig).
+- Nicht untersucht: Die App führt zwei Längen derselben Fährte (Linie 27,0 m, Zähler 21,3 m).
+
+**Geräteprüfung**
+- Offen: #229 (App startet; Fährte vom 22.11. zeigt Ecken an den Winkelmarken; Legen flüssig;
+  Absuche; alte Fährte unverändert). Karte auf «Live – Nachkontrolle offen».
+- Weiter offen: #224, #220.
+
 ## Stand iOS 60 nach OTA #224 – 2026-11-22
 
 Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #224.
