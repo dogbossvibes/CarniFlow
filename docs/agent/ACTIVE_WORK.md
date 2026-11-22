@@ -1,5 +1,30 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #233 – 2026-11-22 (Nacht)
+
+**Erledigt:** Suchspur der Vergleichsansicht hell, gleich breit wie die gelegte Linie, mit Aufbau
+(PR #231, PR #232), als Cherry-Picks auf iOS 60 live (#233). Production: iOS `1b3fd491`, Android
+unverändert `03ca16d1`.
+
+**Offen:**
+- **Gerätenachkontrolle:** #233 (Aufbau ruhig, kein Flackern), #229 (Bildschirmfoto der Nutzerin
+  zeigt die Ecken an den Winkelmarken; Abnahme und Status «Veröffentlicht» ausstehend), #224, #220,
+  #217, #216 auf Android (erst bei der nächsten Android-OTA), #207, #204, #197, dazu #190, #187,
+  #186, #180, #176, #163, #165, #167, #168.
+- **Glättung der gelegten Linie:** Aufgaben-Sitzung misst mit der Simulator-Matrix; Bericht und
+  allfälliger PR folgen. Kein Merge und keine OTA ohne Entscheid der Nutzerin.
+- **Suchspur an anderen Stellen noch blau:** Replay-Bildschirm und PDF-Bericht. Kein Auftrag.
+- **Blaue Suchspur gröber als die Linie** (Punkt nur etwa alle 3 s) und **zwei Längen derselben
+  Fährte** (Linie und Zähler): nicht untersucht, kein Auftrag.
+- **Android:** PR #219, #222, #227, #228, #231, #232 fehlen dort; nur als Cherry-Pick möglich.
+- **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
+  weiter STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196).
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach OTA #229 – 2026-11-22 (Abend)
 
 **Erledigt:** Gelegte Linie läuft in der Anzeige durch die erkannten Winkelpunkte (PR #227,
