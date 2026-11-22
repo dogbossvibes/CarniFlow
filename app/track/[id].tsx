@@ -29,6 +29,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
+import { SEARCH_RUN_COLOR } from '@/features/tracking/components/TrackComparisonLines';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
 import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
@@ -972,7 +973,7 @@ export default function TrackAuswertungScreen() {
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: 12 }}>
             <Legend color={layColor} label="Gelegte Fährte" />
-            <Legend color={C.trackBlue} label="Gelaufene Absuche" />
+            <Legend color={SEARCH_RUN_COLOR} label="Gelaufene Absuche" />
           </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
