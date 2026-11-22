@@ -1,5 +1,28 @@
 # ANYVO – Active Work
 
+## Stand nach Geräteabnahme #224, #229, #233 – 2026-11-22 (spät)
+
+**Erledigt:** Nutzerin hat #224, #229 und #233 auf dem iPhone abgenommen, Karten stehen auf
+«Veröffentlicht». Simulator-Studie zur Linien-Glättung abgeschlossen (PR #235): `LINE_GATE` bleibt
+unverändert. Production unverändert: iOS `1b3fd491`, Android `03ca16d1`.
+
+**Offen:**
+- **Gerätenachkontrolle:** #220, #217, #216 auf Android (erst bei der nächsten Android-OTA),
+  #207, #204, #197, dazu #190, #187, #186, #180, #176, #163, #165, #167, #168.
+- **Winkelerkennung hängt an den Linienpunkten** (`detectCorner()` nur bei gesetztem
+  Linienpunkt): Befund aus PR #235, kein Auftrag. Änderung wäre ein Eingriff in die Erkennung.
+- **Gespeicherte Linie bei schlechtem GPS zu lang** (Simulation) und **zwei Längen derselben
+  Fährte** (Linie und Zähler): nicht untersucht, kein Auftrag.
+- **Suchspur an anderen Stellen noch blau:** Replay-Bildschirm und PDF-Bericht. Kein Auftrag.
+- **Android:** PR #219, #222, #227, #228, #231, #232 fehlen dort; nur als Cherry-Pick möglich.
+- **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
+  weiter STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196).
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach OTA #233 – 2026-11-22 (Nacht)
 
 **Erledigt:** Suchspur der Vergleichsansicht hell, gleich breit wie die gelegte Linie, mit Aufbau
