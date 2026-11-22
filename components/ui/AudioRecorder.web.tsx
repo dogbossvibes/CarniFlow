@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
 import type { AudioNote } from '@/types';
 
 // Web stub: recording requires the Expo Go mobile app.
@@ -17,20 +17,15 @@ import type { AudioNote } from '@/types';
 interface Props {
   value:    AudioNote[];
   onChange: (notes: AudioNote[]) => void;
+  /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
+  readOnly?: boolean;
 }
 
-export function AudioRecorder({ value, onChange }: Props) {
+export function AudioRecorder({ value, onChange, readOnly = false }: Props) {
   const { t } = useT();
-  const del = (idx: number) => {
-    Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
-      { text: t('common.back'), style: 'cancel' },
-      {
-        text: t('media.remove'),
-        style: 'destructive',
-        onPress: () => onChange(value.filter((_, i) => i !== idx)),
-      },
-    ]);
-  };
+  const removal = useUndoableListRemoval(value, onChange);
+  // Nimmt die Sprachnotiz nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
+  const del = (idx: number) => { if (!readOnly) removal.remove(idx, t('undo.audioRemoved')); };
 
   return (
     <View>

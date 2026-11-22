@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -10,6 +10,8 @@ import { useStepCalibration } from '@/features/tracking/hooks/useStepCalibration
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { useToast } from '@/components/ui/Toast';
+import { useUndoToast } from '@/components/ui/UndoToast';
+import type { UndoToastHandle } from '@/lib/undoToast';
 import { HelpButton } from '@/components/help/HelpButton';
 import { useT } from '@/i18n';
 
@@ -32,6 +34,10 @@ export default function StepCalibrationScreen() {
   const measurement = useStepCalibration(blocked);
   const { interrupt } = measurement;
   const { showToast, toast } = useToast();
+  const showUndo = useUndoToast();
+  // Zurücksetzen mit Rückgängig-Frist: Anzeige sofort «Standard», gespeichert wird erst danach.
+  const [pendingReset, setPendingReset] = useState(false);
+  const pendingHandle = useRef<UndoToastHandle | null>(null);
   const { t } = useT();
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -51,6 +57,8 @@ export default function StepCalibrationScreen() {
   const save = useCallback(async (value: number | null) => {
     const current = useTrackingStore.getState();
     if (!active.current || savingRef.current || !loaded || current.isRecording || current.sessionStatus === 'searching') return;
+    // Ein offenes Zurücksetzen zuerst festschreiben, damit es den neuen Wert nie überschreibt.
+    pendingHandle.current?.flush();
     savingRef.current = true; setSaving(true);
     try {
       await setStepLengthM(value);
@@ -61,6 +69,24 @@ export default function StepCalibrationScreen() {
       if (active.current) showToast(t('track.calibrationSaveFailed'));
     } finally { savingRef.current = false; if (active.current) setSaving(false); }
   }, [back, loaded, setStepLengthM, showToast, t]);
+  const requestReset = useCallback(() => {
+    if (pendingHandle.current || savingRef.current || !loaded) return;
+    setPendingReset(true);
+    const clear = () => { pendingHandle.current = null; if (active.current) setPendingReset(false); };
+    pendingHandle.current = showUndo({
+      message: t('undo.stepLengthReset'),
+      onUndo: clear,
+      // Läuft auch beim Verlassen des Screens; nie während Aufnahme/Absuche speichern.
+      onCommit: () => {
+        const current = useTrackingStore.getState();
+        if (current.isRecording || current.sessionStatus === 'searching') { clear(); return; }
+        void setStepLengthM(null)
+          .catch(() => { if (active.current) showToast(t('track.calibrationSaveFailed')); })
+          .finally(clear);
+      },
+    });
+  }, [loaded, setStepLengthM, showToast, showUndo, t]);
+  const shownStepLengthM = pendingReset ? undefined : stepLengthM;
   const issueKeys = {
     signal: 'track.calibrationSignal', interrupted: 'track.calibrationInterrupted',
     implausible: 'track.calibrationInvalid', uncertain: 'track.calibrationUncertain',
@@ -70,8 +96,8 @@ export default function StepCalibrationScreen() {
   const idle = phase === 'idle';
   const result = phase === 'result';
   const failed = phase === 'error' || (result && measurement.issue != null);
-  const currentLabel = !loaded ? t('common.loading') : stepLengthM != null
-    ? t('profile.stepLengthPersonal', { cm: cm(stepLengthM) }) : t('profile.stepLengthDefault');
+  const currentLabel = !loaded ? t('common.loading') : shownStepLengthM != null
+    ? t('profile.stepLengthPersonal', { cm: cm(shownStepLengthM) }) : t('profile.stepLengthDefault');
 
   return <View className="flex-1 bg-ft-bg">
     <SafeAreaView edges={['top', 'bottom']} className="flex-1">
@@ -98,11 +124,8 @@ export default function StepCalibrationScreen() {
           <Text className="text-[15px] text-ft-text leading-[23px]">{t('track.calibrationProtocol', { count: CALIBRATION_STEPS })}</Text>
           <Text className="text-[13px] text-ft-muted leading-[20px]">{t('track.calibrationEstimate')}</Text>
           <Action label={t('track.startCalibration')} onPress={() => { void measurement.start(); }} primary disabled={!loaded || blocked || saving} />
-          {stepLengthM != null && <Action label={t('track.resetToDefault')} disabled={!loaded || blocked || saving} busy={saving}
-            onPress={() => Alert.alert(t('track.resetStepLengthTitle'), t('track.resetStepLengthBody'), [
-              { text: t('common.cancel'), style: 'cancel' },
-              { text: t('track.reset'), style: 'destructive', onPress: () => { void save(null); } },
-            ])} />}
+          {shownStepLengthM != null && <Action label={t('track.resetToDefault')} disabled={!loaded || blocked || saving} busy={saving}
+            onPress={requestReset} />}
         </>}
         {(phase === 'preparing' || phase === 'warming' || phase === 'finishing') && <Text accessibilityLiveRegion="polite" className="text-[16px] font-bold text-ft-text">
           {t(phase === 'finishing' ? 'track.calibrationEndWait' : 'track.calibrationStartWait')}

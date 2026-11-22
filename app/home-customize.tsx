@@ -11,7 +11,7 @@ import {
   addDogBackpackQuickAction,
   backpackWidgetDogIds,
   moveInArray,
-  resetHomeScreenConfig,
+  resetHomeScreenConfigDeferred,
   setHomeScreenConfig,
   setWidgetVisible,
   toggleBackpackWidgetDog,
@@ -40,6 +40,7 @@ import { useDogs } from '@/hooks/useDogs';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useUndoToast } from '@/components/ui/UndoToast';
 import { useT, type TranslationKey } from '@/i18n';
 import { useState } from 'react';
 import {
@@ -89,6 +90,7 @@ const WIDGET_DESC_KEY: Record<HomeWidgetId, TranslationKey> = {
 export default function HomeCustomizeScreen() {
   const router = useRouter();
   const { t } = useT();
+  const showUndo = useUndoToast();
   const { user } = useSession();
   const greetingSound = useGreetingSound(user?.id);
   const { dogs } = useDogs();
@@ -144,14 +146,9 @@ export default function HomeCustomizeScreen() {
   const toggleBackpackWidget = (dogId: string) => setHomeScreenConfig(toggleBackpackWidgetDog(config, dogId));
 
   const onReset = () => {
-    Alert.alert(
-      t('home.reset'),
-      t('home.resetBody'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHomeScreenConfig() },
-      ],
-    );
+    // Sofort zurücksetzen, gespeichert wird erst nach der Rückgängig-Frist.
+    const reset = resetHomeScreenConfigDeferred();
+    showUndo({ message: t('undo.homeReset'), onCommit: reset.commit, onUndo: reset.undo });
   };
 
   return (

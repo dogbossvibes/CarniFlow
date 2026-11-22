@@ -15,19 +15,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { uploadImage } from '@/services/mediaService';
+import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
 
 interface Props {
   value:      string[];
   onChange:   (urls: string[]) => void;
   maxPhotos?: number;
+  /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
+  readOnly?: boolean;
 }
 
-export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
+export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false }: Props) {
   const { t } = useT();
+  const removal = useUndoableListRemoval(value, onChange);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
 
   const pick = async () => {
+    removal.settle();
     if (value.length >= maxPhotos) {
       Alert.alert(t('media.maxReached'), t('media.maxPhotos', { count: maxPhotos }));
       return;
@@ -80,16 +85,8 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
     </View>
   );
 
-  const del = (idx: number) => {
-    Alert.alert(t('media.removePhotoTitle'), t('media.removePhotoBody'), [
-      { text: t('common.back'), style: 'cancel' },
-      {
-        text: t('media.remove'),
-        style: 'destructive',
-        onPress: () => onChange(value.filter((_, i) => i !== idx)),
-      },
-    ]);
-  };
+  // Nimmt das Foto nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
+  const del = (idx: number) => { if (!readOnly) removal.remove(idx, t('undo.photoRemoved')); };
 
   if (value.length === 0) {
     return (
