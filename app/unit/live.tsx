@@ -9,7 +9,7 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
 import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes, resetUnit, retryActiveTrainingLoad } from '@/stores/activeTraining';
-import { tapHaptic } from '@/lib/haptics';
+import { tapHaptic, haptic } from '@/lib/haptics';
 import { useSession } from '@/hooks/useSession';
 import { useT } from '@/i18n';
 
@@ -60,7 +60,7 @@ export default function LiveScreen() {
   if (!active.unitId) return <Redirect href="/unit/start" />;
 
   const beenden = () => {
-    tapHaptic();
+    haptic.medium();   // Training stoppen
     router.push({ pathname: '/unit/summary', params: { duration: String(elapsed) } });
   };
 

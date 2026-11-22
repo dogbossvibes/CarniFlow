@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useTabScrollToTop } from '@/hooks/useTabScrollToTop';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,
@@ -41,6 +42,7 @@ export default function AnalyticsScreen() {
   const [aiOverride, setAiOverride] = useState<TrainingAnalysis | null>(null);
   const { width }              = useWindowDimensions();
   const router                 = useRouter();
+  const scrollRef              = useTabScrollToTop();
 
   // Aktiver Hund gilt app-weit (stores/activeDog.ts); die Chips schalten ihn um.
   const { activeDog: selectedDog, setActiveDog } = useActiveDog(dogs);
@@ -185,6 +187,7 @@ export default function AnalyticsScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           style={s.scroll}
           contentContainerStyle={s.content}
           showsVerticalScrollIndicator={false}

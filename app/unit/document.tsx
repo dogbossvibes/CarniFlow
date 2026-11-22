@@ -46,7 +46,7 @@ import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { DateField } from '@/components/ui/DateField';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { queryClient } from '@/lib/queryClient';
-import { tapHaptic, successHaptic } from '@/lib/haptics';
+import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { AudioNote } from '@/types';
 import type { TrainingMetrics } from '@/types/analytics';
 import type { DocumentSave } from '@/services/trainingDocumentService';
@@ -573,6 +573,7 @@ function DocumentForm() {
     if (!alive.current) return;
     if (error) {
       if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
+      haptic.error();
       Alert.alert(t('common.error'), ['TRAINING_DOCUMENT_REVIEW_REQUIRED', 'CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? t('trainingDoc.reviewSave') : t(error.code === 'LOCAL_SAVE_ERROR' ? 'trainingDoc.draftError' : 'training.saveError')); return;
     }
     setRemoteCompleted(true);
@@ -611,6 +612,7 @@ function DocumentForm() {
     else setSaved(true);
     } catch {
       if (!alive.current) return;
+      haptic.error();
       Alert.alert(t('common.error'), t('training.saveError'));
     } finally {
       if (alive.current && session?.user.id) {

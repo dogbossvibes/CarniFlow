@@ -29,7 +29,7 @@ jest.mock('@/components/ui/AnimatedPressable', () => ({
     return <TouchableOpacity onPress={onPress}>{children}</TouchableOpacity>;
   },
 }));
-jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), successHaptic: jest.fn(), haptic: { error: jest.fn() } }));
+jest.mock('@/lib/haptics', () => ({ tapHaptic: jest.fn(), successHaptic: jest.fn(), haptic: { medium: jest.fn(), error: jest.fn(), success: jest.fn() } }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'dog-1', name: 'Yam' }] }) }));
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'owner-1' } } }) }));
 jest.mock('@/services/trainingUnitService', () => ({ createDocumentedUnit: (...args: unknown[]) => mockCreateDocumentedUnit(...args) }));

@@ -12,6 +12,7 @@ import { quotaAllowsNew } from "@/features/subscription/plans";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
 import { useCallback, useState } from "react";
 import { SharedDogsInbox } from "@/components/dogs/SharedDogsInbox";
 import {
@@ -29,6 +30,7 @@ import { lastTrainingText } from '@/features/training/continue/labels';
 
 export default function HundeScreen() {
   const router = useRouter();
+  const scrollRef = useTabScrollToTop();
   const [section, setSection] = useState<"owned" | "shared">("owned");
   const { t } = useT();
   const { dogs, loading, error, refresh } = useDogs();
@@ -91,6 +93,7 @@ export default function HundeScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           style={s.scroll}
           contentContainerStyle={[s.inhalt, dogs.length === 0 && s.inhaltLeer]}
           showsVerticalScrollIndicator={false}

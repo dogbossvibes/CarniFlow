@@ -19,7 +19,7 @@ import type { TrainingUnit } from '@/types/trainingUnit';
 import { createTrainingUnit } from '@/services/trainingUnitService';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
-import { tapHaptic } from '@/lib/haptics';
+import { tapHaptic, haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
 
 export default function UnitStartScreen() {
@@ -75,6 +75,7 @@ export default function UnitStartScreen() {
         return;
       }
       if (startUnit({ unitId: data.id, dogId, dogName: dogName || null, ownerId, sourceFingerprint: trainingUnitFingerprint(data as TrainingUnit) }) === false) return;
+      haptic.medium();   // Training gestartet
     }
     // Eintrag auf Sparten-Ebene (kein Unterkategorie-Name).
     addExercise({ discipline: disc.label, exercise_name: disc.label, rating: null, notes: null, duration_sec: null }, ownerId);

@@ -16,6 +16,7 @@ import type { TrainingUnit } from '@/types/trainingUnit';
 import { createTrainingUnit } from '@/services/trainingUnitService';
 import { useActiveTraining, startUnit, addExercise, retryActiveTrainingLoad } from '@/stores/activeTraining';
 import { useT } from '@/i18n';
+import { haptic } from '@/lib/haptics';
 
 const HERO_H = 260;
 
@@ -83,6 +84,7 @@ export default function DisciplineScreen() {
         return;
       }
       if (startUnit({ unitId: data.id, dogId, dogName: dogName || null, ownerId, sourceFingerprint: trainingUnitFingerprint(data as TrainingUnit) }) === false) return;
+      haptic.medium();   // Training gestartet
     }
 
     addExercise({ discipline: disc.label, exercise_name: name, rating: null, notes: null, duration_sec: null }, ownerId);
