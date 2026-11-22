@@ -18,6 +18,7 @@ sehen würde, schickt das Ergebnis durch die **echte Lege-Verarbeitung der App**
 | `layRunner.ts` | Speist alles in die echte Engine und sammelt Linie, Winkel, Distanz, Rechenzeit. |
 | `scoring.ts` | Bewertung gegen die Wahrheit. |
 | `feldReplay.ts` | Wiedergabe einer Feldaufnahme (QA-Export) durch die echte Lege-Verarbeitung, mit und ohne Zusatzrauschen. |
+| `lineGateStudy.ts` | Parameterstudie zum Linien-Gate: dieselben Szenarien mit überschriebenen Werten von `LINE_GATE` (nur im Speicher, Produktdatei unverändert). |
 | `scenario.ts`, `matrix.ts` | Einzelszenario, Matrixgruppen, Bericht. |
 | `searchTruth.ts` | Wahre Absuche: Hund (Pendeln, Überlaufen, Kreisen, Verweisen) und Hundeführer an der Leine. |
 | `searchMocks.ts`, `searchBridge.ts`, `searchRunner.tsx` | Betreibt den echten `useSearchRecorder` ohne Gerät und wertet mit `computeTrackAnalyticsV3` aus, verdrahtet wie `app/track/run.tsx`. |
@@ -57,6 +58,10 @@ Gleicher Seed ergibt exakt denselben Lauf.
   65–115° normal, 15–60° spitz), Richtung, Abstand zum wahren Winkelpunkt, falsche Zusatzwinkel.
 - **Linie:** Formfehler (seitlicher Abstand zur wahren Fährte nach Abzug der mittleren
   Verschiebung), Längenfehler, Startpunktfehler.
+- **Ecken-Abschnitt:** Abstand jedes wahren Winkelpunkts zur gespeicherten Linie (`cornerCutMeanM`), zusätzlich nach Abzug
+  der mittleren Verschiebung (`cornerCutShapeMeanM`) und gegen den Winkelpunkt, wie das GPS ihn sah (`cornerCutGpsMeanM`);
+  Abstand der gemeldeten Winkelpunkte zur Linie (`apexToLineMeanM`, dieselbe Messung wie an Feldaufnahmen); Länge des
+  gespeicherten Linienzugs und Unruhe (Richtungsänderung je Linienpunkt abseits der Winkel).
 - **Rechenzeit** der Engine je GPS-Messung.
 - **Absuche:** Abgang erkannt, Fährtenende erreicht, automatische Gegenstands-Erkennung (verwiesene und nicht
   verwiesene Gegenstände), gemeldete Abweichung gegen die wahre Abweichung von Hund und Hundeführer,
@@ -108,6 +113,26 @@ Mehrere Dateien mit Komma trennen. `FAEHRTEN_FELD_SEEDS` setzt die Läufe je Rau
 Grenzen: Das Rauschen kommt zum echten GPS-Fehler der Aufnahme dazu, die Zahlen sind
 deshalb streng und zeigen die Reserve, keine Feldquote. Die Sensorwerte bleiben unverändert.
 Feldaufnahmen nicht ins Repository legen.
+
+## Linien-Gate-Studie
+
+`lineGateStudy.test.ts` fährt eine eigene Matrix (Kurzfährte 5–7 m, Einzelwinkel 10/20/40 m, IGP-1; offenes Feld,
+Feldrand, lichter Wald; Sonderfälle Tempo, ohne Sensor, Android gebündelt) je Variante von `LINE_GATE` mit denselben Seeds.
+
+```
+FAEHRTEN_LINEGATE=1 FAEHRTEN_SIM_SEEDS=10 FAEHRTEN_SIM_OUT=<ordner> npx jest features/tracking/__tests__/sim/lineGateStudy --maxWorkers=1
+```
+
+`FAEHRTEN_LINEGATE` nimmt auch Varianten-Nummern (`0,3,7`, Reihenfolge wie `GATE_VARIANTS`); `FAEHRTEN_LINEGATE_TAG` benennt
+die Ausgabedatei, damit sich die Studie auf zwei Prozesse verteilen lässt (rund 5 min je Variante bei 10 Seeds). Mit
+`FAEHRTEN_FELD` laufen zusätzlich Feldaufnahmen je Variante, unverändert und verrauscht.
+
+Befund vom 2026-11-22 (10 Seeds, 216 Läufe je Variante, plus zwei Feldaufnahmen): Weniger Glättung (`emaAlpha` 0,4 → 0,7)
+bringt die Linie näher an den GEMELDETEN Winkelpunkt (0,72 → 0,33 m), gegenüber dem WAHREN Winkelpunkt aber wenig
+(GPS-Sicht 1,17 → 0,90 m, absolut 3,11 → 2,94 m), und verlängert die Linie (Feldrand +28 → +39 %, Wald +53 → +69 %).
+Auch mit fehlerfreiem GPS bleiben rund 1 m (rechter Winkel) bis 2 m (Spitzwinkel) Abschnitt. Werte deshalb nicht geändert.
+Die Winkelerkennung läuft nur, wenn ein Linienpunkt gesetzt wird: Jede Änderung am Linien-Gate verschiebt diese Zeitpunkte
+und kann kurzlebige Kandidaten melden oder auslassen (Aufnahme vom 22.11.: vierter Winkel bei 33 s).
 
 ## Grenzen
 
