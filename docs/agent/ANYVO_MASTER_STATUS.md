@@ -1,5 +1,33 @@
 # ANYVO Master Status
 
+## Stand nach Geräteabnahme #224, #229, #233 – 2026-11-22 (spät)
+
+Production unverändert gegenüber dem Abschnitt «nach OTA #233» darunter: iOS 60 `1b3fd491`
+(Group `c4a59ad6-…`, Karte #233), Android 53/54 `03ca16d1` (#216). Keine neue OTA.
+
+**Geräteabnahme durch die Nutzerin (iPhone, iOS 60), Karten auf «Veröffentlicht»**
+- **#224** Absuche-Linie dynamisch: «passt».
+- **#229** gelegte Linie durch die Winkelpunkte: «passt», dazu Bildschirmfoto der Fährte vom 22.11.
+- **#233** Suchspur hell, gleich breit, mit Aufbau: «passt».
+- Zu #224 und #233 liegen dem MASTER keine Bilder vor; die Einzelpunkte der Karten wurden nicht
+  einzeln rückgemeldet. Der Vermerk steht jeweils als Kommentar auf der Karte.
+
+**Simulator-Studie zur Glättung der gelegten Linie (PR #235, Testcode, auf `main` `fd7e1ba3`)**
+- Ergebnis: `LINE_GATE` bleibt unverändert. Weniger Glättung zieht die Linie zur Winkelmarke
+  (0,72 m → 0,33 m), kaum zum wahren Winkel (3,11 m → 2,94 m), und verlängert die gespeicherte
+  Linie (lichter Wald +53 % → +69 % gegenüber der wahren Länge). 216 Läufe je Variante,
+  GPS-Annahmen aus der Literatur.
+- Der frühere Vorbefund des MASTER (Abschnitt #233) mass nur diesen scheinbaren Gewinn.
+- Befund, nicht geändert: `detectCorner()` läuft nur, wenn ein Linienpunkt gesetzt wird
+  (`features/tracking/engine/layProcessingSession.ts`); ein kurz sichtbarer Winkel kann je nach
+  Zeitpunkt der Linienpunkte verpasst werden.
+- Befund, nicht geändert: Die gespeicherte Linie ist in der Simulation bei schlechtem GPS deutlich
+  länger als die wahre Fährte (Feldrand +28 %, lichter Wald +53 %).
+- PR #235 wurde gemergt, bevor der Prüflauf «ANYVO Quality Gate» fertig war (nur Testcode).
+
+**Geräteprüfung weiter offen**
+- #220 (Mitschrift im Testmodus), #217, #216 auf Android, #207, #204, #197 und die älteren Karten.
+
 ## Stand iOS 60 nach OTA #233 – 2026-11-22 (Nacht)
 
 Frisch aus EAS gelesen am 22.11.2026. Einzelheiten stehen auf der Release-Karte #233.
