@@ -40,6 +40,9 @@ describe('Hundebereich auf der Absuche-Karte (T-217)', () => {
 
   it('wird in der Blindsuche und vor dem Start nicht gezeichnet', () => {
     expect(run()).toContain('dogRange={blindSearch || arming ? null : dogRange}');
-    expect(run()).toMatch(/s\.recording && s\.estimatedDogPosition\s*\? dogRangeLine\(snapData\.laidPoints, laidArc\.cum, s\.progressM, s\.dogProgressM\)/);
+    expect(run()).toMatch(/s\.recording && s\.estimatedDogPosition\s*\? dogRangeLine\(laidDisplay\.points, laidDisplay\.cum, s\.progressM, s\.dogProgressM\)/);
+    // Band, abgesuchtes und nächstes Stück folgen der Eckenführung der Anzeige; Bogenlängen bleiben die der gespeicherten Linie.
+    expect(run()).toContain('cornerDisplayLine(snapData.laidPoints, cornerPointsFromMarkers(snapData.laidMarkers), laidArc.cum)');
+    expect(run()).toContain('laidLineParts(laidDisplay.points, laidDisplay.cum, 0, s.progressM)');
   });
 });
