@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '@/constants/colors';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
@@ -43,11 +44,17 @@ export function UndoToastHost() {
   }, []);
 
   // iOS hält JS-Timer im Hintergrund an und kann die App danach beenden: eine als
-  // erledigt gezeigte Aktion deshalb beim Wechsel in den Hintergrund festschreiben.
+  // erledigt gezeigte Aktion deshalb festschreiben, sobald die App nicht mehr aktiv
+  // ist (auch 'inactive': App-Umschalter, aus dem die App weggewischt werden kann).
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => { if (state === 'background') flushUndoToast(); });
+    const subscription = AppState.addEventListener('change', state => { if (state !== 'active') flushUndoToast(); });
     return () => subscription.remove();
   }, []);
+
+  // Der Hinweis gehört zum Bildschirm, auf dem er ausgelöst wurde: öffnet sich ein
+  // anderer Bildschirm darüber, wird festgeschrieben und der Hinweis geschlossen.
+  const pathname = usePathname();
+  useEffect(() => flushUndoToast, [pathname]);
 
   const id = entry?.id;
   const message = entry?.message;
