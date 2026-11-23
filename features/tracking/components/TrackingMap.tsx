@@ -198,6 +198,8 @@ const EMPTY_PLACED: Map<string, PlacedLabel> = new Map();
 /** Breite des Hundebereich-Bands (px). Im Simulator auf Satellitenbild geprüft: 16 px / 30 % war zu blass, 26 px / 40 % ist klar erkennbar. */
 export const DOG_RANGE_STROKE_WIDTH = 26;
 // Absuche: abgesuchter Teil blass über der gelegten Linie, Stück bis zum nächsten Ereignis dünn betont.
+/** Stapelstufe der blauen Ist-Suchspur: über abgesuchtem/nächstem Stück der gelegten Linie (4), unter Kürzel-Strichen. */
+export const RUN_TRACE_Z = 5;
 export const LAID_DONE_STROKE = { color: 'rgba(150,156,152,0.92)', width: 6 } as const;
 export const LAID_NEXT_STROKE = { color: '#FAC775', width: 3 } as const;
 
@@ -516,7 +518,9 @@ export function TrackingMap({
           );
         }))}
         {/* Absuche: abgesuchter Teil der gelegten Linie blass, Stück bis zum nächsten Ereignis betont.
-            Über der Lay-Linie (zIndex 2/3), unter der Suchspur (später gezeichnet) und allen Markern. */}
+            Über der Lay-Linie (zIndex 2/3), unter der Suchspur (zIndex 5) und allen Markern.
+            Android (Google Maps) ordnet Linien nach zIndex; bei gleichem Wert ist die Reihenfolge nicht
+            festgelegt. Die Suchspur liegt deshalb eine Stufe höher, sonst könnte die breite graue Linie sie verdecken. */}
         {!comparison && laidDone?.map((part, index) => (
           <Polyline key={`laid-done-${index}`} coordinates={part} strokeColor={LAID_DONE_STROKE.color} strokeWidth={LAID_DONE_STROKE.width}
             lineCap="round" lineJoin="round" zIndex={4} />
@@ -527,7 +531,7 @@ export function TrackingMap({
         ))}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
-          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={4} />
+          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={RUN_TRACE_Z} />
         ))}
 
         {/* Verworfene Punkte (Debug): kleine rote Marker */}
@@ -569,8 +573,8 @@ export function TrackingMap({
             zum daneben stehenden Kürzel (Polyline/Circle — keine zusätzlichen Marker-Views). */}
         {labelLeaders.map(leader => (
           <Fragment key={`leader-${leader.key}`}>
-            <Polyline coordinates={leader.coordinates} strokeColor="rgba(255,255,255,0.92)" strokeWidth={2} zIndex={5} />
-            {Circle && <Circle center={leader.anchor} radius={0.6} fillColor="#FFFFFF" strokeColor="#04110F" strokeWidth={1.5} zIndex={6} />}
+            <Polyline coordinates={leader.coordinates} strokeColor="rgba(255,255,255,0.92)" strokeWidth={2} zIndex={RUN_TRACE_Z + 1} />
+            {Circle && <Circle center={leader.anchor} radius={0.6} fillColor="#FFFFFF" strokeColor="#04110F" strokeWidth={1.5} zIndex={RUN_TRACE_Z + 2} />}
           </Fragment>
         ))}
 

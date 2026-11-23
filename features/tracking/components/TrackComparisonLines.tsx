@@ -1,5 +1,5 @@
 import { Fragment, memo, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { PixelRatio, Platform } from 'react-native';
 import type { ComponentType } from 'react';
 import type { MapPolylineProps } from 'react-native-maps';
 import { removeGpsJitter, type LatLng } from '../utils/gpsFilter';
@@ -21,6 +21,15 @@ export const SEARCH_RUN_WIDTH = 6;          // = Breite der gelegten Linie (norm
 export const SEARCH_RUN_FLOW = { width: 3.5, dash: [10, 14] as number[], stepPt: 3, tickMs: 110 } as const;
 const FLOW_CYCLE = SEARCH_RUN_FLOW.dash[0] + SEARCH_RUN_FLOW.dash[1];
 
+/**
+ * Strichmuster für die Karte. Google Maps (Android) nimmt Strich und Lücke in rohen Pixeln, die
+ * Linienbreite aber in dichteunabhängigen Punkten. Ohne Umrechnung wären die Striche dort winzig.
+ */
+export function searchRunDashPattern(os: string = Platform.OS, density: number = PixelRatio.get()): number[] {
+  if (os !== 'android' || !(density > 0)) return SEARCH_RUN_FLOW.dash;
+  return SEARCH_RUN_FLOW.dash.map(v => Math.round(v * density));
+}
+
 type Coordinates = { latitude: number; longitude: number }[];
 
 /**
@@ -33,6 +42,7 @@ const SearchRunFlow = memo(function SearchRunFlow({ Polyline, parts, paused }: {
   const reduceMotion = useReduceMotion();
   const animate = Platform.OS === 'ios' && !reduceMotion && !paused && parts.length > 0;
   const [phase, setPhase] = useState(0);
+  const dash = useMemo(() => searchRunDashPattern(), []);
   useEffect(() => {
     if (!animate) return undefined;
     // Kleinere Phase = Striche rücken in Zeichenrichtung (Start → Ende) vor.
@@ -41,7 +51,7 @@ const SearchRunFlow = memo(function SearchRunFlow({ Polyline, parts, paused }: {
   }, [animate]);
   return <>
     {parts.map((part, i) => <Polyline key={`run-flow-${i}`} testID="track-comparison-run-flow" coordinates={part}
-      strokeColor={SEARCH_RUN_COLOR} strokeWidth={SEARCH_RUN_FLOW.width} lineDashPattern={SEARCH_RUN_FLOW.dash}
+      strokeColor={SEARCH_RUN_COLOR} strokeWidth={SEARCH_RUN_FLOW.width} lineDashPattern={dash}
       lineDashPhase={phase} zIndex={13} lineCap="butt" lineJoin="round" />)}
   </>;
 });
