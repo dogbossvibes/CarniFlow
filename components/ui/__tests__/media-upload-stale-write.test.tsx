@@ -128,3 +128,59 @@ describe('Video', () => {
     expect(busy).toHaveBeenLastCalledWith(false);
   });
 });
+
+// ── Review OTA «Rückgängig» (B5, N1) ────────────────────────────────────────
+describe('B5: Aushängen während des Uploads', () => {
+  let photos: string[];
+  function Form({ show }: { show: boolean }) {
+    const [value, setValue] = React.useState(['p1']);
+    React.useEffect(() => { photos = value; }, [value]);
+    return show ? <PhotoPicker value={value} onChange={setValue} onBusyChange={busy} /> : null;
+  }
+  it('meldet «beschäftigt» bis der Upload fertig ist, auch wenn der Baustein vorher verschwindet', async () => {
+    act(() => { tree = TestRenderer.create(<Form show />); });
+    tap(['add', 'camera-outline']);
+    await flush();
+    expect(busy).toHaveBeenLastCalledWith(true);
+    act(() => { tree.update(<Form show={false} />); });
+    expect(busy).not.toHaveBeenLastCalledWith(false);
+    await act(async () => { photoUpload[0].resolve({ url: 'neu' }); });
+    await flush();
+    expect(busy).toHaveBeenLastCalledWith(false);
+    expect(photos).toEqual(['p1', 'neu']);
+  });
+
+  it('Sprachnotiz: verschwindet der Baustein während der Aufnahme, wird die Sperre gelöst', async () => {
+    function AudioForm({ show }: { show: boolean }) {
+      const [value, setValue] = React.useState<AudioNote[]>([]);
+      return show ? <AudioRecorder value={value} onChange={setValue} onBusyChange={busy} /> : null;
+    }
+    act(() => { tree = TestRenderer.create(<AudioForm show />); });
+    tap(['mic-outline']);
+    await flush();
+    expect(busy).toHaveBeenLastCalledWith(true);
+    act(() => { tree.update(<AudioForm show={false} />); });
+    expect(busy).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe('N1: Rückfrage offen, während ein Upload fertig wird', () => {
+  let photos: string[];
+  function Form() {
+    const [value, setValue] = React.useState(['p1', 'p2']);
+    React.useEffect(() => { photos = value; }, [value]);
+    return <PhotoPicker value={value} onChange={setValue} />;
+  }
+  it('Bestätigen entfernt nur das gewählte Foto, das neue bleibt', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    act(() => { tree = TestRenderer.create(<Form />); });
+    tap(['add']);
+    await flush();
+    tap(['close-circle']);                  // Rückfrage zu «p1» offen
+    await act(async () => { photoUpload[0].resolve({ url: 'neu' }); });
+    await flush();
+    expect(photos).toEqual(['p1', 'p2', 'neu']);
+    confirmAlert(alert);
+    expect(photos).toEqual(['p2', 'neu']);
+  });
+});

@@ -22,7 +22,7 @@ import { uploadAudio } from '@/services/mediaService';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
-import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
+import { useBusyHold, useLatestRef } from '@/hooks/useLatestRef';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import type { AudioNote } from '@/types';
 
@@ -56,7 +56,14 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
   const busy = isRecording || finishing || uploading;
   // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Stopp-Tipp.
   const latest = useLatestRef({ value, onChange });
-  useBusyReport(busy, onBusyChange);
+  // Sperre von Aufnahmebeginn bis Upload-Ende. Wird der Baustein während des Uploads
+  // ausgehängt, bleibt sie bis zum Ende bestehen (der Upload schreibt danach noch).
+  // Wird er während der Aufnahme ausgehängt, endet die Aufnahme ohne Ergebnis: dann
+  // wird die Sperre sofort gelöst.
+  const holdBusy = useBusyHold(onBusyChange);
+  const busyRelease = useRef<(() => void) | null>(null);
+  const stopping = useRef(false);
+  useEffect(() => () => { if (!stopping.current) { busyRelease.current?.(); busyRelease.current = null; } }, []);
   const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || busy });
   const [seconds,     setSeconds]     = useState(0);
   const [playingIdx,  setPlayingIdx]  = useState<number | null>(null);
@@ -105,6 +112,8 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
       await recorder.prepareToRecordAsync();
       recorder.record();
 
+      busyRelease.current?.();
+      busyRelease.current = holdBusy();
       setIsRecording(true);
       setSeconds(0);
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
@@ -117,6 +126,7 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
   const stopRec = async () => {
     if (!isRecording) return;
     removal.settle();
+    stopping.current = true;
     setFinishing(true);
     clearInterval(timerRef.current!);
     const dur = fmt(seconds);
@@ -143,6 +153,9 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
       console.error('[Recording Stop]', e);
       Alert.alert(t('share.notReadyTitle'), t('audio.recordingSaveFailed'));
     } finally {
+      stopping.current = false;
+      busyRelease.current?.();
+      busyRelease.current = null;
       setUploading(false);
       setFinishing(false);
     }
@@ -203,7 +216,12 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
       {
         text: t('media.remove'),
         style: 'destructive',
-        onPress: () => onChange(value.filter((_, i) => i !== idx)),
+        // Mit dem aktuellen Stand entfernen: eine in der Zwischenzeit fertige Aufnahme bleibt erhalten.
+        onPress: () => {
+          const current = latest.current.value;
+          const at = current.indexOf(value[idx]);
+          if (at >= 0) latest.current.onChange(current.filter((_, i) => i !== at));
+        },
       },
     ]);
   };
