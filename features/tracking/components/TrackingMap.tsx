@@ -471,7 +471,7 @@ export function TrackingMap({
             (zIndex 1; Lay-Linie 2/3, Suchspur 4). Winkel, Gegenstände, Start/Ziel und Abrisse sind
             Marker und liegen immer darüber; die Lay-Linie bleibt in der Bandmitte sichtbar. */}
         {dogRange && dogRange.length > 1 && (
-          <Polyline coordinates={dogRange} strokeColor="rgba(21,230,195,0.40)" strokeWidth={DOG_RANGE_STROKE_WIDTH}
+          <Polyline coordinates={dogRange} strokeColor="rgba(0,255,204,0.40)" strokeWidth={DOG_RANGE_STROKE_WIDTH}
             lineCap="round" lineJoin="round" zIndex={1} />
         )}
         {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
@@ -829,7 +829,7 @@ const s = StyleSheet.create({
   viewMenuRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   viewMenu:    { minWidth: 178, padding: 6, gap: 2, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.94)', borderWidth: 1, borderColor: C.trackBorder },
   viewMenuItem:   { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, borderRadius: 10 },
-  viewMenuItemOn: { backgroundColor: 'rgba(21,230,195,0.12)' },
+  viewMenuItemOn: { backgroundColor: 'rgba(0,255,204,0.12)' },
   viewMenuTxt:    { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.trackText },
   viewMenuTxtOn:  { color: C.trackPrimary },
   fadedMarker: { opacity: SEARCH_VIEW.passedOpacity },
@@ -876,6 +876,6 @@ const s = StyleSheet.create({
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },
   posCore:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
-  dogGlow:     { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(21,230,195,0.22)', alignItems: 'center', justifyContent: 'center' },
+  dogGlow:     { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,255,204,0.22)', alignItems: 'center', justifyContent: 'center' },
   dogCore:     { width: 24, height: 24, borderRadius: 12, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#04110F' },
 });

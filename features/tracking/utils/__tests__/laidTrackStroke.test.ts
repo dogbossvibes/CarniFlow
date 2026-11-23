@@ -2,7 +2,7 @@ import { laidTrackStroke } from '@/features/tracking/utils/trackSegments';
 import { C } from '@/constants/colors';
 
 // Produktions-Bugfix: die GELEGTE Fährte war während der Absuche gestrichelt/gedimmt
-// türkis (rgba(21,230,195,0.55) + lineDashPattern [8,8]) und dadurch von der blauen
+// türkis (rgba(0,255,204,0.55) + lineDashPattern [8,8]) und dadurch von der blauen
 // Ist-Suchspur nicht unterscheidbar. Diese Tests fixieren die Rollen dauerhaft, damit
 // sie nicht erneut vertauscht werden.
 
@@ -22,7 +22,7 @@ describe('laidTrackStroke — gelegte Fährte immer solide', () => {
 
   it('gelegte Farbe ist NICHT das gedimmte Türkis von früher', () => {
     const s = laidTrackStroke('normal', C.trackPrimary);
-    expect(s.strokeColor).not.toBe('rgba(21,230,195,0.55)');
+    expect(s.strokeColor).not.toBe('rgba(0,255,204,0.55)');
   });
 
   it('Teilstrecken-Overlay: dicker (6), eigene Segmentfarbe, kein Dash', () => {

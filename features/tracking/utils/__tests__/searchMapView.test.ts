@@ -187,9 +187,9 @@ describe('B — Fährten-Zoom und freie Sicht', () => {
   });
 
   it('Linie: ca. 6 pt in der Fährtenfarbe mit dunkler Kontur', () => {
-    const stroke = searchLaidStroke({ strokeColor: '#15e6c3', strokeWidth: 4 });
+    const stroke = searchLaidStroke({ strokeColor: '#00FFCC', strokeWidth: 4 });
     expect(stroke.strokeWidth).toBe(6);
-    expect(stroke.strokeColor).toBe('#15e6c3');
+    expect(stroke.strokeColor).toBe('#00FFCC');
     expect(stroke.outlineWidth).toBeGreaterThan(stroke.strokeWidth);
     expect(stroke.outlineColor).toBe('#04110F');
   });

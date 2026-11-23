@@ -21,7 +21,7 @@ function alterLabel(birth: string | null): string | null {
 
 function Chip({ label, accent }: { label: string; accent?: boolean }) {
   return (
-    <View className={`rounded-[8px] px-2 py-[3px] border ${accent ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line'}`}>
+    <View className={`rounded-[8px] px-2 py-[3px] border ${accent ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.4)]' : 'bg-white/5 border-ft-line'}`}>
       <Text className={`text-[11px] font-semibold ${accent ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
     </View>
   );

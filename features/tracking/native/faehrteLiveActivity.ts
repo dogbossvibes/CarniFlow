@@ -47,8 +47,8 @@ export function startFaehrteActivity(dogName?: string): void {
       {
         backgroundColor:        '#0F1115',
         titleColor:             '#FFFFFF',
-        subtitleColor:          '#15E6C3',
-        progressViewTint:       '#15E6C3',
+        subtitleColor:          '#00FFCC',
+        progressViewTint:       '#00FFCC',
         progressViewLabelColor: '#FFFFFF',
         deepLinkUrl:            '/track/legen',
         timerType:              'digital',

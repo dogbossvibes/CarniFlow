@@ -70,7 +70,7 @@ export function startSearchKeepalive(): Promise<void> {
         foregroundService: {
           notificationTitle: '🐾 Absuche läuft',
           notificationBody: 'Ortung aktiv – tippen, um ANYVO zu öffnen',
-          notificationColor: '#15E6C3',
+          notificationColor: '#00FFCC',
           // App beendet → Dienst und Benachrichtigung weg (die Absuche lebt nur mit der App).
           killServiceOnDestroy: true,
         },

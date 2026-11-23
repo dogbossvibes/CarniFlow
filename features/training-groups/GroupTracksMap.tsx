@@ -70,7 +70,7 @@ const s = StyleSheet.create({
   map: { height: 260 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 10, paddingTop: 10 },
   chip: { minHeight: 32, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCardAlt },
-  chipOn: { borderColor: C.trackPrimary, backgroundColor: 'rgba(21,230,195,0.1)' },
+  chipOn: { borderColor: C.trackPrimary, backgroundColor: 'rgba(0,255,204,0.1)' },
   chipText: { color: C.trackTextSec, fontSize: 12, fontWeight: '600' },
   chipTextOn: { color: C.trackPrimary },
   legend: { color: C.trackTextSec, fontSize: 12, padding: 10, lineHeight: 17 },

@@ -787,7 +787,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         await startBackgroundUpdates({
           notificationTitle: '🐾 Fährte läuft',
           notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
-          notificationColor: '#15E6C3',
+          notificationColor: '#00FFCC',
           diagnosticSessionId: input.localId,
         });
         if (!isCurrentRecording()) return; // stopAll already queued cleanup before any newer start

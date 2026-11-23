@@ -86,7 +86,7 @@ export default function HomeZoneScreen() {
                 {(zones ?? []).map(z => <Circle key={z.id} center={{ latitude: z.lat, longitude: z.lng }} radius={z.radiusM}
                   strokeColor="rgba(255,255,255,0.9)" fillColor="rgba(255,255,255,0.18)" strokeWidth={2} />)}
                 {center ? <Circle center={{ latitude: center.lat, longitude: center.lng }} radius={radiusM}
-                  strokeColor={C.trackPrimary} fillColor="rgba(21,230,195,0.22)" strokeWidth={2} /> : null}
+                  strokeColor={C.trackPrimary} fillColor="rgba(0,255,204,0.22)" strokeWidth={2} /> : null}
                 {center ? <Marker coordinate={{ latitude: center.lat, longitude: center.lng }} pinColor={C.trackPrimary} tracksViewChanges={false} /> : null}
               </MapView>
             </View>

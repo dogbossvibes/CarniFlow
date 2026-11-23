@@ -8,7 +8,7 @@ describe('Hundebereich auf der Absuche-Karte (T-217)', () => {
     const src = map();
     const band = src.slice(src.indexOf('{dogRange && dogRange.length > 1 && ('), src.indexOf('{/* Rohspur (Debug)'));
     expect(band).toContain('zIndex={1}');
-    expect(band).toMatch(/strokeColor="rgba\(21,230,195,0\.40\)"/);
+    expect(band).toMatch(/strokeColor="rgba\(0,255,204,0\.40\)"/);
     expect(band).not.toContain('<Marker');
     // Im Quelltext vor Lay-Linie und Markern → bei gleichem zIndex ebenfalls darunter.
     expect(src.indexOf('{dogRange && dogRange.length > 1 && (')).toBeLessThan(src.indexOf('{/* Gelegte Fährte (Soll-Linie)'));

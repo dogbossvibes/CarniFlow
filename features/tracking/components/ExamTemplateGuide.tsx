@@ -60,7 +60,7 @@ export function ExamTemplateChooser({ selected, onSelect, t }: {
             <Pressable key={option.id ?? 'none'} onPress={() => onSelect(option.id)}
               accessibilityRole="radio" accessibilityState={{ checked: on }}
               accessibilityLabel={`${t('track.exam.title')}: ${option.label}`}
-              className={`px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+              className={`px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
               <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{option.label}</Text>
             </Pressable>
           );

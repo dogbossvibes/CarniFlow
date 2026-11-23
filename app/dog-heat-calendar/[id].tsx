@@ -368,7 +368,7 @@ const s = StyleSheet.create({
   weekRow: { flexDirection: 'row' },
   dayCell: { flex: 1, height: 48, alignItems: 'center', paddingTop: 6, position: 'relative', borderRadius: 7 },
   dayCellData: { backgroundColor: 'rgba(255,255,255,0.018)' },
-  dayCellToday: { backgroundColor: 'rgba(21,230,195,0.10)' },
+  dayCellToday: { backgroundColor: 'rgba(0,255,204,0.10)' },
   dayNumber: { zIndex: 1, fontSize: 12, color: C.trackTextSec, fontWeight: '700' },
   dayNumberToday: { color: C.trackPrimary, fontWeight: '900' },
   phaseBar: { position: 'absolute', left: 1, right: 1, bottom: 7, height: 8 },

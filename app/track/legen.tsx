@@ -956,7 +956,7 @@ export default function LegenScreen() {
                           const on = d.id === activeDog?.id;
                           return (
                             <Pressable key={d.id} onPress={() => setSelectedDogId(d.id)}
-                              className={`flex-row items-center gap-1.5 pl-1.5 pr-[12px] py-1.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                              className={`flex-row items-center gap-1.5 pl-1.5 pr-[12px] py-1.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
                               <View className="w-[22px] h-[22px] rounded-full bg-ft-acc items-center justify-center">
                                 <Text className="text-[10px] font-extrabold text-ft-acc-text">{(d.name?.[0] ?? '?').toUpperCase()}</Text>
                               </View>
@@ -975,7 +975,7 @@ export default function LegenScreen() {
                       const on = surface === sfc;
                       return (
                         <Pressable key={sfc} onPress={() => setSurface(sfc)}
-                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
                           <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{sfc}</Text>
                         </Pressable>
                       );
@@ -989,7 +989,7 @@ export default function LegenScreen() {
                       const on = condition === c;
                       return (
                         <Pressable key={c} onPress={() => setCondition(on ? null : c)}
-                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
                           <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{c}</Text>
                         </Pressable>
                       );
@@ -1004,7 +1004,7 @@ export default function LegenScreen() {
                       const on = autoDetect === (val === 'auto');
                       return (
                         <Pressable key={val} onPress={() => void setAutoDetect(val === 'auto')}
-                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
                           <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
                           <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
                         </Pressable>
@@ -1032,7 +1032,7 @@ export default function LegenScreen() {
                           accessibilityRole="switch"
                           accessibilityState={{ checked: on }}
                           accessibilityLabel={t('track.layVoiceToggle')}
-                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}>
                           <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
                           <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
                         </Pressable>
@@ -1164,7 +1164,7 @@ export default function LegenScreen() {
           <Pressable
             accessibilityLabel={activeSegment ? t('track.segmentStop') : t('track.segmentStart')}
             accessibilityHint={t('track.segmentStopHint')}
-            className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${activeSegment ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
+            className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${activeSegment ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
             onPress={handleTsToggle} disabled={phase !== 'recording'}
           >
             <Ionicons name={activeSegment ? 'stop-circle-outline' : 'trail-sign-outline'} size={20} color={activeSegment ? FT.acc : FT.text} />
@@ -1227,7 +1227,7 @@ export default function LegenScreen() {
                   accessibilityLabel={`${segmentLabel(type)} ${t('common.select').toLowerCase()}`}
                   onPress={() => setSegmentType(type)}
                   style={{ width: '47%', flexGrow: 1 }}
-                  className={`flex-row items-center gap-2 px-3 py-3 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
+                  className={`flex-row items-center gap-2 px-3 py-3 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
                 >
                   <Ionicons name={SEGMENT_ICONS[type]} size={18} color={on ? FT.acc : FT.muted} />
                   <Text className={`text-[12.5px] font-bold ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{segmentLabel(type)}</Text>

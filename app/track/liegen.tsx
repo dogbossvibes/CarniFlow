@@ -322,7 +322,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
         {id && <DistractionEntry parentId={id} />}
         {/* Timer in der Mitte */}
         <View className="flex-1 items-center justify-center px-6">
-          <View className="w-[150px] h-[150px] rounded-full items-center justify-center mb-7 border-2 border-[rgba(21,230,195,0.35)] bg-ft-acc-dim">
+          <View className="w-[150px] h-[150px] rounded-full items-center justify-center mb-7 border-2 border-[rgba(0,255,204,0.35)] bg-ft-acc-dim">
             <Ionicons name="hourglass-outline" size={30} color={FT.acc} />
           </View>
           <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1.4px] uppercase mb-1">{t('track.laidSince')}</Text>

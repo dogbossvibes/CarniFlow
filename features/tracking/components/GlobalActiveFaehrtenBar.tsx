@@ -47,7 +47,7 @@ export function GlobalActiveFaehrtenBar({ style }: { style?: object }) {
 }
 
 const s = StyleSheet.create({
-  bar:    { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(21,230,195,0.30)', paddingHorizontal: 13, paddingVertical: 11 },
+  bar:    { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0,255,204,0.30)', paddingHorizontal: 13, paddingVertical: 11 },
   dotWrap:{ width: 30, height: 30, borderRadius: 10, backgroundColor: C.trackCardAlt, alignItems: 'center', justifyContent: 'center' },
   dot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: C.trackPrimary },
   title:  { fontSize: 13.5, color: C.trackText, fontWeight: '800' },
