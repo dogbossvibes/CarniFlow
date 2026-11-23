@@ -32,6 +32,19 @@ export async function claimNewbieQuota(kind: QuotaKind, ref: string): Promise<Qu
   }
 }
 
+// Gibt eine Fährten-Buchung zurück, wenn die Aufnahme nie zustande kam (RPC
+// release_newbie_quota, supabase/migrations/20261123200000_newbie_track_claim_release.sql).
+// Der Server entscheidet: nur eigene, frische (≤ 24 h) Buchung im laufenden Monat und nur,
+// wenn es unter `ref` keine Fährte gibt. Best-effort: Fehler (Netz, Funktion noch nicht
+// vorhanden) ändern nichts am Ablauf, die Buchung bleibt dann wie bisher bestehen.
+export async function releaseNewbieQuota(kind: 'track', ref: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('release_newbie_quota', { p_kind: kind, p_ref: ref });
+    if (error) return false;
+    return data === true;
+  } catch { return false; }
+}
+
 // Übersetzt einen QuotaStatus in einen Fehler, der den Save-/Start-Flow abbricht.
 // null = ok (fortfahren). Der Code steuert die UX (Upgrade vs. Retry).
 export function quotaBlock(status: QuotaStatus): QuotaBlock | null {

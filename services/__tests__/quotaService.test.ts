@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 jest.mock('@/lib/supabase', () => ({ supabase: { rpc: jest.fn() } }));
 
 import { supabase } from '@/lib/supabase';
-import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
+import { claimNewbieQuota, quotaBlock, releaseNewbieQuota } from '@/services/quotaService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 
 const rpc = supabase.rpc as unknown as jest.Mock;
@@ -213,5 +213,22 @@ describe('Migration 20260925090000_newbie_track_quota_one.sql — Struktur (fina
     expect(mig).not.toMatch(/function public\.claim_newbie_quota/);
     expect(mig).not.toMatch(/function public\.newbie_quota_status/);
     expect(mig).not.toMatch(/function public\.is_pro_member/);
+  });
+});
+
+describe('releaseNewbieQuota — Rückgabe einer nie gestarteten Fährte', () => {
+  afterEach(() => rpc.mockReset());
+  it('ruft release_newbie_quota mit Art und ID auf; true nur bei Server-true', async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    expect(await releaseNewbieQuota('track', 'ref-1')).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('release_newbie_quota', { p_kind: 'track', p_ref: 'ref-1' });
+    rpc.mockResolvedValue({ data: false, error: null });
+    expect(await releaseNewbieQuota('track', 'ref-1')).toBe(false);
+  });
+  it('Fehler oder fehlende Funktion: still false, nichts wirft', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'function does not exist' } });
+    expect(await releaseNewbieQuota('track', 'x')).toBe(false);
+    rpc.mockRejectedValue(new Error('offline'));
+    expect(await releaseNewbieQuota('track', 'x')).toBe(false);
   });
 });

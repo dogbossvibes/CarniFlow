@@ -37,7 +37,7 @@ describe('NEWBIE-Fährten-Zugang: kein Pro-only-Hardgate mehr', () => {
     expect(legen).toContain("const { isPro } = useCapabilities();");
     expect(legen).toContain("if (!resumed && !isPro) {");
     expect(legen.indexOf("if (requestedSessionId && !resumed)")).toBeLessThan(legen.indexOf("claimNewbieQuota(\'track\'"));
-    expect(legen).toContain("const clientUuid = requestedSessionId ?? Crypto.randomUUID();");
+    expect(legen).toContain("const clientUuid = requestedSessionId ?? trackClaimRef.current ?? Crypto.randomUUID();");
     expect(legen).toContain("claimNewbieQuota('track', trackClaimRef.current)");
     expect(legen).toContain("handleQuotaBlock(block, 'track', t, () => router.push('/premium' as never));");
   });
@@ -67,5 +67,25 @@ describe('Plan-UI: NEWBIE-Karte wirbt mit 1 Fährte/Monat statt „keine Fährte
   it('premium.tsx nutzt featureOneTrackMonth, nicht mehr featureNoTrack', () => {
     expect(premium).not.toMatch(/featureNoTrack/);
     expect(premium).toMatch(/featureOneTrackMonth/);
+  });
+});
+
+describe('NEWBIE-Fährte: abgebrochener Start gibt das Kontingent zurück', () => {
+  const legen = readFileSync('app/track/legen.tsx', 'utf8');
+  it('Buchungs-ID ist die Fährten-ID; Buchung gilt erst als offen nach erfolgreichem Claim', () => {
+    expect(legen).toContain('if (!block) claimPendingRef.current = true;');
+    expect(legen.indexOf('if (!block) claimPendingRef.current = true;')).toBeGreaterThan(legen.indexOf("claimNewbieQuota('track', trackClaimRef.current)"));
+  });
+  it('sobald die Aufnahme läuft, zählt die Buchung (kein Zurückgeben mehr)', () => {
+    const started = legen.slice(legen.indexOf('onSessionStarted: () => {'), legen.indexOf('onSessionStarted: () => {') + 200);
+    expect(started).toContain('claimPendingRef.current = false;');
+  });
+  it('nur beim Verlassen ohne gestartete Aufnahme wird zurückgegeben, genau einmal', () => {
+    expect(legen).toMatch(/useEffect\(\(\) => \(\) => \{\s*const ref = trackClaimRef\.current;\s*if \(claimPendingRef\.current && ref\) \{\s*claimPendingRef\.current = false;\s*void releaseNewbieQuota\('track', ref\);/);
+    expect(legen.match(/releaseNewbieQuota\(/g)).toHaveLength(1);
+  });
+  it('Fortsetzen und Premium buchen nicht und geben nichts zurück', () => {
+    const claimBlock = legen.slice(legen.indexOf('if (!resumed && !isPro) {'), legen.indexOf('if (!resumed && !isPro) {') + 400);
+    expect(claimBlock).toContain('claimPendingRef.current = true');
   });
 });
