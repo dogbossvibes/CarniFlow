@@ -57,6 +57,26 @@ export function resetHelpSeen() {
   persist();
 }
 
+// Zurücksetzen mit Rückgängig-Frist: Anzeige sofort leer, gespeichert wird erst
+// bei `commit`. Wird die App vorher beendet, bleibt der gespeicherte Stand erhalten.
+export function resetHelpSeenDeferred(): { commit: () => void; undo: () => void } {
+  const owner = currentUserId;
+  const previous = state;
+  const sameOwner = () => currentUserId === owner && hydratedFor === owner;
+  state = [];
+  emit();
+  return {
+    // Auch später gesehene Hinweise (markHelpSeen) bleiben dabei erhalten.
+    commit: () => { if (sameOwner()) persist(); },
+    undo: () => {
+      if (!sameOwner()) return;
+      state = [...previous, ...state.filter(id => !previous.includes(id))];
+      emit();
+      persist();
+    },
+  };
+}
+
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
 const getSnapshot = () => state;
 

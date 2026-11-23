@@ -366,7 +366,7 @@ export default function TrainingDetailScreen() {
           {einheit.photo_urls?.length > 0 ? (
             <>
               <AbschnittLabel text="FOTOS" />
-              <PhotoPicker value={einheit.photo_urls} onChange={() => {}} />
+              <PhotoPicker value={einheit.photo_urls} onChange={() => {}} readOnly />
             </>
           ) : null}
 
@@ -374,7 +374,7 @@ export default function TrainingDetailScreen() {
           {einheit.video_url ? (
             <>
               <AbschnittLabel text="VIDEO" />
-              <VideoUpload value={einheit.video_url} onChange={() => {}} />
+              <VideoUpload value={einheit.video_url} onChange={() => {}} readOnly />
             </>
           ) : null}
 
@@ -389,6 +389,7 @@ export default function TrainingDetailScreen() {
                   createdAt: `Aufnahme ${i + 1}`,
                 }))}
                 onChange={() => {}}
+                readOnly
               />
             </>
           ) : null}
