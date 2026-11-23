@@ -22,6 +22,15 @@ jest.mock('@/features/tracking/services/trackRecoveryService', () => ({
   reopenCancelledTrack: (...a: unknown[]) => mockReopen(...a),
 }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+// NEWBIE-Kontingent beim Wiederöffnen: Standard = nichts zurückgegeben (wie bisher, keine Buchung).
+const mockWasReleased = jest.fn(async (_ref: string) => false);
+const mockClaim = jest.fn(async (_k: string, _r: string) => ({ status: 'ok', used: 1, limit: 1 }));
+const mockForget = jest.fn(async (_ref: string) => {});
+jest.mock('@/services/quotaService', () => ({
+  wasTrackReleased: (r: string) => mockWasReleased(r),
+  claimNewbieQuota: (k: string, r: string) => mockClaim(k, r),
+  forgetReleasedTrack: (r: string) => mockForget(r),
+}));
 let mockQa = false;
 jest.mock('@/features/tracking/utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQa }));
 
@@ -352,4 +361,30 @@ it('im Hundeprofil erklärt fehlende Geometrie die nicht verfügbare Wiederaufna
   expect(byId(renderer, 'track-recovery-unavailable')).toBeDefined();
   expect(byId(renderer, 'track-resume-cta')).toBeUndefined();
   expect(texts(renderer)).toContain('Ihre vorhandenen Daten bleiben erhalten.');
+});
+
+describe('Wiederöffnen und NEWBIE-Kontingent', () => {
+  it('ohne Rückgabe: keine Buchung, Wiederöffnen wie bisher', async () => {
+    mockWasReleased.mockResolvedValueOnce(false);
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled' });
+    mockReopen.mockResolvedValue({ ok: true, decision: { ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/t' } });
+    const r = await mount();
+    const btn = byId(r, 'track-reopen-cancelled');
+    expect(btn).toBeDefined();
+    await act(async () => { btn.props.onPress(); });
+    expect(mockClaim).not.toHaveBeenCalled();
+  });
+  it('nach Rückgabe und «Limit erreicht»: Hinweis, kein Wiederöffnen', async () => {
+    mockWasReleased.mockResolvedValueOnce(true);
+    mockClaim.mockResolvedValueOnce({ status: 'exceeded', used: 1, limit: 1 });
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled' });
+    const r = await mount();
+    const btn = byId(r, 'track-reopen-cancelled');
+    expect(btn).toBeDefined();
+    mockReopen.mockClear();
+    await act(async () => { btn.props.onPress(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(mockClaim).toHaveBeenCalledWith('track', 'sess-A');
+    expect(mockReopen).not.toHaveBeenCalled();
+  });
 });

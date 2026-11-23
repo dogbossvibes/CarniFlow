@@ -109,6 +109,9 @@ begin
 end; $$;
 grant execute on function public.claim_newbie_quota(text, text) to authenticated;
 
+-- Rückgabe einer nie gestarteten Fährten-Buchung: siehe
+-- supabase/migrations/20261123200000_newbie_track_claim_release.sql (release_newbie_quota).
+
 -- Status/Restkontingent (Anzeige). Dog = Ist-Bestand aus dogs, sonst Monats-Claims.
 create or replace function public.newbie_quota_status(p_kind text)
 returns table(used int, "limit" int)

@@ -35,7 +35,7 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { isResumeOfActiveFaehrte, reopenTarget, shouldShowActiveFaehrteConflict, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import { clearPending } from '@/features/tracking/store/trackPersist';
 import * as Crypto from 'expo-crypto';
-import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
+import { claimNewbieQuota, quotaBlock, releaseNewbieQuota } from '@/services/quotaService';
 import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
@@ -205,6 +205,17 @@ export default function LegenScreen() {
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
   const trackClaimRef = useRef<string | null>(null);   // stabile Fährten-ID für den idempotenten NEWBIE-Quota-Claim
+  // Gebuchte, aber nie gestartete NEWBIE-Fährte: beim Verlassen des Screens zurückgeben.
+  const claimPendingRef = useRef(false);
+  // Verlässt die Nutzerin den Screen, bevor die Aufnahme lief (z. B. GPS nie bereit), wird
+  // die Buchung zurückgegeben. Der Server prüft zusätzlich, dass es keine Fährte unter der ID gibt.
+  useEffect(() => () => {
+    const ref = trackClaimRef.current;
+    if (claimPendingRef.current && ref) {
+      claimPendingRef.current = false;
+      void releaseNewbieQuota('track', ref);
+    }
+  }, []);
   const [showBgDisclosure, setShowBgDisclosure] = useState(Platform.OS === 'android');    // Play-Disclosure VOR erster Location-Permission
   const [disclosurePurpose, setDisclosurePurpose] = useState<'permission' | 'recording'>('permission');
   const [permissionFlowStarted, setPermissionFlowStarted] = useState(Platform.OS !== 'android');
@@ -361,6 +372,8 @@ export default function LegenScreen() {
                   useActiveFaehrten.getState().remove(dId);
                   void clearPending(dId);
                   void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');   // dauerhaft: nie wieder „Fährte fortsetzen"
+                  // NEWBIE: nie abgesuchte Fährte gibt das Kontingent zurück (Server prüft zusätzlich).
+                  if (entry.sessionId && entry.status !== 'searching') void releaseNewbieQuota('track', entry.sessionId);
                   if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
                   proceedToStart();   // erst danach darf eine neue Fährte entstehen
                 } },
@@ -470,6 +483,7 @@ export default function LegenScreen() {
     if (!resumed && !isPro) {
       if (!trackClaimRef.current) trackClaimRef.current = Crypto.randomUUID();
       const block = quotaBlock((await claimNewbieQuota('track', trackClaimRef.current)).status);
+      if (!block) claimPendingRef.current = true;
       if (block) {
         beganRef.current = false;
         hapticWarning();
@@ -481,7 +495,10 @@ export default function LegenScreen() {
     // Führende Session-ID SOFORT (kein Warten auf Supabase, kein getUser). Dieselbe UUID
     // wird später deterministisch als training_sessions.id verwendet (idempotenter Sync).
     const uid = session?.user?.id;
-    const clientUuid = requestedSessionId ?? Crypto.randomUUID();
+    // NEWBIE: Fährten-ID = Buchungs-ID, damit der Server eine gespeicherte Fährte der Buchung
+    // zuordnen kann (Rückgabe nur ohne Fährte). Ein fehlgeschlagener Start legt unter der ID
+    // noch nichts an (useTrackRecorder: lokale Session erst nach allen Prüfungen).
+    const clientUuid = requestedSessionId ?? trackClaimRef.current ?? Crypto.randomUUID();
     sessionIdRef.current = null;   // Remote-ID erst nach erfolgreichem Insert (unten)
     const r = await rec.beginRecording({
       localId: clientUuid,
@@ -489,6 +506,7 @@ export default function LegenScreen() {
       ownerId: uid,
       dogId:   activeDog?.id ?? null,
       onSessionStarted: () => {
+        claimPendingRef.current = false;   // Fährte läuft → Buchung zählt
         setPhase('recording');
         sessionIdRef.current = clientUuid;
         hapticSuccess();

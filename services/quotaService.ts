@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import type { QuotaKind } from '@/features/subscription/plans';
 
@@ -30,6 +31,46 @@ export async function claimNewbieQuota(kind: QuotaKind, ref: string): Promise<Qu
     if (__DEV__) return { status: 'ok', used: 0, limit: 0, error: `[dev-bypass] ${(e as Error)?.message ?? e}` };
     return { status: 'error', used: 0, limit: 0, error: (e as Error)?.message };   // Production: fail-closed
   }
+}
+
+// Gibt eine Fährten-Buchung zurück, wenn die Aufnahme nie zustande kam (RPC
+// release_newbie_quota, supabase/migrations/20261123200000_newbie_track_claim_release.sql).
+// Der Server entscheidet: nur eigene, frische (≤ 24 h) Buchung im laufenden Monat und nur,
+// wenn es unter `ref` keine Fährte gibt. Best-effort: Fehler (Netz, Funktion noch nicht
+// vorhanden) ändern nichts am Ablauf, die Buchung bleibt dann wie bisher bestehen.
+export async function releaseNewbieQuota(kind: 'track', ref: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('release_newbie_quota', { p_kind: kind, p_ref: ref });
+    if (error || data !== true) return false;
+    await rememberReleasedTrack(ref);
+    return true;
+  } catch { return false; }
+}
+
+// Lokal gemerkte, zurückgegebene Fährten: nur sie buchen beim Wiederöffnen erneut. Fährten
+// ohne Rückgabe (auch alle vor dieser Änderung gelegten) öffnen wie bisher ohne Buchung.
+const RELEASED_KEY = 'newbie_released_tracks_v1';
+async function readReleased(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RELEASED_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
+}
+async function rememberReleasedTrack(ref: string): Promise<void> {
+  try {
+    const list = await readReleased();
+    if (!list.includes(ref)) await AsyncStorage.setItem(RELEASED_KEY, JSON.stringify([...list, ref].slice(-50)));
+  } catch { /* best-effort */ }
+}
+export async function wasTrackReleased(ref: string): Promise<boolean> {
+  return (await readReleased()).includes(ref);
+}
+export async function forgetReleasedTrack(ref: string): Promise<void> {
+  try {
+    const list = await readReleased();
+    if (list.includes(ref)) await AsyncStorage.setItem(RELEASED_KEY, JSON.stringify(list.filter(x => x !== ref)));
+  } catch { /* best-effort */ }
 }
 
 // Übersetzt einen QuotaStatus in einen Fehler, der den Save-/Start-Flow abbricht.
