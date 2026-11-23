@@ -34,7 +34,7 @@ const RUN: ReplayGeometry = {
   points: Array.from({ length: 9 }, (_, i) => ll(0.6, i * 5)),
   pointsTimeSec: Array.from({ length: 9 }, (_, i) => i * 5),
 };
-const HEAT = [{ segmentId: 's1', segmentIndex: 0, coordinates: RUN.points.slice(0, 4), color: '#15E6C3', band: 'very_low' as const }];
+const HEAT = [{ segmentId: 's1', segmentIndex: 0, coordinates: RUN.points.slice(0, 4), color: '#00FFCC', band: 'very_low' as const }];
 
 type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex: number };
 function polylines(node: ReactTestRenderer): PolyProps[] {
@@ -110,7 +110,7 @@ describe('TrackReplayMap — Referenz vs. Absuche', () => {
     const { polys } = renderAt(20);
     const heat = polys.filter(p => p.zIndex === 4);
     expect(heat).toHaveLength(1);
-    expect(heat[0].strokeColor).toBe('#15E6C3');
+    expect(heat[0].strokeColor).toBe('#00FFCC');
     expect(heat[0].strokeWidth).toBeLessThan(8);
     expect(heat[0].coordinates).toHaveLength(4);
   });

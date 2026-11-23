@@ -18,7 +18,7 @@ import { TRACK_LOCATION_TASK } from '@/features/tracking/native/backgroundLocati
 import { useT } from '@/i18n';
 
 const SPLASH_BG = '#0F1115';   // = expo-splash-screen backgroundColor in app.json
-const MINT = '#15e6c3';
+const MINT = '#00FFCC';
 
 // Läuft nur einmal pro JS-Start (Kaltstart); ein Remount des Gates prüft nicht erneut.
 let decided = false;
@@ -141,7 +141,7 @@ const s = StyleSheet.create({
   body:      { color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
   bar:       { width: 150, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', marginTop: 22, overflow: 'hidden' },
   barFill:   { height: '100%', borderRadius: 2, backgroundColor: MINT },
-  toast:     { position: 'absolute', left: 14, right: 14, bottom: 96, backgroundColor: '#181a20', borderWidth: 1, borderColor: 'rgba(21,230,195,0.35)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
+  toast:     { position: 'absolute', left: 14, right: 14, bottom: 96, backgroundColor: '#181a20', borderWidth: 1, borderColor: 'rgba(0,255,204,0.35)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   toastText: { color: '#ffffff', fontSize: 13, lineHeight: 18 },
   toastStrong: { color: MINT, fontWeight: '800' },
 });

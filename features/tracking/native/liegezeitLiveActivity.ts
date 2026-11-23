@@ -106,7 +106,7 @@ export function startLiegezeitActivity(meta: LiegezeitActivityMeta, labels: Lieg
     const id = la.startActivity(
       { title: `${dogName} · ${labels.lying}`, subtitle: `${labels.since} ${fmtClock(meta.startedAt)}` },
       // Das V1-Widget setzt das Schema selbst davor → nur Pfad + Query.
-      { backgroundColor: '#0F1115', titleColor: '#FFFFFF', subtitleColor: '#15E6C3',
+      { backgroundColor: '#0F1115', titleColor: '#FFFFFF', subtitleColor: '#00FFCC',
         deepLinkUrl: restingDeepLinkPath(meta.dogId, meta.sessionId), timerType: 'digital' },
     );
     if (id) v1Ids.set(k, id);
