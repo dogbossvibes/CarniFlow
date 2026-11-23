@@ -82,10 +82,33 @@ describe('NEWBIE-Fährte: abgebrochener Start gibt das Kontingent zurück', () =
   });
   it('nur beim Verlassen ohne gestartete Aufnahme wird zurückgegeben, genau einmal', () => {
     expect(legen).toMatch(/useEffect\(\(\) => \(\) => \{\s*const ref = trackClaimRef\.current;\s*if \(claimPendingRef\.current && ref\) \{\s*claimPendingRef\.current = false;\s*void releaseNewbieQuota\('track', ref\);/);
-    expect(legen.match(/releaseNewbieQuota\(/g)).toHaveLength(1);
+    expect(legen.match(/releaseNewbieQuota\(/g)).toHaveLength(2);   // Verlassen ohne Start + Abbruch im Konflikt-Dialog
   });
   it('Fortsetzen und Premium buchen nicht und geben nichts zurück', () => {
     const claimBlock = legen.slice(legen.indexOf('if (!resumed && !isPro) {'), legen.indexOf('if (!resumed && !isPro) {') + 400);
     expect(claimBlock).toContain('claimPendingRef.current = true');
+  });
+});
+
+describe('NEWBIE-Fährte: abgebrochen vor der Absuche gibt das Kontingent zurück', () => {
+  const legen = readFileSync('app/track/legen.tsx', 'utf8');
+  const liegen = readFileSync('app/track/liegen.tsx', 'utf8');
+  const cta = readFileSync('features/tracking/components/TrackResumeCta.tsx', 'utf8');
+  it('Abbruch im Konflikt-Dialog (legen.tsx): Rückgabe nach dem Abbruch-Marker, nie während der Absuche', () => {
+    const at = legen.indexOf("void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');");
+    const rel = legen.indexOf("if (entry.sessionId && entry.status !== 'searching') void releaseNewbieQuota('track', entry.sessionId);");
+    expect(at).toBeGreaterThan(0);
+    expect(rel).toBeGreaterThan(at);
+  });
+  it('Abbruch in der Liegezeit (liegen.tsx): Rückgabe, aber kein Claim', () => {
+    const at = liegen.indexOf("void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');");
+    expect(liegen.indexOf("void m.releaseNewbieQuota('track', target.sessionId);")).toBeGreaterThan(at);
+    expect(liegen).not.toMatch(/claimNewbieQuota/);
+  });
+  it('Wiederöffnen bucht nur zurückgegebene Fährten erneut; «Limit erreicht» sperrt vor dem Wiederöffnen', () => {
+    const gate = cta.indexOf('if (await q.wasTrackReleased(sessionId)) {');
+    expect(gate).toBeGreaterThan(0);
+    expect(cta.indexOf("q.claimNewbieQuota('track', sessionId)")).toBeGreaterThan(gate);
+    expect(cta.indexOf("handleQuotaBlock({ code: 'quota_exceeded' }, 'track'")).toBeLessThan(cta.indexOf('const r = await reopenCancelledTrack('));
   });
 });

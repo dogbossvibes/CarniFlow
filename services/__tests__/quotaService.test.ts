@@ -2,9 +2,12 @@ import { readFileSync } from 'fs';
 import { Alert } from 'react-native';
 
 jest.mock('@/lib/supabase', () => ({ supabase: { rpc: jest.fn() } }));
+jest.mock('@react-native-async-storage/async-storage', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 import { supabase } from '@/lib/supabase';
-import { claimNewbieQuota, quotaBlock, releaseNewbieQuota } from '@/services/quotaService';
+import { claimNewbieQuota, forgetReleasedTrack, quotaBlock, releaseNewbieQuota, wasTrackReleased } from '@/services/quotaService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 
 const rpc = supabase.rpc as unknown as jest.Mock;
@@ -230,5 +233,19 @@ describe('releaseNewbieQuota — Rückgabe einer nie gestarteten Fährte', () =>
     expect(await releaseNewbieQuota('track', 'x')).toBe(false);
     rpc.mockRejectedValue(new Error('offline'));
     expect(await releaseNewbieQuota('track', 'x')).toBe(false);
+  });
+});
+
+describe('zurückgegebene Fährten lokal merken (nur sie buchen beim Wiederöffnen erneut)', () => {
+  afterEach(() => rpc.mockReset());
+  it('nur nach Server-true gemerkt; vergessen entfernt sie', async () => {
+    rpc.mockResolvedValue({ data: false, error: null });
+    await releaseNewbieQuota('track', 'nein');
+    expect(await wasTrackReleased('nein')).toBe(false);
+    rpc.mockResolvedValue({ data: true, error: null });
+    await releaseNewbieQuota('track', 'ja');
+    expect(await wasTrackReleased('ja')).toBe(true);
+    await forgetReleasedTrack('ja');
+    expect(await wasTrackReleased('ja')).toBe(false);
   });
 });

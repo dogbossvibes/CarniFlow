@@ -287,6 +287,16 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
     // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
     void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
+    // NEWBIE: eine nie abgesuchte Fährte gibt das Monatskontingent zurück (Server prüft:
+    // eigene Fährte, keine Absuche). Best-effort; Premium hat keine Buchung.
+    // Erst bei Bedarf laden: hält den Liegezeit-Screen frei von der Supabase-Initialisierung.
+    if (target.sessionId) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const m = require('@/services/quotaService') as typeof import('@/services/quotaService');
+        void m.releaseNewbieQuota('track', target.sessionId);
+      } catch { /* best-effort: Buchung bleibt wie bisher */ }
+    }
     void endLiegezeitNotification({ dogId: target.dogId ?? dogId, sessionId: target.sessionId });   // nur DIESE Activity (cancelled)
     setAllowLeave(true);
     repeat();   // hebt die SDK-58-Sperre auf und wiederholt die blockierte Navigation

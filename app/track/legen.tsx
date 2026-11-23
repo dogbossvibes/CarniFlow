@@ -372,6 +372,8 @@ export default function LegenScreen() {
                   useActiveFaehrten.getState().remove(dId);
                   void clearPending(dId);
                   void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');   // dauerhaft: nie wieder „Fährte fortsetzen"
+                  // NEWBIE: nie abgesuchte Fährte gibt das Kontingent zurück (Server prüft zusätzlich).
+                  if (entry.sessionId && entry.status !== 'searching') void releaseNewbieQuota('track', entry.sessionId);
                   if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
                   proceedToStart();   // erst danach darf eine neue Fährte entstehen
                 } },

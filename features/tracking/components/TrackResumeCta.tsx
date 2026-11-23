@@ -137,6 +137,23 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, s
     actionLock.current = true; const token = generation.current;
     setBusy('reopen');
     try {
+      // NEWBIE: Hat der Abbruch das Monatskontingent zurückgegeben, bucht Wiederöffnen erneut
+      // (idempotent auf die Fährten-ID; Premium ohne Verbrauch). Nur ein klares «Limit erreicht»
+      // sperrt; ohne Netz bleibt Wiederöffnen wie bisher möglich. Fährten ohne Rückgabe öffnen ohne Buchung.
+      // Erst bei Bedarf laden: die Karte bleibt frei von der Supabase-Initialisierung.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const q = require('@/services/quotaService') as typeof import('@/services/quotaService');
+      if (await q.wasTrackReleased(sessionId)) {
+        const quota = await q.claimNewbieQuota('track', sessionId);
+        if (token !== generation.current) return;
+        if (quota.status === 'exceeded') {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { handleQuotaBlock } = require('@/features/subscription/quotaUx') as typeof import('@/features/subscription/quotaUx');
+          handleQuotaBlock({ code: 'quota_exceeded' }, 'track', t, () => router.push('/premium' as never));
+          return;
+        }
+        if (quota.status === 'ok') void q.forgetReleasedTrack(sessionId);
+      }
       const r = await reopenCancelledTrack(sessionId, dogId, { hasRemoteSearchRun, ...(userId ? { userId } : {}) });
       if (token !== generation.current) return;
       if (r.ok) setDecision(r.decision);   // → normale Karte mit „Fährte fortsetzen"

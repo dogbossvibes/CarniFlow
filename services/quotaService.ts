@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import type { QuotaKind } from '@/features/subscription/plans';
 
@@ -40,9 +41,36 @@ export async function claimNewbieQuota(kind: QuotaKind, ref: string): Promise<Qu
 export async function releaseNewbieQuota(kind: 'track', ref: string): Promise<boolean> {
   try {
     const { data, error } = await supabase.rpc('release_newbie_quota', { p_kind: kind, p_ref: ref });
-    if (error) return false;
-    return data === true;
+    if (error || data !== true) return false;
+    await rememberReleasedTrack(ref);
+    return true;
   } catch { return false; }
+}
+
+// Lokal gemerkte, zurückgegebene Fährten: nur sie buchen beim Wiederöffnen erneut. Fährten
+// ohne Rückgabe (auch alle vor dieser Änderung gelegten) öffnen wie bisher ohne Buchung.
+const RELEASED_KEY = 'newbie_released_tracks_v1';
+async function readReleased(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RELEASED_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
+}
+async function rememberReleasedTrack(ref: string): Promise<void> {
+  try {
+    const list = await readReleased();
+    if (!list.includes(ref)) await AsyncStorage.setItem(RELEASED_KEY, JSON.stringify([...list, ref].slice(-50)));
+  } catch { /* best-effort */ }
+}
+export async function wasTrackReleased(ref: string): Promise<boolean> {
+  return (await readReleased()).includes(ref);
+}
+export async function forgetReleasedTrack(ref: string): Promise<void> {
+  try {
+    const list = await readReleased();
+    if (list.includes(ref)) await AsyncStorage.setItem(RELEASED_KEY, JSON.stringify(list.filter(x => x !== ref)));
+  } catch { /* best-effort */ }
 }
 
 // Übersetzt einen QuotaStatus in einen Fehler, der den Save-/Start-Flow abbricht.
