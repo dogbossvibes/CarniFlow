@@ -1,7 +1,7 @@
 import React, {useEffect,useRef} from 'react';
 import TestRenderer,{act,type ReactTestRenderer} from 'react-test-renderer';
 import {Platform} from 'react-native';
-import {TrackComparisonLines,SEARCH_RUN_COLOR,SEARCH_RUN_FLOW,SEARCH_RUN_WIDTH} from '../TrackComparisonLines';
+import {TrackComparisonLines,searchRunDashPattern,SEARCH_RUN_COLOR,SEARCH_RUN_FLOW,SEARCH_RUN_WIDTH} from '../TrackComparisonLines';
 import type {MapPolylineProps} from 'react-native-maps';
 import {C} from '@/constants/colors';
 let mockReduceMotion=true;
@@ -54,6 +54,13 @@ describe('Laufband',()=>{
   act(()=>view.update(<TrackComparisonLines {...props}/>));expect(jest.getTimerCount()).toBe(1);tick(2);const moving=flow().lineDashPhase;
   act(()=>view.update(<TrackComparisonLines {...props} paused/>));expect(jest.getTimerCount()).toBe(0);tick(5);
   expect(flow().lineDashPhase).toBe(moving);   // kein Sprung beim Anhalten
+ });
+ it('Strichmuster: iOS unverändert, Android in Pixel umgerechnet (sonst winzige Striche)',()=>{
+  expect(searchRunDashPattern('ios',3)).toBe(SEARCH_RUN_FLOW.dash);
+  expect(searchRunDashPattern('android',3)).toEqual([30,42]);
+  expect(searchRunDashPattern('android',2.625)).toEqual([26,37]);
+  expect(searchRunDashPattern('android',0)).toBe(SEARCH_RUN_FLOW.dash);
+  expect(searchRunDashPattern('android',NaN)).toBe(SEARCH_RUN_FLOW.dash);
  });
  it('nach dem Schliessen läuft kein Timer weiter',()=>{
   setOs('ios');mockReduceMotion=false;render();expect(jest.getTimerCount()).toBe(1);act(()=>view.unmount());expect(jest.getTimerCount()).toBe(0);

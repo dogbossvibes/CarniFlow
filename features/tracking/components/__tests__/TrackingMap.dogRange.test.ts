@@ -45,4 +45,11 @@ describe('Hundebereich auf der Absuche-Karte (T-217)', () => {
     expect(run()).toContain('cornerDisplayLine(snapData.laidPoints, cornerPointsFromMarkers(snapData.laidMarkers), laidArc.cum)');
     expect(run()).toContain('laidLineParts(laidDisplay.points, laidDisplay.cum, 0, s.progressM)');
   });
+  it('Android-Stapelung: blaue Suchspur liegt eine Stufe über dem abgesuchten und dem nächsten Stück', () => {
+    const src = map();
+    expect(src).toContain('export const RUN_TRACE_Z = 5;');
+    expect(src).toMatch(/key=\{`run-\$\{index\}`\}[^\n]*zIndex=\{RUN_TRACE_Z\}/);
+    expect(src).toMatch(/key=\{`laid-done-\$\{index\}`\}[\s\S]{0,200}zIndex=\{4\}/);
+    expect(src).toMatch(/key=\{`laid-next-\$\{index\}`\}[\s\S]{0,200}zIndex=\{4\}/);
+  });
 });
