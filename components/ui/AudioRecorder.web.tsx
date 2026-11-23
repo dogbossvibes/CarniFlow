@@ -29,6 +29,8 @@ interface Props {
   undoScope?: string | null;
   /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
   undoLocked?: boolean;
+  /** Im Web ohne Wirkung (keine Aufnahme); nur für gleiche Props wie nativ. */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 export function AudioRecorder({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {

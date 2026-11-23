@@ -8,10 +8,13 @@ import { uploadVideo } from '@/services/mediaService';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { tapHaptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
+import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
 
 interface Props {
   value:    string[];
   onChange: (urls: string[]) => void;
+  /** Meldet true, solange aufgenommen oder hochgeladen wird (z. B. um den Hundewechsel zu sperren). */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 function VideoCell({ uri, onRemove }: { uri: string; onRemove: () => void }) {
@@ -29,10 +32,13 @@ function VideoCell({ uri, onRemove }: { uri: string; onRemove: () => void }) {
 }
 
 // Mehrere Videos: Upload nach Supabase Storage (training-videos) + Player je Video.
-export function MultiVideoUpload({ value, onChange }: Props) {
+export function MultiVideoUpload({ value, onChange, onBusyChange }: Props) {
   const { t } = useT();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
+  // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Start.
+  const latest = useLatestRef({ value, onChange });
+  useBusyReport(uploading, onBusyChange);
 
   const pick = async () => {
     // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
@@ -53,7 +59,7 @@ export function MultiVideoUpload({ value, onChange }: Props) {
     try {
       const { url } = await uploadVideo(result.assets[0].uri, setProgress);
       tapHaptic();
-      onChange([...value, url]);
+      latest.current.onChange([...latest.current.value, url]);
     } catch (e: any) {
       Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
