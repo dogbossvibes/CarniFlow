@@ -6,7 +6,7 @@ import type { DistractionTrack } from '@/features/tracking-distractions/model';
 import { DistractionLines } from '@/features/tracking-distractions/DistractionLayer';
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useToast } from '@/components/ui/Toast';
@@ -28,9 +28,10 @@ import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
 import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
   lookAheadFractionForInsets, placeSearchLabels, searchLaidStroke, searchViewSpanM, trackHeadingAtProgress,
-  SEARCH_ZOOM, nextSearchZoomLevel,
+  SEARCH_ZOOM, nextSearchZoomLevel, CORNER_GLOW,
   type LabelFeature, type PlacedLabel,
 } from '@/features/tracking/utils/searchMapView';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 
 import { TrackComparisonLines } from './TrackComparisonLines';
 
@@ -168,6 +169,8 @@ interface Props {
   laidDone?:        { latitude: number; longitude: number }[][] | null;
   /** Absuche: Stück von der Hundeführerin bis zum nächsten Ereignis (dünne Betonung). Nur Anzeige. */
   laidNext?:        { latitude: number; longitude: number }[][] | null;
+  /** Absuche: Stück der gelegten Fährte um die nächste Ecke; leuchtet langsam auf (statt Kreis und Kürzel). */
+  cornerGlow?:      { latitude: number; longitude: number }[][] | null;
   heading?:         number | null;
   // ── Smart Follow (navigationsartige Kartenansicht) ──
   // Aktiv nur während einer laufenden Aufnahme/Absuche; historische Karten
@@ -202,9 +205,59 @@ export const DOG_RANGE_STROKE_WIDTH = 26;
 export const RUN_TRACE_Z = 5;
 export const LAID_DONE_STROKE = { color: 'rgba(150,156,152,0.92)', width: 6 } as const;
 export const LAID_NEXT_STROKE = { color: '#FAC775', width: 3 } as const;
+/**
+ * Ist-Suchspur: genau so breit wie die gelegte Fährte daneben — in der Absuche 6 pt (searchLaidStroke),
+ * sonst 4 pt —, mit dunkler Kontur wie die gelegte Linie in der Absuche (+3 pt).
+ */
+export const RUN_TRACE_STROKE = { color: '#FFFFFF', searchWidth: 6, width: 4, outlineColor: '#04110F', outlineExtra: 3 } as const;
+export function runTraceStroke(searchActive: boolean): { color: string; width: number; outlineColor: string; outlineWidth: number } {
+  const width = searchActive ? RUN_TRACE_STROKE.searchWidth : RUN_TRACE_STROKE.width;
+  return { color: RUN_TRACE_STROKE.color, width, outlineColor: RUN_TRACE_STROKE.outlineColor, outlineWidth: width + RUN_TRACE_STROKE.outlineExtra };
+}
+/**
+ * Leuchtende Ecke: Schein in der Fährtenfarbe des Hundes, etwas breiter als die gelegte Linie.
+ * Apple Maps ordnet Linien nicht nach zIndex, eine neu gezeichnete Linie liegt dort immer oben;
+ * darum leicht durchscheinend, damit die Suchspur darunter erkennbar bleibt.
+ * Android: über der Lay-Linie (4), unter der Suchspur (5).
+ */
+export const CORNER_GLOW_STROKE = { width: 14, brightAlpha: 'F2', dimAlpha: '66' } as const;
+
+/** Fährtenfarbe mit Deckkraft (Hex-Alpha). Unbekannte Farbformate bleiben unverändert. */
+export function withAlpha(color: string, alphaHex: string): string {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return `${color}${alphaHex}`;
+  if (/^#[0-9a-f]{8}$/i.test(color)) return `${color.slice(0, 7)}${alphaHex}`;
+  return color;
+}
+
+/** Normaler Winkel (keine Sonderfigur): in der Absuche ohne Kreis und Kürzel, die Ecke leuchtet stattdessen. */
+function isPlainAngle(m: MapMarker): boolean {
+  return m.type === 'winkel' && angleMarkerKind(m.angleKind) === 'angle';
+}
+
+/**
+ * Leuchtende Ecke. Eigene Komponente, damit pro Puls nur dieses kurze Stück neu gezeichnet wird.
+ * Langsamer Wechsel hell ↔ gedämpft (nur iOS); bei «Bewegung reduzieren» und auf Android leuchtet
+ * sie ruhig — Android zeichnet Linien bei Stiländerungen ebenfalls neu, das bliebe unruhig.
+ */
+const CornerGlow = memo(function CornerGlow({ Polyline, parts, color: baseColor }: { Polyline: React.ComponentType<any>; parts: { latitude: number; longitude: number }[][]; color: string }) {
+  const reduceMotion = useReduceMotion();
+  const visible = parts.filter(part => part.length > 1);
+  const animate = Platform.OS === 'ios' && !reduceMotion && visible.length > 0;
+  const [bright, setBright] = useState(true);
+  useEffect(() => {
+    if (!animate) return undefined;
+    const timer = setInterval(() => setBright(current => !current), CORNER_GLOW.pulseMs);
+    return () => clearInterval(timer);
+  }, [animate]);
+  const color = withAlpha(baseColor, !animate || bright ? CORNER_GLOW_STROKE.brightAlpha : CORNER_GLOW_STROKE.dimAlpha);
+  return <>
+    {visible.map((part, index) => <Polyline key={`corner-glow-${index}`} testID="search-corner-glow" coordinates={part}
+      strokeColor={color} strokeWidth={CORNER_GLOW_STROKE.width} lineCap="round" lineJoin="round" zIndex={4} />)}
+  </>;
+});
 
 export function TrackingMap({
-  comparison = false, comparisonPaused = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, laidNext, heading,
+  comparison = false, comparisonPaused = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, cornerGlow, heading,
   smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -320,6 +373,7 @@ export function TrackingMap({
     })),
     [layPoints, segments, cornerPoints],
   );
+  const runStroke = runTraceStroke(searchActive);
   const runParts = useMemo(
     () => splitContinuousPoints(runPoints ?? []).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
     [runPoints],
@@ -349,6 +403,8 @@ export function TrackingMap({
     markerList.forEach((m, index) => {
       const numberedObject = m.type === 'gegenstand' && m.material !== 'ball' && m.material !== 'duebel';
       if (m.type !== 'winkel' && !numberedObject) return;
+      // Normale Winkel bekommen in der Absuche kein Kürzel: die Ecke leuchtet stattdessen auf.
+      if (isPlainAngle(m)) return;
       features.push({ key: `marker:${index}`, kind: m.type === 'winkel' ? 'angle' : 'object', lat: m.lat!, lng: m.lng!, arcM: m.arcM });
     });
     // Massstab der gewählten Stufe (nicht des kurzzeitigen Nah-Zooms) → Kürzel springen nur beim Umschalten.
@@ -360,14 +416,14 @@ export function TrackingMap({
   }), [placedLabels]);
   const [groupSelection, setGroupSelection] = useState<TrackDetailSelection | null>(null);
   const markerGroups = useMemo(() => {
-    const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.map((marker, index) => ({
+    const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.flatMap((marker, index) => (searchActive && isPlainAngle(marker) ? [] : [{
       key: `marker:${index}`, lat: marker.lat!, lng: marker.lng!,
       label: marker.type === 'winkel' ? marker.angleKind === 'abriss' && marker.geometryDirection !== 'links' && marker.geometryDirection !== 'rechts' ? '×' : specialAngleBadge(marker) ?? ANGLE_SHORT[marker.angleKind!] ?? '∠'
         : marker.type === 'gegenstand' ? isTrainingJoker(marker.material) ? t(marker.material === 'ball' ? 'track.materialBall' : 'track.materialDowel') : `G${marker.objectIndex ?? objectNo.get(index) ?? ''}`
         : describeSelection({ kind: 'marker', marker }, t).title,
       selection: { kind: 'marker', marker: marker.type === 'gegenstand' && !isTrainingJoker(marker.material)
         ? { ...marker, objectIndex: marker.objectIndex ?? objectNo.get(index) } : marker },
-    }));
+    }]));
     const startPosition = startAnchor ?? layPoints[0];
     if (startPosition) features.push({ key: 'start', ...startPosition, label: t('track.startFlag'), selection: { kind: 'start' } });
     if (endPoint) features.push({ key: 'end', ...endPoint, label: t('track.endFlag'), selection: { kind: 'end',
@@ -376,7 +432,7 @@ export function TrackingMap({
     // Neben die Linie gestellte Kürzel (Absuche) werden nicht zu Sammelmarkern verdichtet.
     const groupable = placedLabels.size > 0 ? features.filter(feature => !placedLabels.has(feature.key)) : features;
     return groupMapFeatures(groupable, ptPerM > 0 ? 34 / ptPerM : 1.5).filter(group => group.length > 1);
-  }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t, placedLabels]);
+  }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t, placedLabels, searchActive]);
   const groupedKeys = useMemo(() => new Set(markerGroups.flatMap(group => group.map(feature => feature.key))), [markerGroups]);
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
@@ -489,10 +545,12 @@ export function TrackingMap({
         {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const base = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           // Absuche: breitere Linie mit dunkler Kontur — weiterhin solide, nie gedimmt.
+          // Schlüssel wechselt mit der Absuche: Apple Maps legt neu hinzugefügte Linien immer obenauf.
+          // Ohne Neuaufbau käme die neue Kontur ÜBER die farbige Linie und verdeckte die Fährtenfarbe.
           const emphasis = searchActive && !base.lineDashPattern ? searchLaidStroke(base) : null;
           const stroke = emphasis ?? base;
           return (
-            <Fragment key={part.id}>
+            <Fragment key={`${part.id}:${searchActive ? 'search' : 'plain'}`}>
               {emphasis && (
                 <Polyline coordinates={part.mapCoordinates} strokeColor={emphasis.outlineColor} strokeWidth={emphasis.outlineWidth}
                   lineCap="round" lineJoin="round" zIndex={part.kind === 'segment' ? 2 : 1} />
@@ -511,7 +569,7 @@ export function TrackingMap({
         }) : layParts.filter(part => part.length > 1).map((part, index) => {
           const emphasis = searchActive ? searchLaidStroke({ strokeColor: layColor, strokeWidth: 4 }) : null;
           return (
-            <Fragment key={`lay-${index}`}>
+            <Fragment key={`lay-${index}:${searchActive ? 'search' : 'plain'}`}>
               {emphasis && <Polyline coordinates={part} strokeColor={emphasis.outlineColor} strokeWidth={emphasis.outlineWidth} lineCap="round" lineJoin="round" />}
               <Polyline coordinates={part} strokeColor={layColor} strokeWidth={emphasis?.strokeWidth ?? 4} lineCap="round" lineJoin="round" />
             </Fragment>
@@ -521,17 +579,22 @@ export function TrackingMap({
             Über der Lay-Linie (zIndex 2/3), unter der Suchspur (zIndex 5) und allen Markern.
             Android (Google Maps) ordnet Linien nach zIndex; bei gleichem Wert ist die Reihenfolge nicht
             festgelegt. Die Suchspur liegt deshalb eine Stufe höher, sonst könnte die breite graue Linie sie verdecken. */}
+        {!comparison && searchActive && cornerGlow && cornerGlow.length > 0 && <CornerGlow Polyline={Polyline} parts={cornerGlow} color={layColor} />}
         {!comparison && laidDone?.map((part, index) => (
           <Polyline key={`laid-done-${index}`} coordinates={part} strokeColor={LAID_DONE_STROKE.color} strokeWidth={LAID_DONE_STROKE.width}
             lineCap="round" lineJoin="round" zIndex={4} />
         ))}
-        {!comparison && laidNext?.map((part, index) => (
-          <Polyline key={`laid-next-${index}`} coordinates={part} strokeColor={LAID_NEXT_STROKE.color} strokeWidth={LAID_NEXT_STROKE.width}
-            lineCap="round" lineJoin="round" zIndex={4} />
-        ))}
-        {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
+        {/* Stück bis zum nächsten Ereignis: nicht mehr als dünner Strich gezeichnet — gelegte Linie und
+            Suchspur sollen gleich breit wirken. `laidNext` bleibt für Aufrufer erhalten. */}
+        {/* Gelaufene Ist-Suchspur: weiss mit dunkler Kontur, so breit wie die gelegte Fährte in der Absuche.
+            Weiss hebt sich von jeder Fährtenfarbe ab (auch von Blau). Kontur zuerst, damit Weiss oben liegt. */}
         {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
-          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={RUN_TRACE_Z} />
+          <Fragment key={`run-${index}`}>
+            <Polyline coordinates={part} strokeColor={runStroke.outlineColor} strokeWidth={runStroke.outlineWidth}
+              lineCap="round" lineJoin="round" zIndex={RUN_TRACE_Z} />
+            <Polyline testID="search-run-trace" coordinates={part} strokeColor={runStroke.color} strokeWidth={runStroke.width}
+              lineCap="round" lineJoin="round" zIndex={RUN_TRACE_Z} />
+          </Fragment>
         ))}
 
         {/* Verworfene Punkte (Debug): kleine rote Marker */}
@@ -590,6 +653,8 @@ export function TrackingMap({
           if (m.type === 'winkel') {
             // Abriss / GW / OW / BW haben eigene Darstellungen; sonst normaler Winkel.
             const ak = angleMarkerKind(m.angleKind);
+            // Absuche: normaler Winkel ohne Kürzel, die Ecke leuchtet auf (CornerGlow).
+            if (searchActive && ak === 'angle') return null;
             if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak}
               label={ak === 'abriss' && m.geometryDirection !== 'links' && m.geometryDirection !== 'rechts' ? undefined : specialAngleBadge(m) ?? undefined}
               onPress={onPress} faded={faded} />;

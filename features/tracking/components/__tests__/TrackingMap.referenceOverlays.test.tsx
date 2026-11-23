@@ -51,7 +51,7 @@ const REF_COLORS = new Set(REFS.map(r => referenceTrackStroke(r.colorKey).stroke
 const isRef = (x: { strokeColor: string }) => REF_COLORS.has(x.strokeColor);
 const isHalo = (x: { strokeColor: string }) => x.strokeColor === REFERENCE_TRACK_HALO.strokeColor;
 
-type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex?: number };
+type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex?: number; testID?: string };
 const polys = (n: ReactTestRenderer): PolyProps[] => (n.root as any).findAllByType(RNMaps!.Polyline).map((x: any) => x.props);
 const markers = (n: ReactTestRenderer) => (n.root as any).findAllByType(RNMaps!.Marker);
 
@@ -105,7 +105,7 @@ describe('TrackingMap — Referenz-Fährten', () => {
     const without = polys(renderMap()).filter(x => !isRef(x) && !isHalo(x));
     const withRefs = polys(renderMap({ referenceOverlays: REFS })).filter(x => !isRef(x) && !isHalo(x));
     expect(withRefs).toEqual(without);
-    expect(withRefs.find(x => x.strokeColor === C.trackBlue)?.coordinates).toHaveLength(RUN.length);
+    expect(withRefs.find(x => x.testID === 'search-run-trace')?.coordinates).toHaveLength(RUN.length);
   });
 
   it('nur ein Start-Label je Referenz — keine Winkel/Gegenstände anderer Fährten', () => {
@@ -153,7 +153,7 @@ it('verwendet die gewählte Hundefarbe nur für die aktive gelegte Spur, Referen
   const own = p.filter(x => x.strokeColor === '#AABBCC');
   expect(own.length).toBeGreaterThan(0);
   expect(own[0].coordinates[0].latitude).toBe(LAY[0].lat);
-  expect(p.some(x => x.strokeColor === C.trackBlue)).toBe(true);
+  expect(p.some(x => x.testID === 'search-run-trace')).toBe(true);
   expect(p.filter(isRef).map(x => x.strokeColor)).toEqual(REFS.map(o => referenceTrackStroke(o.colorKey).strokeColor));
 });
 
@@ -171,14 +171,16 @@ it('keeps coincident live routes distinct without remounting overlays as a long 
   const node = renderMap({ layPoints: lay, runPoints: lay.slice(0, 2) });
   const polylines = (): { props: any }[] => (node.root as any).findAllByType(RNMaps!.Polyline);
   const laid = polylines().find(p => p.props.strokeColor === C.trackPrimary)!;
-  const run = polylines().find(p => p.props.strokeColor === C.trackBlue)!;
-  expect(laid.props.strokeWidth).toBeGreaterThan(run.props.strokeWidth);
+  const run = polylines().find(p => p.props.testID === 'search-run-trace')!;
+  // gleich breit wie die gelegte Linie; unterscheidbar durch Weiss mit dunkler Kontur
+  expect(run.props.strokeWidth).toBe(laid.props.strokeWidth);
+  expect(run.props.strokeColor).toBe('#FFFFFF');
   const coordinates = laid.props.coordinates;
   for (let length = 100; length <= 5000; length += 100) {
     act(() => node.update(<TrackingMap layPoints={lay} runPoints={lay.slice(0, length)} currentPosition={null} follow={false} />));
     expect(polylines().find(p => p.props.strokeColor === C.trackPrimary)).toBe(laid);
     expect(laid.props.coordinates).toBe(coordinates);
-    expect(polylines().find(p => p.props.strokeColor === C.trackBlue)).toBe(run);
+    expect(polylines().find(p => p.props.testID === 'search-run-trace')).toBe(run);
   }
 });
 

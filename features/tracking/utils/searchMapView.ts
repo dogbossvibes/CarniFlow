@@ -211,6 +211,28 @@ export function nextEventArcM(events: readonly SearchEvent[], handlerProgressM: 
   return ahead.length ? Math.min(ahead[0], trackTotalM) : trackTotalM;
 }
 
+/** Leuchtende Ecke: wie weit vor dem Hund sie aufleuchtet und wie lang das Stück um den Knick ist. */
+export const CORNER_GLOW = { aheadM: 25, halfLengthM: 7, pulseMs: 700 } as const;
+
+/**
+ * Stück der gelegten Fährte um die nächste Ecke vor der virtuellen Hundeposition, das in der
+ * Absuche aufleuchtet (statt Kreis und Kürzel). null, wenn keine Ecke innerhalb von `aheadM`
+ * liegt. Eine Ecke, an der der Hund gerade steht, leuchtet noch. Reine Anzeige.
+ */
+export function cornerGlowRange(
+  cornerArcsM: readonly number[], dogProgressM: number, trackTotalM: number,
+  options: { aheadM?: number; halfLengthM?: number } = {},
+): { fromM: number; toM: number } | null {
+  if (!Number.isFinite(dogProgressM)) return null;
+  const aheadM = options.aheadM ?? CORNER_GLOW.aheadM, halfM = options.halfLengthM ?? CORNER_GLOW.halfLengthM;
+  const next = cornerArcsM.filter(arcM => Number.isFinite(arcM) && arcM >= dogProgressM && arcM - dogProgressM <= aheadM)
+    .sort((a, b) => a - b)[0];
+  if (next == null) return null;
+  const total = Number.isFinite(trackTotalM) && trackTotalM > 0 ? trackTotalM : next + halfM;
+  const fromM = clamp(next - halfM, 0, total), toM = clamp(next + halfM, 0, total);
+  return toM > fromM ? { fromM, toM } : null;
+}
+
 /** Bereits passiert (→ blasses Kürzel)? Ohne Bogenlänge nie blass. */
 export function isEventPassed(arcM: number | null | undefined, dogProgressM: number): boolean {
   return arcM != null && Number.isFinite(arcM) && Number.isFinite(dogProgressM)

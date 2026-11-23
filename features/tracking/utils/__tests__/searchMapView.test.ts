@@ -6,8 +6,33 @@ import {
   SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
   lookAheadFractionForInsets, nextSearchEvents, placeSearchLabels, searchLaidStroke, searchViewSpanM,
   SEARCH_ZOOM, SEARCH_ZOOM_LEVELS, nextSearchZoomLevel, isSearchZoomLevel,
-  trackHeadingAtProgress, type LabelFeature,
+  trackHeadingAtProgress, type LabelFeature, cornerGlowRange, CORNER_GLOW,
 } from '@/features/tracking/utils/searchMapView';
+
+describe('cornerGlowRange — leuchtende Ecke in der Absuche', () => {
+  it('nächste Ecke vor dem Hund innerhalb der Vorschau: Stück 7 m davor bis 7 m danach', () => {
+    expect(cornerGlowRange([40, 90], 20, 200)).toEqual({ fromM: 33, toM: 47 });
+  });
+  it('weiter als die Vorschau entfernt: keine Ecke leuchtet', () => {
+    expect(cornerGlowRange([40], 40 - CORNER_GLOW.aheadM - 1, 200)).toBeNull();
+    expect(cornerGlowRange([40], 40 - CORNER_GLOW.aheadM, 200)).toEqual({ fromM: 33, toM: 47 });
+  });
+  it('steht der Hund an der Ecke, leuchtet sie noch; danach die nächste oder keine', () => {
+    expect(cornerGlowRange([40, 60], 40, 200)).toEqual({ fromM: 33, toM: 47 });
+    expect(cornerGlowRange([40, 60], 41, 200)).toEqual({ fromM: 53, toM: 67 });
+    expect(cornerGlowRange([40], 41, 200)).toBeNull();
+  });
+  it('am Anfang und Ende auf die Fährte begrenzt; Reihenfolge der Ecken egal', () => {
+    expect(cornerGlowRange([3], 0, 100)).toEqual({ fromM: 0, toM: 10 });
+    expect(cornerGlowRange([98, 70], 90, 100)).toEqual({ fromM: 91, toM: 100 });
+    expect(cornerGlowRange([70, 50], 45, 100)).toEqual({ fromM: 43, toM: 57 });
+  });
+  it('ohne gültige Werte: nichts', () => {
+    expect(cornerGlowRange([], 10, 100)).toBeNull();
+    expect(cornerGlowRange([NaN], 10, 100)).toBeNull();
+    expect(cornerGlowRange([20], NaN, 100)).toBeNull();
+  });
+});
 
 const M_PER_DEG = 111320;
 const LAT0 = 47;
