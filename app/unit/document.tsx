@@ -469,11 +469,14 @@ function DocumentForm() {
 
   // Each dog keeps its own unit/request identities and complete local form.
   // Inactive drafts stay inside the existing account-scoped durable draft.
-  const mediaBusy = useRef(new Set<string>());
-  const setMediaBusy = useCallback((kind: string, busy: boolean) => { if (busy) mediaBusy.current.add(kind); else mediaBusy.current.delete(kind); }, []);
-  const onPhotoBusy = useCallback((busy: boolean) => setMediaBusy('photo', busy), [setMediaBusy]);
-  const onVideoBusy = useCallback((busy: boolean) => setMediaBusy('video', busy), [setMediaBusy]);
-  const onAudioBusy = useCallback((busy: boolean) => setMediaBusy('audio', busy), [setMediaBusy]);
+  // Laufende Aufnahmen/Uploads (Zähler: nach Ein-/Ausklappen kann ein zweiter Upload
+  // starten, während der erste noch läuft). Ref für die sofortige Prüfung, State für die Anzeige.
+  const mediaBusyCount = useRef(0);
+  const [mediaBusy, setMediaBusyState] = useState(false);
+  const onMediaBusy = useCallback((busy: boolean) => {
+    mediaBusyCount.current = Math.max(0, mediaBusyCount.current + (busy ? 1 : -1));
+    setMediaBusyState(mediaBusyCount.current > 0);
+  }, []);
   const emptyDogDraft = (targetDog: string): Omit<DocumentDraft, 'otherDogs'> => ({
     unitId: Crypto.randomUUID(), operationId: Crypto.randomUUID(), focusId: Crypto.randomUUID(),
     dogId: targetDog, activeDisc, selected: [], description: '', score: 0, date: new Date().toISOString(),
@@ -483,7 +486,7 @@ function DocumentForm() {
   const changeDog = (targetDog: string) => {
     // Läuft noch eine Aufnahme oder ein Upload, gehört das Ergebnis zum aktuellen Hund:
     // erst danach wechseln, sonst landet das Medium beim anderen Hund.
-    if (mediaBusy.current.size) return;
+    if (mediaBusyCount.current > 0) return;
     if (dogSwitchLock.current || dogId === targetDog || editing || saving || pendingSave || remoteCompleted) return;
     dogSwitchLock.current = true;
     const snapshot = draftSnapshot();
@@ -513,7 +516,8 @@ function DocumentForm() {
   const canSave = draftReady && editLoaded && !editConflict && !!dogId && dogs.some(d => d.id === dogId) && selected.some(e => e.performed);
 
   const speichern = async () => {
-    if (!canSave || !session?.user.id || saveLock.current) return;
+    // Während eines Uploads nicht speichern: das laufende Medium fehlte sonst still im Eintrag.
+    if (!canSave || !session?.user.id || saveLock.current || mediaBusyCount.current > 0) return;
     saveLock.current = true;
     Keyboard.dismiss();
     setSaving(true);
@@ -820,7 +824,7 @@ function DocumentForm() {
           <Text style={s.label}>{t('trainingDoc.sessionNextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
           <TextInput style={s.textarea} value={nextFocus} onChangeText={text => { setNextFocus(text); setNextFocusDiscipline(hintDiscipline?.label ?? activeDisc); setNextFocusDisciplineKey(hintDiscipline ? scopeKey(hintDiscipline) : ''); }} editable={!saving && !remoteCompleted} multiline maxLength={500}
             placeholder={t('trainingDoc.sessionNextFocus')} placeholderTextColor={C.textMuted} accessibilityLabel={t('trainingDoc.sessionNextFocus')} />
-          <TouchableOpacity onPress={() => setDetails(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: details }} style={s.contextToggle}>
+          <TouchableOpacity onPress={() => { if (!mediaBusy) setDetails(v => !v); }} disabled={mediaBusy} accessibilityRole="button" accessibilityState={{ expanded: details, disabled: mediaBusy }} style={s.contextToggle}>
             <Text style={s.actionText}>{t('trainingFlow.optionalDetails')}</Text>
           </TouchableOpacity>
           {details && <>
@@ -873,11 +877,11 @@ function DocumentForm() {
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.mediaLabel')}</Text>
           <View style={s.mediaCard}>
             <Text style={s.mediaSubLabel}>{t('training.photosLabel')}</Text>
-            <PhotoPicker value={photos} onChange={setPhotos} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onPhotoBusy} />
+            <PhotoPicker value={photos} onChange={setPhotos} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onMediaBusy} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.videosLabel')}</Text>
-            <MultiVideoUpload value={videos} onChange={setVideos} onBusyChange={onVideoBusy} />
+            <MultiVideoUpload value={videos} onChange={setVideos} onBusyChange={onMediaBusy} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.voiceRecordingsLabel')}</Text>
-            <AudioRecorder value={audio} onChange={setAudio} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onAudioBusy} />
+            <AudioRecorder value={audio} onChange={setAudio} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onMediaBusy} />
           </View>
 
           </>}
@@ -903,7 +907,7 @@ function DocumentForm() {
           </Text>
         ))}
         <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97}
-          disabled={saving || !canSave}
+          disabled={saving || !canSave || mediaBusy}
           onPress={speichern}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
