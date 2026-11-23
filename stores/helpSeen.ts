@@ -74,7 +74,11 @@ export function resetHelpSeenDeferred(): DeferredReset {
   emit();
   const handle: DeferredReset = {
     // Auch später gesehene Hinweise (markHelpSeen) bleiben dabei erhalten.
-    commit: () => { if (sameOwner()) persist(); },
+    commit: () => {
+      // Nach dem Festschreiben gilt ein späteres Zurücksetzen als neue Aktion.
+      if (pendingReset?.handle === handle) pendingReset = null;
+      if (sameOwner()) persist();
+    },
     undo: () => {
       if (pendingReset?.handle === handle) pendingReset = null;
       if (!sameOwner()) return;

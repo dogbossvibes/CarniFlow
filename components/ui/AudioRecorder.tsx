@@ -43,9 +43,15 @@ interface Props {
 
 export function AudioRecorder({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
   const { t } = useT();
-  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked });
   const [isRecording, setIsRecording] = useState(false);
   const [uploading,   setUploading]   = useState(false);
+  // Vom Stopp-Tipp bis zum Ende des Uploads: `stopRec` schreibt danach mit dem
+  // Stand vom Stopp-Tipp zurück, in dieser Zeit darf sich die Liste nicht ändern.
+  const [finishing,   setFinishing]   = useState(false);
+  // Rückgängig nur, solange keine Aufnahme läuft, gestoppt oder hochgeladen wird:
+  // sonst würde eine als zurückgeholt gemeldete Notiz still wieder entfernt.
+  const busy = isRecording || finishing || uploading;
+  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || busy });
   const [seconds,     setSeconds]     = useState(0);
   const [playingIdx,  setPlayingIdx]  = useState<number | null>(null);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -104,6 +110,8 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
 
   const stopRec = async () => {
     if (!isRecording) return;
+    removal.settle();
+    setFinishing(true);
     clearInterval(timerRef.current!);
     const dur = fmt(seconds);
     setIsRecording(false);
@@ -130,6 +138,7 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
       Alert.alert(t('share.notReadyTitle'), t('audio.recordingSaveFailed'));
     } finally {
       setUploading(false);
+      setFinishing(false);
     }
   };
 
@@ -182,7 +191,7 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
   // Nimmt die Sprachnotiz nur aus der Auswahl (keine Datei wird gelöscht).
   const del = (idx: number) => {
     if (readOnly) return;
-    if (removalMode === 'undo') { if (!uploading) removal.remove(idx, t('undo.audioRemoved')); return; }
+    if (removalMode === 'undo') { if (!busy) removal.remove(idx, t('undo.audioRemoved')); return; }
     Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
       { text: t('common.back'), style: 'cancel' },
       {

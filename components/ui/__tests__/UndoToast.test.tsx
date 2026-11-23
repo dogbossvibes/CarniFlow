@@ -6,6 +6,8 @@ import { getUndoToastSnapshot, showUndoToast, undoToast } from '@/lib/undoToast'
 
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }) }));
+let mockPathname = '/unit/document';
+jest.mock('expo-router', () => ({ usePathname: () => mockPathname }));
 jest.mock('@/hooks/useReduceMotion', () => ({ useReduceMotion: () => true }));
 
 let tree: ReactTestRenderer;
@@ -61,15 +63,26 @@ it('verschwindet nach der Frist von selbst', () => {
   expect(tree.toJSON()).toBeNull();
 });
 
-it('B3: schreibt fest, sobald die App in den Hintergrund geht', () => {
+it.each(['inactive', 'background'] as const)('B3: schreibt fest, sobald die App nicht mehr aktiv ist (%s)', state => {
   const onUndo = jest.fn(), onCommit = jest.fn();
   act(() => { showUndoToast({ message: 'Startbildschirm zurückgesetzt', onUndo, onCommit }); });
-  act(() => { appStateListener?.('inactive'); });
+  act(() => { appStateListener?.('active'); });
   expect(onCommit).not.toHaveBeenCalled();
-  act(() => { appStateListener?.('background'); });
+  act(() => { appStateListener?.(state); });
   expect(onCommit).toHaveBeenCalledTimes(1);
   expect(onUndo).not.toHaveBeenCalled();
   expect(tree.toJSON()).toBeNull();
+});
+
+it('schliesst den Hinweis mit Festschreiben, wenn ein anderer Bildschirm geöffnet wird', () => {
+  const onUndo = jest.fn(), onCommit = jest.fn();
+  act(() => { showUndoToast({ message: 'Foto entfernt', onUndo, onCommit }); });
+  mockPathname = '/training/123';
+  act(() => { tree.update(<UndoToastHost />); });
+  expect(onCommit).toHaveBeenCalledTimes(1);
+  expect(onUndo).not.toHaveBeenCalled();
+  expect(tree.toJSON()).toBeNull();
+  mockPathname = '/unit/document';
 });
 
 it('N3: schliesst die Tastatur, damit sie den Hinweis nicht verdeckt', () => {

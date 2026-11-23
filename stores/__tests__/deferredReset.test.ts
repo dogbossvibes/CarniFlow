@@ -61,6 +61,21 @@ describe('Startbildschirm zurücksetzen mit Rückgängig', () => {
     tree.unmount();
   });
 
+  it('späteres Zurücksetzen nach dem Festschreiben ist eine neue Aktion', async () => {
+    const tree = await mount(USER);
+    act(() => setHomeScreenConfig(custom()));
+    let reset!: ReturnType<typeof resetHomeScreenConfigDeferred>;
+    act(() => { reset = resetHomeScreenConfigDeferred(); });
+    act(() => reset.commit());
+    // Standard ist gespeichert; erneutes Zurücksetzen + Rückgängig bleibt beim Standard.
+    act(() => { reset = resetHomeScreenConfigDeferred(); });
+    act(() => reset.undo());
+    await flush();
+    expect(homeCfg.layout).toBe(DEFAULT_HOME_CONFIG.layout);
+    expect((await stored(homeKey(USER))).layout).toBe(DEFAULT_HOME_CONFIG.layout);
+    tree.unmount();
+  });
+
   it('Rückgängig stellt die alte Einstellung wieder her', async () => {
     const tree = await mount(USER);
     act(() => setHomeScreenConfig(custom()));
@@ -114,6 +129,11 @@ describe('Hilfe-Hinweise zurücksetzen mit Rückgängig', () => {
 
     act(() => { reset = resetHelpSeenDeferred(); });
     act(() => reset.commit());
+    await flush();
+    expect(await stored(helpKey('help-user'))).toEqual([]);
+    // Späteres Zurücksetzen nach dem Festschreiben ist eine neue Aktion.
+    act(() => { reset = resetHelpSeenDeferred(); });
+    act(() => reset.undo());
     await flush();
     expect(await stored(helpKey('help-user'))).toEqual([]);
     tree.unmount();

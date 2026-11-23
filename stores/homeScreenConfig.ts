@@ -539,6 +539,8 @@ export function resetHomeScreenConfigDeferred(): DeferredReset {
   const handle: DeferredReset = {
     // Wurde inzwischen etwas geändert, hat setHomeScreenConfig bereits gespeichert.
     commit: () => {
+      // Nach dem Festschreiben gilt ein späteres Zurücksetzen als neue Aktion.
+      if (pendingReset?.handle === handle) pendingReset = null;
       if (!sameOwner() || state !== resetState) return;
       AsyncStorage.setItem(keyForUser(currentUserId), JSON.stringify(state)).catch(() => { /* best-effort */ });
     },
