@@ -1,26 +1,26 @@
-import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useCallback, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useHoldAction } from '@/features/tracking/hooks/useHoldAction';
+import { hapticTap } from '@/features/tracking/utils/haptics';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 import { registerGroupResources } from '@/features/training-groups/registerResources';
-import { RAIN_HOLD_MS } from '@/features/tracking/utils/rainMode';
+import { RAIN_HOLD_MS, RAIN_SWITCH_DELAY_MS } from '@/features/tracking/utils/rainMode';
 import type { MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import type { SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import type { TrackSegmentType } from '@/features/tracking/utils/trackSegments';
 
 registerGroupResources('rainMode', {
-  de: { on: 'Regenmodus einschalten', off: 'Aus', offLabel: 'Regenmodus ausschalten', hold: 'halten', holdHint: 'Gedrückt halten', angle: 'Winkel', object: 'Gegenstand', joker: 'Joker', segment: 'Teilstrecke', segmentStop: 'Teilstrecke beenden', sameAsLast: 'wie zuletzt', last: 'Zuletzt: {{label}}', direction: 'Richtung wählen', fromTrack: 'Richtung aus der Spur', askTitle: 'Es regnet', askBody: 'Regenmodus mit grossen Tasten einschalten?', yes: 'Einschalten', no: 'Nein' },
-  gsw: { on: 'Rägemodus iischalte', off: 'Us', offLabel: 'Rägemodus usschalte', hold: 'hebe', holdHint: 'Drückt hebe', angle: 'Winkel', object: 'Gägestand', joker: 'Joker', segment: 'Teilstrecki', segmentStop: 'Teilstrecki beände', sameAsLast: 'wie zletscht', last: 'Zletscht: {{label}}', direction: 'Richtig wähle', fromTrack: 'Richtig us de Spur', askTitle: 'Es rägnet', askBody: 'Rägemodus mit grosse Taschte iischalte?', yes: 'Iischalte', no: 'Nei' },
-  en: { on: 'Turn on rain mode', off: 'Off', offLabel: 'Turn off rain mode', hold: 'hold', holdHint: 'Press and hold', angle: 'Corner', object: 'Article', joker: 'Joker', segment: 'Section', segmentStop: 'End section', sameAsLast: 'same as last', last: 'Last: {{label}}', direction: 'Choose direction', fromTrack: 'Direction from track', askTitle: 'It is raining', askBody: 'Turn on rain mode with large buttons?', yes: 'Turn on', no: 'No' },
-  fr: { on: 'Activer le mode pluie', off: 'Arrêt', offLabel: 'Désactiver le mode pluie', hold: 'maintenir', holdHint: 'Maintenir appuyé', angle: 'Angle', object: 'Objet', joker: 'Joker', segment: 'Tronçon', segmentStop: 'Terminer le tronçon', sameAsLast: 'comme le dernier', last: 'Dernier : {{label}}', direction: 'Choisir le sens', fromTrack: 'Sens depuis la piste', askTitle: 'Il pleut', askBody: 'Activer le mode pluie avec de grandes touches ?', yes: 'Activer', no: 'Non' },
-  it: { on: 'Attiva modalità pioggia', off: 'Off', offLabel: 'Disattiva modalità pioggia', hold: 'tieni', holdHint: 'Tieni premuto', angle: 'Angolo', object: 'Oggetto', joker: 'Joker', segment: 'Tratto', segmentStop: 'Termina tratto', sameAsLast: 'come l’ultimo', last: 'Ultimo: {{label}}', direction: 'Scegli la direzione', fromTrack: 'Direzione dalla traccia', askTitle: 'Piove', askBody: 'Attivare la modalità pioggia con tasti grandi?', yes: 'Attiva', no: 'No' },
-  es: { on: 'Activar modo lluvia', off: 'Off', offLabel: 'Desactivar modo lluvia', hold: 'mantener', holdHint: 'Mantener pulsado', angle: 'Ángulo', object: 'Objeto', joker: 'Comodín', segment: 'Tramo', segmentStop: 'Terminar tramo', sameAsLast: 'como el último', last: 'Último: {{label}}', direction: 'Elegir dirección', fromTrack: 'Dirección del rastro', askTitle: 'Está lloviendo', askBody: '¿Activar el modo lluvia con botones grandes?', yes: 'Activar', no: 'No' },
+  de: { on: 'Regenmodus einschalten', off: 'Aus', offLabel: 'Regenmodus ausschalten', hold: 'halten', holdHint: 'Gedrückt halten', angle: 'Winkel', object: 'Gegenstand', joker: 'Joker', segment: 'Teilstrecke', segmentStop: 'Teilstrecke beenden', sameAsLast: 'wie zuletzt', last: 'Zuletzt: {label}', direction: 'Richtung wählen', fromTrack: 'Richtung aus der Spur', askTitle: 'Es regnet', askBody: 'Regenmodus mit grossen Tasten einschalten?', yes: 'Einschalten', no: 'Nein' },
+  gsw: { on: 'Rägemodus iischalte', off: 'Us', offLabel: 'Rägemodus usschalte', hold: 'hebe', holdHint: 'Drückt hebe', angle: 'Winkel', object: 'Gägestand', joker: 'Joker', segment: 'Teilstrecki', segmentStop: 'Teilstrecki beände', sameAsLast: 'wie zletscht', last: 'Zletscht: {label}', direction: 'Richtig wähle', fromTrack: 'Richtig us de Spur', askTitle: 'Es rägnet', askBody: 'Rägemodus mit grosse Taschte iischalte?', yes: 'Iischalte', no: 'Nei' },
+  en: { on: 'Turn on rain mode', off: 'Off', offLabel: 'Turn off rain mode', hold: 'hold', holdHint: 'Press and hold', angle: 'Corner', object: 'Article', joker: 'Joker', segment: 'Section', segmentStop: 'End section', sameAsLast: 'same as last', last: 'Last: {label}', direction: 'Choose direction', fromTrack: 'Direction from track', askTitle: 'It is raining', askBody: 'Turn on rain mode with large buttons?', yes: 'Turn on', no: 'No' },
+  fr: { on: 'Activer le mode pluie', off: 'Arrêt', offLabel: 'Désactiver le mode pluie', hold: 'maintenir', holdHint: 'Maintenir appuyé', angle: 'Angle', object: 'Objet', joker: 'Joker', segment: 'Tronçon', segmentStop: 'Terminer le tronçon', sameAsLast: 'comme le dernier', last: 'Dernier : {label}', direction: 'Choisir le sens', fromTrack: 'Sens depuis la piste', askTitle: 'Il pleut', askBody: 'Activer le mode pluie avec de grandes touches ?', yes: 'Activer', no: 'Non' },
+  it: { on: 'Attiva modalità pioggia', off: 'Off', offLabel: 'Disattiva modalità pioggia', hold: 'tieni', holdHint: 'Tieni premuto', angle: 'Angolo', object: 'Oggetto', joker: 'Joker', segment: 'Tratto', segmentStop: 'Termina tratto', sameAsLast: 'come l’ultimo', last: 'Ultimo: {label}', direction: 'Scegli la direzione', fromTrack: 'Direzione dalla traccia', askTitle: 'Piove', askBody: 'Attivare la modalità pioggia con tasti grandi?', yes: 'Attiva', no: 'No' },
+  es: { on: 'Activar modo lluvia', off: 'Off', offLabel: 'Desactivar modo lluvia', hold: 'mantener', holdHint: 'Mantener pulsado', angle: 'Ángulo', object: 'Objeto', joker: 'Comodín', segment: 'Tramo', segmentStop: 'Terminar tramo', sameAsLast: 'como el último', last: 'Último: {label}', direction: 'Elegir dirección', fromTrack: 'Dirección del rastro', askTitle: 'Está lloviendo', askBody: '¿Activar el modo lluvia con botones grandes?', yes: 'Activar', no: 'No' },
 });
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -28,39 +28,63 @@ type AngleChoice = 'gw' | 'ow' | 'bw' | 'abriss' | 'absatz';
 type Page = 'main' | 'angle' | 'angleDir' | 'object' | 'joker' | 'segment';
 export type RainChoice<T extends string> = { value: T; label: string };
 
-const AnimatedView = Animated.createAnimatedComponent(View);
+// Grosse Taste: kurz halten, dann loslassen. Ein reiner Tap bleibt wirkungslos
+// → Regentropfen lösen nichts aus. Screenreader lösen über onAccessibilityTap
+// direkt aus.
+//
+// Befunde aus dem Simulator-Test:
+//  1. Ausgelöst wird erst beim LOSLASSEN. Wechselt die Ansicht, während der
+//     Finger noch aufliegt, verliert React Native die nächste Berührung.
+//  2. Ob lange genug gehalten wurde, entscheidet die gemessene Dauer der
+//     Berührung selbst (Zeitstempel von Drücken und Loslassen), nicht ein
+//     JS-Zeitgeber: der kann sich bei beschäftigtem JS-Thread verspäten, dann
+//     ging ein korrekt gehaltener Druck verloren.
+//  4. Die Ansicht wechselt erst kurz nach dem Loslassen. Sonst kam die erste
+//     Berührung auf der neuen Ansicht teils gar nicht in der App an.
+//  3. Keine Reanimated-Füllanimation; Rückmeldung ist eine schlichte
+//     Farbänderung («bereit») plus Vibration. Beides ist nur Anzeige.
+const eventTime = (e?: GestureResponderEvent) => {
+  const ts = e?.nativeEvent?.timestamp;
+  return typeof ts === 'number' && Number.isFinite(ts) && ts > 0 ? ts : Date.now();
+};
 
-// Grosse Taste, die erst nach kurzem Halten auslöst (useHoldAction: ein reiner
-// Tap bleibt wirkungslos → Regentropfen lösen nichts aus). Screenreader lösen
-// über onAccessibilityTap direkt aus.
 function RainHoldButton({ label, sub, icon, onHold, accent, tall, testID }: {
   label: string; sub?: string; icon?: IconName; onHold: () => void; accent?: boolean; tall?: boolean; testID?: string;
 }) {
   const { t: tr } = useTranslation('rainMode');
-  const progress = useSharedValue(0);
-  const hold = useHoldAction(onHold, RAIN_HOLD_MS);
-  const onPressIn = useCallback(() => {
-    progress.set(withTiming(1, { duration: RAIN_HOLD_MS, easing: Easing.linear }));
-    hold.onPressIn();
-  }, [hold, progress]);
+  const pressedAt = useRef<number | null>(null);
+  const [ready, setReady] = useState(false);
+  // Zeitgeber NUR für Vibration + «bereit»-Farbe; ausgelöst wird unten über die Dauer.
+  const showReady = useCallback(() => { setReady(true); hapticTap(); }, []);
+  const hint = useHoldAction(showReady, RAIN_HOLD_MS);
+  const onPressIn = useCallback((e?: GestureResponderEvent) => {
+    pressedAt.current = eventTime(e);
+    setReady(false);
+    hint.onPressIn();
+  }, [hint]);
   const onPressOut = useCallback(() => {
-    progress.set(withTiming(0, { duration: 120 }));
-    hold.onPressOut();
-  }, [hold, progress]);
-  const fill = useAnimatedStyle(() => ({ width: `${progress.get() * 100}%` }));
+    hint.onPressOut();
+    setReady(false);
+  }, [hint]);
+  const onRelease = useCallback((e?: GestureResponderEvent) => {
+    const start = pressedAt.current;
+    pressedAt.current = null;
+    if (start == null || eventTime(e) - start < RAIN_HOLD_MS) return;   // kurzer Tipp → nichts
+    // Ansicht erst kurz NACH dem Loslassen wechseln (siehe Befund 4).
+    setTimeout(onHold, RAIN_SWITCH_DELAY_MS);
+  }, [onHold]);
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={sub && sub !== tr('hold') ? `${label}, ${sub}` : label}
       accessibilityHint={tr('holdHint')}
-      onPress={hold.onPress}
+      onPress={onRelease}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onAccessibilityTap={onHold}
-      style={[s.key, tall && s.keyTall, accent && s.keyAccent]}
+      style={[s.key, tall && s.keyTall, accent && s.keyAccent, ready && (accent ? s.keyAccentReady : s.keyReady)]}
     >
-      <AnimatedView pointerEvents="none" style={[s.fill, accent && s.fillAccent, fill]} />
       {icon ? <Ionicons name={icon} size={tall ? 34 : 24} color={accent ? FT.accText : FT.acc} /> : null}
       <Text style={[s.keyLabel, accent && s.keyLabelAccent]} numberOfLines={2}>{label}</Text>
       {sub ? <Text style={[s.keySub, accent && s.keyLabelAccent]} numberOfLines={1}>{sub}</Text> : null}
@@ -144,13 +168,13 @@ function RainModeContent({
     body = (
       <>
         {title(tr('angle'))}
-        <ScrollView contentContainerStyle={s.list}>
+        <View style={s.list}>
           {(['gw', 'ow', 'bw', 'abriss'] as const).map(k => (
             <RainHoldButton key={k} testID={`rain-angle-${k}`} label={angleName(k)} sub={k === 'abriss' ? undefined : k.toUpperCase()} onHold={() => { setAngleKind(k); setPage('angleDir'); }} />
           ))}
           <RainHoldButton testID="rain-angle-absatz" label={angleName('absatz')} onHold={() => done(onAngle('absatz'), angleName('absatz'))} />
           {back}
-        </ScrollView>
+        </View>
       </>
     );
   } else if (page === 'angleDir' && angleKind) {
@@ -160,7 +184,7 @@ function RainModeContent({
     body = (
       <>
         {title(`${angleName(kind)} · ${tr('direction')}`)}
-        <ScrollView contentContainerStyle={s.list}>
+        <View style={s.list}>
           <View style={s.row}>
             <RainHoldButton testID="rain-dir-links" icon="return-up-back-outline" label={t('track.detailLeft')} onHold={() => pick('links', kind === 'abriss' ? 'unresolved' : 'normal', t('track.detailLeft'))} />
             <RainHoldButton testID="rain-dir-rechts" icon="return-up-forward-outline" label={t('track.detailRight')} onHold={() => pick('rechts', kind === 'abriss' ? 'unresolved' : 'normal', t('track.detailRight'))} />
@@ -171,9 +195,13 @@ function RainModeContent({
               <RainHoldButton testID="rain-dir-spitz-rechts" label={t('track.detailSharpRight')} onHold={() => pick('rechts', 'sharp', t('track.detailSharpRight'))} />
             </View>
           )}
-          {kind !== 'abriss' && <RainHoldButton testID="rain-dir-auto" label={tr('fromTrack')} onHold={() => done(onAngle(kind), angleName(kind))} />}
+          {kind !== 'abriss' && (
+            <View style={s.row}>
+              <RainHoldButton testID="rain-dir-auto" label={tr('fromTrack')} onHold={() => done(onAngle(kind), angleName(kind))} />
+            </View>
+          )}
           {back}
-        </ScrollView>
+        </View>
       </>
     );
   } else if (page === 'object') {
@@ -183,36 +211,40 @@ function RainModeContent({
     body = (
       <>
         {title(`${tr('object')} ${objectCount + 1}`)}
-        <ScrollView contentContainerStyle={s.list}>
-          {lastChoice && <RainHoldButton testID="rain-object-last" accent label={lastChoice.label} sub={tr('sameAsLast')} onHold={() => done(onObject(lastChoice.value), lastChoice.label)} />}
+        <View style={s.list}>
+          {lastChoice && (
+            <View style={s.row}>
+              <RainHoldButton testID="rain-object-last" accent label={lastChoice.label} sub={tr('sameAsLast')} onHold={() => done(onObject(lastChoice.value), lastChoice.label)} />
+            </View>
+          )}
           {rows.map(pair => (
             <View key={pair[0].value} style={s.row}>
               {pair.map(m => <RainHoldButton key={m.value} testID={`rain-object-${m.value}`} label={m.label} onHold={() => done(onObject(m.value), m.label)} />)}
             </View>
           ))}
           {back}
-        </ScrollView>
+        </View>
       </>
     );
   } else if (page === 'joker') {
     body = (
       <>
         {title(tr('joker'))}
-        <ScrollView contentContainerStyle={s.list}>
+        <View style={s.list}>
           {jokers.map(j => <RainHoldButton key={j.value} testID={`rain-joker-${j.value}`} tall label={j.label} onHold={() => done(onObject(j.value), j.label)} />)}
           <Text style={s.hint}>{t('track.jokerHint')}</Text>
           {back}
-        </ScrollView>
+        </View>
       </>
     );
   } else {
     body = (
       <>
         {title(tr('segment'))}
-        <ScrollView contentContainerStyle={s.list}>
+        <View style={s.list}>
           {segmentTypes.map(seg => <RainHoldButton key={seg.value} testID={`rain-segment-${seg.value}`} label={seg.label} onHold={() => done(onStartSegment(seg.value), seg.label)} />)}
           {back}
-        </ScrollView>
+        </View>
       </>
     );
   }
@@ -246,13 +278,15 @@ const s = StyleSheet.create({
   body: { flex: 1, gap: 12 },
   grid: { flex: 1, gap: 12 },
   row: { flex: 1, flexDirection: 'row', gap: 12 },
-  list: { gap: 12, paddingBottom: 8 },
+  // Kein ScrollView: die Tasten teilen sich die Höhe (im Simulator ging die erste
+  // Berührung in einer frisch eingehängten Scroll-Ansicht verloren).
+  list: { flex: 1, gap: 12 },
   title: { color: FT.text, fontSize: 20, fontWeight: '800' },
   key: { flex: 1, minHeight: 72, borderRadius: 20, backgroundColor: FT.surface2, borderWidth: 1, borderColor: FT.lineStrong, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10, overflow: 'hidden' },
   keyTall: { minHeight: 120 },
   keyAccent: { backgroundColor: FT.acc, borderColor: FT.acc },
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: FT.accDim },
-  fillAccent: { backgroundColor: 'rgba(0,0,0,0.18)' },
+  keyReady: { borderColor: FT.acc, borderWidth: 3, backgroundColor: FT.accDim },
+  keyAccentReady: { borderColor: FT.text, borderWidth: 3, backgroundColor: FT.acc2 },
   keyLabel: { color: FT.text, fontSize: 19, fontWeight: '800', textAlign: 'center' },
   keyLabelAccent: { color: FT.accText },
   keySub: { color: FT.muted, fontSize: 13, fontWeight: '600' },
