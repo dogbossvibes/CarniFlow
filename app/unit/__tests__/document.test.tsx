@@ -90,7 +90,8 @@ jest.mock('@/components/ui/AnimatedPressable', () => ({
   },
 }));
 jest.mock('@/components/help/HelpButton', () => ({ HelpButton: () => null }));
-jest.mock('@/components/ui/PhotoPicker', () => ({ PhotoPicker: () => null }));
+const mockPhotoPicker = jest.fn((_props: { value: string[]; undoScope?: string | null; onChange: (urls: string[]) => void; onBusyChange?: (busy: boolean) => void }) => null);
+jest.mock('@/components/ui/PhotoPicker', () => ({ PhotoPicker: (props: Parameters<typeof mockPhotoPicker>[0]) => mockPhotoPicker(props) }));
 jest.mock('@/components/ui/AudioRecorder', () => ({ AudioRecorder: () => null }));
 jest.mock('@/components/training/MultiVideoUpload', () => ({ MultiVideoUpload: () => null }));
 jest.mock('@/components/training/MetricsInput', () => ({ MetricsInput: () => null }));
@@ -254,6 +255,46 @@ describe('DocumentScreen dog selection', () => {
       expect.any(Array),
       'unit-id', expect.any(Function),
     );
+  });
+
+  // Vorbestehender Befund (Review OTA «Bedienung 2», N3): Ein Hundewechsel während
+  // eines laufenden Uploads legte das Medium beim anderen Hund ab.
+  it('sperrt den Hundewechsel, solange ein Medium aufgenommen oder hochgeladen wird', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }];
+    const node = render();
+    await flush();
+    const chip = (name: string) => node.root.findAll(n => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === name && n.props.onPress)[0];
+    const photo = () => mockPhotoPicker.mock.calls.at(-1)![0];
+    const pickDog = (name: string) => { if (!chip(name)) showContext(node); act(() => chip(name).props.onPress()); };
+    act(() => chip('Yam').props.onPress());
+    await flush();
+    await selectExercise(node);
+    const openDetails = () => { if (!mockPhotoPicker.mock.calls.length || !strings(node).includes('training.photosLabel')) tap(node, 'trainingFlow.optionalDetails'); };
+    openDetails();
+    await flush();
+    act(() => photo().onChange(['foto-yam']));
+    await flush();
+    expect(photo().undoScope).toBe('dog-1');
+
+    act(() => photo().onBusyChange!(true));
+    pickDog('Malu');
+    await flush();
+    expect(photo().undoScope).toBe('dog-1');
+    expect(photo().value).toEqual(['foto-yam']);
+
+    // Upload fertig: das Foto bleibt bei Yam, danach ist der Wechsel wieder möglich.
+    act(() => { photo().onChange(['foto-yam', 'foto-neu']); photo().onBusyChange!(false); });
+    await flush();
+    pickDog('Malu');
+    await flush();
+    await selectExercise(node); openDetails(); await flush();
+    expect(photo().undoScope).toBe('dog-2');
+    expect(photo().value).toEqual([]);
+    pickDog('Yam');
+    await flush();
+    openDetails(); await flush();
+    expect(photo().undoScope).toBe('dog-1');
+    expect(photo().value).toEqual(['foto-yam', 'foto-neu']);
   });
 
   it('keeps multiple dogs selectable instead of auto-selecting one', async () => {

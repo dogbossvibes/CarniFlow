@@ -16,6 +16,7 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { uploadImage } from '@/services/mediaService';
 import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
+import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
 
 interface Props {
   value:      string[];
@@ -32,11 +33,16 @@ interface Props {
   undoScope?: string | null;
   /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
   undoLocked?: boolean;
+  /** Meldet true, solange aufgenommen oder hochgeladen wird (z. B. um den Hundewechsel zu sperren). */
+  onBusyChange?: (busy: boolean) => void;
 }
 
-export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
+export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked, onBusyChange }: Props) {
   const { t } = useT();
   const [uploading, setUploading] = useState(false);
+  // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Start.
+  const latest = useLatestRef({ value, onChange });
+  useBusyReport(uploading, onBusyChange);
   // Während eines Uploads kein Rückgängig: der Upload schreibt mit dem alten Stand zurück.
   const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || uploading });
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
@@ -79,7 +85,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false,
         const { url } = await uploadImage(result.assets[i].uri, f => setProgress((i + f) / total));
         newUrls.push(url);
       }
-      onChange([...value, ...newUrls]);
+      latest.current.onChange([...latest.current.value, ...newUrls]);
     } catch (e: any) {
       Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
