@@ -34,7 +34,7 @@ export function DogSmartCard({ tip, onStart }: { tip: DogAiTip | null; onStart: 
 const s = StyleSheet.create({
   card:     { borderRadius: 20, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, padding: 16, gap: 12 },
   head:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(21,230,195,0.16)', alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(0,255,204,0.16)', alignItems: 'center', justifyContent: 'center' },
   title:    { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', letterSpacing: -0.2 },
   hint:     { fontSize: 13.5, color: C.trackTextSec, fontWeight: '500', lineHeight: 19 },
   rec:      { flexDirection: 'row', gap: 8, backgroundColor: C.trackCard, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, padding: 11 },

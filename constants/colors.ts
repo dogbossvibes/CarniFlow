@@ -57,9 +57,9 @@ export const C = {
   trackCard:      '#141518',                 // --surface-2
   trackCardAlt:   '#1b1d21',                 // --surface-3
   trackBorder:    'rgba(255,255,255,0.075)', // --line
-  trackPrimary:   '#15e6c3',                 // --acc (Mint)
+  trackPrimary:   '#00FFCC',                 // --acc (Mint)
   trackPrimaryDk: '#00c9d6',                 // --acc-2
-  trackGlow:      'rgba(21,230,195,0.45)',   // --acc-glow
+  trackGlow:      'rgba(0,255,204,0.45)',   // --acc-glow
   trackText:      '#ffffff',                 // --text
   trackTextSec:   'rgba(255,255,255,0.56)',  // --muted
   trackTextMut:   'rgba(255,255,255,0.34)',  // --faint
@@ -73,7 +73,7 @@ export const C = {
 export type ColorKey = keyof typeof C;
 
 // ── Fährten-Tab Design-Tokens (1:1 aus design_handoff_faehrten/anyvo.css) ──
-// Eigenes Token-Set für das neue Fährten-Design (Mint #15e6c3), damit der
+// Eigenes Token-Set für das neue Fährten-Design (Mint #00FFCC), damit der
 // Redesign-Flow konsistent ist, ohne bestehende C.track*-Screens zu verändern.
 // Fährtenfarben je Hund für Referenz-Fährten auf der Karte (Multi-Dog-Overlays).
 // In der DB steht nur der semantische Key (dogs.track_overlay_color_key), die Werte
@@ -96,10 +96,10 @@ export const FT = {
   surface3:   '#1b1d21',
   line:       'rgba(255,255,255,0.075)',
   lineStrong: 'rgba(255,255,255,0.14)',
-  acc:        '#15e6c3',   // Primär-Akzent (Mint)
+  acc:        '#00FFCC',   // Primär-Akzent (Mint)
   acc2:       '#00c9d6',   // Gradient-Partner
-  accDim:     'rgba(21,230,195,0.13)',
-  accGlow:    'rgba(21,230,195,0.45)',
+  accDim:     'rgba(0,255,204,0.13)',
+  accGlow:    'rgba(0,255,204,0.45)',
   accText:    '#04201b',   // Text auf Mint-Buttons
   warn:       '#ffb547',
   bad:        '#ff5d6c',

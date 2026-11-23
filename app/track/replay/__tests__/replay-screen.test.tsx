@@ -16,7 +16,7 @@ let mockSession: { user: { id: string } } | null = { user: { id: 'owner' } };
 const mockLocalDetail = jest.fn();
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: mockSession }) }));
 
-jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ color: '#15E6C3' }) }));
+jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ color: '#00FFCC' }) }));
 // Isolate the existing pace-history boundary from live backend configuration.
 jest.mock('@/features/tracking/services/dogPaceHistoryService', () => ({ getDogPaceHistory: jest.fn(async () => []) }));
 jest.mock('@/lib/supabase', () => ({ supabase: { auth: {

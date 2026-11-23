@@ -1318,7 +1318,7 @@ export default function TrackRunScreen() {
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
           {arming ? (
-            <View className="flex-row items-center gap-[6px] px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(21,230,195,0.4)]">
+            <View className="flex-row items-center gap-[6px] px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(0,255,204,0.4)]">
               <Ionicons name="locate" size={12} color={FT.acc} />
               <Text className="text-[11px] font-extrabold tracking-[1.4px] text-ft-acc">ANSATZ</Text>
             </View>
@@ -1343,11 +1343,11 @@ export default function TrackRunScreen() {
           )}
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
-            className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
+            className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
             <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={17} color={voiceOn ? FT.acc : FT.muted} />
           </Pressable>
           {/* Live-Score */}
-          <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(21,230,195,0.4)]">
+          <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(0,255,204,0.4)]">
             <Ionicons name="trophy" size={12} color={FT.acc} />
             <Text className="text-[12px] font-extrabold text-ft-acc" style={{ fontVariant: ['tabular-nums'] }}>{s.score}</Text>
           </View>
@@ -1438,7 +1438,7 @@ export default function TrackRunScreen() {
                   <Text className="flex-1 text-[13px] font-bold text-ft-warn">{t('track.offTrackWarning')}</Text>
                 </View>
               ) : recoveryVisible ? (
-                <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-[rgba(21,230,195,0.45)]">
+                <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-[rgba(0,255,204,0.45)]">
                   <Ionicons name="checkmark-circle" size={16} color={FT.acc} />
                   <Text className="flex-1 text-[13px] font-bold text-ft-acc">{t('track.backOnTrack')}</Text>
                 </View>
@@ -1465,7 +1465,7 @@ export default function TrackRunScreen() {
             <View className="absolute top-[84px] left-[14px] right-[62px] flex-row" pointerEvents="none" testID="track-next-event">
               <View
                 className={`flex-row items-center gap-2 rounded-[16px] px-4 py-2.5 border ${nextEvent.highlight ? '' : 'bg-ft-glass border-ft-glass-line'}`}
-                style={nextEvent.highlight ? { backgroundColor: 'rgba(21,230,195,0.16)', borderColor: 'rgba(21,230,195,0.55)' } : undefined}
+                style={nextEvent.highlight ? { backgroundColor: 'rgba(0,255,204,0.16)', borderColor: 'rgba(0,255,204,0.55)' } : undefined}
               >
                 <Ionicons name="arrow-up" size={15} color={FT.acc} />
                 <Text
@@ -1483,7 +1483,7 @@ export default function TrackRunScreen() {
               Nutzer beendet die Absuche weiterhin bewusst selbst. */}
           {!arming && s.recording && trackEndReached && (
             <View className="absolute top-[84px] left-[14px] right-[14px]" pointerEvents="none">
-              <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3.5 border" style={{ backgroundColor: 'rgba(21,230,195,0.16)', borderColor: 'rgba(21,230,195,0.55)' }}>
+              <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3.5 border" style={{ backgroundColor: 'rgba(0,255,204,0.16)', borderColor: 'rgba(0,255,204,0.55)' }}>
                 <Ionicons name="flag" size={18} color={FT.acc} />
                 <Text className="flex-1 text-[13.5px] font-black text-ft-acc">{t('track.trackEndReached')}</Text>
               </View>
@@ -1559,7 +1559,7 @@ export default function TrackRunScreen() {
                 contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24 }}
               >
               <View className="items-center gap-2">
-                <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(21,230,195,0.4)] bg-ft-acc-dim mb-1">
+                <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(0,255,204,0.4)] bg-ft-acc-dim mb-1">
                   <Ionicons name="locate" size={26} color={FT.acc} />
                 </View>
                 <Text className="text-[13px] font-bold text-ft-text text-center leading-[19px] max-w-[280px]">{t('track.searchApproachHint')}</Text>
@@ -1621,7 +1621,7 @@ export default function TrackRunScreen() {
                         key={d}
                         accessibilityLabel={t('track.searchHandlerDistanceOption', { meters: String(d) })}
                         onPress={() => { setSearchHandlerDistanceM(d); rememberHandlerDistance(d); }}
-                        className={`px-6 py-2.5 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}
+                        className={`px-6 py-2.5 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.55)]' : 'bg-white/5 border-ft-line'}`}
                       >
                         <Text className={`text-[14px] font-black ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{d} m</Text>
                       </Pressable>

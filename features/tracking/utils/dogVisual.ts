@@ -6,7 +6,7 @@ import type { Dog } from '@/types';
 // aus der id ab, damit jeder Hund eine eigene, konstante Tönung bekommt.
 
 const PALETTE: [string, string][] = [
-  ['#15e6c3', '#0a9e94'],   // mint
+  ['#00FFCC', '#0a9e94'],   // mint
   ['#8ad7ff', '#3a7bd1'],   // blau
   ['#ffb547', '#e07b2e'],   // orange
   ['#c79bff', '#7b4dd1'],   // violett

@@ -55,13 +55,13 @@ export function paceBand(speedMps: number, percentiles: { p33: number; p66: numb
 // (siehe Modulkommentar); Confidence nutzt eine neutrale Grausättigung statt
 // Ampelfarben, Abweichung/Tempo dürfen eine echte Bewertungsskala zeigen.
 export const DEVIATION_BAND_COLORS: Record<DeviationBand, string> = {
-  very_low: '#15E6C3', low: '#8FE6C9', medium: '#F5C043', high: '#E5484D',
+  very_low: '#00FFCC', low: '#8FE6C9', medium: '#F5C043', high: '#E5484D',
 };
 export const CONFIDENCE_BAND_COLORS: Record<ConfidenceBand, string> = {
   excellent: '#8FD8FF', good: '#5FB8E0', limited: '#8A93A6', unreliable: '#5A6070',
 };
 export const PACE_BAND_COLORS: Record<PaceBand, string> = {
-  slow: '#8FE6C9', normal: '#15E6C3', fast: '#3FA8E0',
+  slow: '#8FE6C9', normal: '#00FFCC', fast: '#3FA8E0',
 };
 
 export interface HeatmapPart {

@@ -246,7 +246,7 @@ export default function GroupSessionScreen() {
     const lying = lyingMs(track, serverNow);
     const time = lying === null ? '' : formatDuration(lying);
     if (track.status === 'laying') return { text: t(pendingHandover.has(track.trackId) ? 'groups.handoverPending' : 'groups.statusLaying'), color: C.trackBlue, bg: 'rgba(77,163,255,0.14)' };
-    if (track.status === 'lying') return { text: t('groups.statusLying', { time }), color: C.trackPrimary, bg: 'rgba(21,230,195,0.14)' };
+    if (track.status === 'lying') return { text: t('groups.statusLying', { time }), color: C.trackPrimary, bg: 'rgba(0,255,204,0.14)' };
     if (track.status === 'searching') return { text: t('groups.statusSearching', { time }), color: C.trackWarning, bg: 'rgba(255,181,71,0.14)' };
     if (track.status === 'searched') return { text: t('groups.statusSearched', { time }), color: C.trackTextSec, bg: 'rgba(255,255,255,0.08)' };
     return { text: t('groups.statusRevoked'), color: C.trackTextMut, bg: 'rgba(255,255,255,0.05)' };

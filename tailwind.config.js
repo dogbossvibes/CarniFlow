@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 // ANYVO — Tailwind/NativeWind Theme. Design-Tokens 1:1 aus
-// design_handoff_faehrten/anyvo.css (Fährten-Bereich, Mint #15e6c3).
+// design_handoff_faehrten/anyvo.css (Fährten-Bereich, Mint #00FFCC).
 module.exports = {
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
@@ -19,10 +19,10 @@ module.exports = {
           surface3:      '#1b1d21',
           line:          'rgba(255,255,255,0.075)',
           'line-strong': 'rgba(255,255,255,0.14)',
-          acc:           '#15e6c3',
+          acc:           '#00FFCC',
           'acc-2':       '#00c9d6',
-          'acc-dim':     'rgba(21,230,195,0.13)',
-          'acc-glow':    'rgba(21,230,195,0.45)',
+          'acc-dim':     'rgba(0,255,204,0.13)',
+          'acc-glow':    'rgba(0,255,204,0.45)',
           'acc-text':    '#04201b',
           warn:          '#ffb547',
           bad:           '#ff5d6c',
@@ -34,7 +34,7 @@ module.exports = {
         },
         // Material-Marker (Stoff/Holz/Leder/Plastik/Diverses) — tunable.
         mat: {
-          stoff:    '#15e6c3',
+          stoff:    '#00FFCC',
           holz:     '#c08457',
           leder:    '#a9744f',
           plastik:  '#4da3ff',

@@ -206,6 +206,6 @@ const s = StyleSheet.create({
   legendTxt:   { fontSize: 10, color: C.trackTextSec, fontWeight: '700' },
   startFlag:   { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   endFlag:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  puckGlow:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(21,230,195,0.22)', alignItems: 'center', justifyContent: 'center' },
+  puckGlow:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,255,204,0.22)', alignItems: 'center', justifyContent: 'center' },
   puckCore:    { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
 });
