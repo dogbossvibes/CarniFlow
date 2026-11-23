@@ -1,5 +1,47 @@
 # ANYVO Master Status
 
+## Stand nach OTA #249 (iOS 60) und #251 (Android) – 2026-11-23
+
+Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf den Release-Karten #249 und #251.
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `0bc41835fd0445d6f8c92fe661eeb14a9cdb035e`,
+  Update Group `1e8106d6-2757-47bc-adf5-4f0ba974827c`, Branch
+  `release/ios60-ohne-rueckgaengig-20261123`, Karte #249 (Veröffentlicht). Vorher: `1b3fd491` (#233).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit
+  `aa3e0546392814f9cb8f05be217a11e1b5b870f6`, Update Group
+  `90594e6e-1ba5-43ce-81c2-b45d0bf2a64c`, Branch `release/android53-nachzug-20261123`,
+  Karte #251 (Live – Nachkontrolle offen). Vorher: `03ca16d1` (#216).
+- Die nächste OTA muss `0bc41835` (iOS) bzw. `aa3e0546` (Android) enthalten.
+
+**Inhalt**
+- **#249 (nur iOS):** PR #238 (Schnellmenü), #239 (Tab-Tipp, Haptik), #241 (Mint `#00FFCC`), #242
+  (Suchspur als Laufband statt Aufbau), #243 (Journal ohne rote Ecken), #245 (auf iOS ohne Wirkung).
+  Cherry-Picks; Import-Zeile in `app/(tabs)/home.tsx` von Hand zusammengeführt;
+  `features/tracking/native/searchKeepalive.ts` aus #241 weggelassen (gibt es auf der iOS-Linie nicht).
+  Dieser Stand ist deshalb nicht zeilengleich mit `main`.
+- **#251 (nur Android):** Nachzug von PR #219, #222, #227, #228, #231, #232, #242, #243, dazu #245
+  (Android: Suchspur über der grauen Linie per `RUN_TRACE_Z`, Strichmuster mit Pixeldichte).
+  Ohne Gerätetest (kein Android-Gerät; Emulator zeigt keine Karte). Freigabe der Nutzerin nach
+  Abnahme von #249 auf dem iPhone.
+
+**Bewusst nicht ausgeliefert: «Erledigt · Rückgängig»** (PR #237, #244, #247 auf `main`)
+- Zweimal bei der unabhängigen Review durchgefallen: erst B1–B3 (Medien beim falschen Hund,
+  Rückgängig während Speichern, Verlust beim Beenden), dann B4 (Sprachnotiz während Aufnahme).
+  #244 und #247 sollen das beheben; die Korrektur aus #247 ist noch nicht unabhängig geprüft.
+- Vor einer OTA oder einem Build mit diesen PRs: neue unabhängige Review.
+- PR #250 (`fa7dcc5e`, Medien-Upload bei Hundewechsel, vorbestehender Fehler) liegt auf `main`,
+  in keiner OTA, vom MASTER nicht durchgesehen.
+
+**OTA-Abdeckung:** drei Meldungen als begründete Ausnahme eingetragen (PR #248, Entscheid der
+Nutzerin): Trainingskarten deckend (4.11., 10.11.) und ohne rote Ecken (11.11.). Korrekturen im
+Code weiter wirksam, Zeilen nur weiterbearbeitet (#238) bzw. verschoben (#243).
+
+**Offen**
+- PR #246 Regenmodus (Fährte legen): offen, Simulator-Test der Aufgaben-Sitzung läuft. Fährtenbereich,
+  daher vor einer OTA am Gerät oder im Simulator prüfen. Vorschlag MASTER: versteckt im Testmodus ausliefern.
+- Geräteprüfung: #251 (nur auf echtem Android-Gerät möglich), #216 auf Android, #197 und ältere Karten.
+
 ## Stand nach Geräteabnahme #204, #207, #217, #220 – 2026-11-23
 
 Production unverändert, frisch aus EAS gelesen am 23.11.2026: iOS 60 `1b3fd491`
