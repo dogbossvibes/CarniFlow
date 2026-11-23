@@ -1,15 +1,16 @@
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
 import { RainModeOverlay } from '../RainModeOverlay';
-import { RAIN_HOLD_MS, isRainyWeatherCode } from '@/features/tracking/utils/rainMode';
+import { RAIN_HOLD_MS, RAIN_SWITCH_DELAY_MS, isRainyWeatherCode } from '@/features/tracking/utils/rainMode';
 
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 jest.mock('@/features/training-groups/registerResources', () => ({ registerGroupResources: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
-jest.mock('@/features/tracking/utils/haptics', () => ({ hapticSuccess: jest.fn() }));
+jest.mock('@/features/tracking/utils/haptics', () => ({ hapticSuccess: jest.fn(), hapticTap: jest.fn() }));
 
-type Node = { props: { onPress: () => void; onPressIn: () => void; onPressOut: () => void; onAccessibilityTap?: () => void } };
+type Ev = { nativeEvent: { timestamp: number } };
+type Node = { props: { onPress: (e?: Ev) => void; onPressIn: (e?: Ev) => void; onPressOut: () => void; onAccessibilityTap?: () => void } };
 let tree: ReturnType<typeof Renderer.create>;
 
 function makeProps(over: Partial<React.ComponentProps<typeof RainModeOverlay>> = {}) {
@@ -34,7 +35,10 @@ const has = (testID: string) => tree.root.findAll(n => n.props.testID === testID
 function hold(testID: string, ms = RAIN_HOLD_MS) {
   act(() => { node(testID).props.onPressIn(); });
   act(() => { jest.advanceTimersByTime(ms); });
-  act(() => { node(testID)?.props.onPressOut(); });
+  // Ausgelöst wird erst beim Loslassen (onPressOut + onPress), nicht schon beim Halten.
+  act(() => { node(testID).props.onPressOut(); node(testID).props.onPress(); });
+  // Die Ansicht wechselt erst kurz nach dem Loslassen.
+  act(() => { jest.advanceTimersByTime(RAIN_SWITCH_DELAY_MS); });
 }
 
 beforeEach(() => jest.useFakeTimers());
@@ -57,6 +61,38 @@ describe('RainModeOverlay — Halten statt Tippen', () => {
     expect(p.onObject).toHaveBeenCalledTimes(1);
     expect(p.onObject).toHaveBeenCalledWith('gummi');
     expect(has('rain-object')).toBe(true);   // zurück auf der Hauptansicht
+  });
+
+  it('Halten allein löst nichts aus; erst das Loslassen wechselt die Ansicht', () => {
+    render();
+    act(() => { node('rain-object').props.onPressIn(); });
+    act(() => { jest.advanceTimersByTime(RAIN_HOLD_MS * 3); });
+    expect(has('rain-object')).toBe(true);
+    expect(has('rain-object-holz')).toBe(false);
+    act(() => { node('rain-object').props.onPressOut(); node('rain-object').props.onPress(); });
+    expect(has('rain-object-holz')).toBe(false);   // noch nicht: kurze Pause nach dem Loslassen
+    act(() => { jest.advanceTimersByTime(RAIN_SWITCH_DELAY_MS); });
+    expect(has('rain-object-holz')).toBe(true);
+  });
+
+  it('entscheidend ist die gemessene Dauer der Berührung, nicht ein Zeitgeber', () => {
+    render();
+    // Zeitgeber laufen absichtlich NICHT weiter (beschäftigter JS-Thread).
+    act(() => { node('rain-object').props.onPressIn({ nativeEvent: { timestamp: 1000 } }); });
+    act(() => { node('rain-object').props.onPressOut(); node('rain-object').props.onPress({ nativeEvent: { timestamp: 1000 + RAIN_HOLD_MS - 1 } }); });
+    act(() => { jest.advanceTimersByTime(RAIN_SWITCH_DELAY_MS); });
+    expect(has('rain-object-holz')).toBe(false);
+    act(() => { node('rain-object').props.onPressIn({ nativeEvent: { timestamp: 5000 } }); });
+    act(() => { node('rain-object').props.onPressOut(); node('rain-object').props.onPress({ nativeEvent: { timestamp: 5000 + RAIN_HOLD_MS } }); });
+    act(() => { jest.advanceTimersByTime(RAIN_SWITCH_DELAY_MS); });
+    expect(has('rain-object-holz')).toBe(true);
+  });
+
+  it('nach einem zu kurzen Halten bleibt auch ein späterer Tipp wirkungslos', () => {
+    render();
+    hold('rain-object', RAIN_HOLD_MS - 50);
+    act(() => { node('rain-object').props.onPress(); });
+    expect(has('rain-object-holz')).toBe(false);
   });
 
   it('Screenreader lösen ohne Halten aus', () => {
