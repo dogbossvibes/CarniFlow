@@ -1,4 +1,5 @@
-import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
+import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
+import { useTranslation } from 'react-i18next';
 import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
 import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
@@ -63,6 +64,8 @@ import {
 } from '@/features/tracking/utils/trackSegments';
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
+import { RainModeOverlay } from '@/features/tracking/components/RainModeOverlay';
+import { isRainyWeatherCode } from '@/features/tracking/utils/rainMode';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 import { useActiveTrackOverlays } from '@/features/tracking/hooks/useActiveTrackOverlays';
 import { TrackReferenceOverlayControl } from '@/features/tracking/components/TrackReferenceOverlayControl';
@@ -210,6 +213,9 @@ export default function LegenScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
   const [pocketLock, setPocketLock] = useState(false);
+  // Regenmodus: zweite, vereinfachte Ansicht (nur Anzeige — Aufnahme läuft unverändert weiter).
+  const [rainMode, setRainMode] = useState(false);
+  const { t: tRain } = useTranslation('rainMode');
   const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
   const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [pendingExit, setPendingExit] = useState<{ href: string } | { back: true } | null>(null);
@@ -245,6 +251,7 @@ export default function LegenScreen() {
 
   // Zuletzt gewähltes Gegenstand-Material → Default für den Schnell-Gegenstand.
   const lastMaterialRef = useRef<MarkerMaterial>('diverses');
+  const [lastMaterial, setLastMaterial] = useState<MarkerMaterial | null>(null);   // nur Anzeige („wie zuletzt" im Regenmodus)
 
   // Gegenstand mit gewähltem Material setzen. Erst, wenn der Startanker steht —
   // sonst würde er im Warmup-Drift landen (kein Crash, nur Hinweis).
@@ -252,11 +259,13 @@ export default function LegenScreen() {
     setGsPicker(false);
     const st = useTrackingStore.getState();
     // Ohne Startanker UND valide aktuelle Position kein (koordinatenloser) Gegenstand.
-    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
+    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return false; }
     hapticMarker();                 // sofort, VOR dem Speichern
     lastMaterialRef.current = material;
+    setLastMaterial(material);
     void rec.addMarker('gegenstand', { material });
     announceEvent(objectEvent(material), 'set');   // „Gegenstand" bzw. „Dübel"
+    return true;
   }, [rec, showToast, t, announceEvent]);
 
   // Schnell-Gegenstand (Hardware-Taste / Kurzbefehl): ohne Material-Auswahl, am
@@ -271,18 +280,19 @@ export default function LegenScreen() {
 
   // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
   // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
-  const placeWinkel = useCallback((angleKind: AngleKind, geometry?: SpecialGeometry) => {
-    if (phaseRef.current !== 'recording') return;
+  const placeWinkel = useCallback((angleKind: AngleKind, geometry?: SpecialGeometry): boolean => {
+    if (phaseRef.current !== 'recording') return false;
     const st = useTrackingStore.getState();
     // Fachliche Annahme ZUERST: ohne Startanker UND ohne valide aktuelle Position
     // wird KEIN (koordinatenloser) Marker gesetzt und KEIN Erfolg gemeldet.
-    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
+    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return false; }
     // addMarker fügt den Marker (mit currentPosition) SYNCHRON in den Store ein
     // (commitMarker → s.addMarker vor dem ersten await) → Karte reagiert sofort.
     void rec.addMarker('winkel', { angleKind, ...geometry });
     if (angleKind === 'abriss') hapticWarning(); else hapticAngle();   // Feedback nach der Annahme
     announceEvent(angleEvent(angleKind), 'set');
     setWinkelSheet(false);
+    return true;
   }, [rec, showToast, t, announceEvent]);
 
   // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
@@ -483,6 +493,14 @@ export default function LegenScreen() {
         sessionIdRef.current = clientUuid;
         hapticSuccess();
         showToast(t('toast.trackRunning'));
+        // Regen-Vorschlag: höchstens einmal, nur beim frischen Start (nicht beim Fortsetzen)
+        // und nur, wenn das bereits geladene Wetter Regen meldet. Reine Ansichtswahl.
+        if (!resumed && isRainyWeatherCode(weather?.weatherCode)) {
+          Alert.alert(tRain('askTitle'), tRain('askBody'), [
+            { text: tRain('no'), style: 'cancel' },
+            { text: tRain('yes'), onPress: () => setRainMode(true) },
+          ]);
+        }
         if (layVoiceRef.current) requestVoice({ eventType: 'status', text: t('track.voiceRecordingStarted'),
           language: getSpeechLocale(), priority: 3, onceKey: 'lay-recording-start', phase: 'lay',
           valid: () => useTrackingStore.getState().isRecording });
@@ -508,7 +526,7 @@ export default function LegenScreen() {
       },
     });   // UI/Timer wurden per Callback gestartet; lokale Session ist jetzt angelegt
     if (r.error) { beganRef.current = false; showToast(r.error === 'gps_not_ready' ? t('track.gpsPreparing') : r.error); return; }
-  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router, params.id]);
+  }, [session, activeDog, rec, showToast, t, tRain, surface, condition, weather, currentPosition, isPro, router, params.id]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
@@ -567,19 +585,20 @@ export default function LegenScreen() {
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
 
   // TS starten: SOFORT scharf am aktuellen TrackPoint (keine Vorab-Schrittzahl).
-  const startTrackSegment = useCallback(() => {
-    if (phaseRef.current !== 'recording' || !activeDog) return;
+  // `type`/`customLabel` kommen vom Sheet (normales Menü) oder direkt vom Regenmodus.
+  const beginTrackSegment = useCallback((type: TrackSegmentType, customLabel: string): boolean => {
+    if (phaseRef.current !== 'recording' || !activeDog) return false;
     const st = useTrackingStore.getState();
-    if (activeOrPlannedSegment(st.segments)) return;   // nur EINE aktive Teilstrecke
-    const label = normalizeCustomSegmentLabel(segmentCustomLabel);
-    if (segmentType === 'custom' && !label) { showToast(t('track.segmentCustomRequired')); return; }
+    if (activeOrPlannedSegment(st.segments)) return false;   // nur EINE aktive Teilstrecke
+    const label = normalizeCustomSegmentLabel(customLabel);
+    if (type === 'custom' && !label) { showToast(t('track.segmentCustomRequired')); return false; }
     const idx = st.trackPoints.length - 1;
     // Kein gültiger TrackPoint / keine Position → kein Segment, kein Erfolgsfeedback.
-    if (idx < 0 || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
+    if (idx < 0 || !st.currentPosition) { showToast(t('toast.startPointWait')); return false; }
     const segment = createActiveSegment({
       dogId: activeDog.id,
       trackSessionId: sessionIdRef.current,
-      type: segmentType,
+      type,
       customLabel: label,
       currentStep: metersToSteps(st.distanceMeters, stepLengthM),   // abgeleitet aus realer Distanz
       startTrackPointIndex: idx,
@@ -590,7 +609,9 @@ export default function LegenScreen() {
     setSegmentSheet(false);
     hapticSuccess();
     if (segment.voiceEnabled) speakTrackSegment(t('track.segmentStarted'));
-  }, [activeDog, segmentCustomLabel, segmentType, segmentVoiceEnabled, showToast, t, stepLengthM]);
+    return true;
+  }, [activeDog, segmentVoiceEnabled, showToast, t, stepLengthM]);
+  const startTrackSegment = useCallback(() => { beginTrackSegment(segmentType, segmentCustomLabel); }, [beginTrackSegment, segmentType, segmentCustomLabel]);
 
   // TS stoppen: aktuellen TrackPoint als Ende; plannedLengthSteps = tatsächliche Länge.
   const stopTrackSegment = useCallback(() => {
@@ -810,6 +831,18 @@ export default function LegenScreen() {
               style={{ elevation: 30 }}
             >
               <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={19} color={pocketLock ? FT.accText : FT.text} />
+            </Pressable>
+          )}
+          {phase === 'recording' && !pocketLock && (
+            <Pressable
+              testID="rain-mode-toggle"
+              accessibilityRole="button"
+              accessibilityLabel={tRain('on')}
+              onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(false); setSegmentSheet(false); setRainMode(true); }}
+              className="absolute top-[64px] right-[62px] z-30 w-10 h-10 rounded-[12px] border items-center justify-center bg-black/90 border-ft-line-strong"
+              style={{ elevation: 30 }}
+            >
+              <Ionicons name="water-outline" size={19} color={FT.text} />
             </Pressable>
           )}
           {view === 'map' ? (
@@ -1205,6 +1238,26 @@ export default function LegenScreen() {
           />
         </View>
       </SafeAreaView>
+
+      {/* Regenmodus: ruft dieselben Funktionen auf wie das Menü oben (keine eigene Speicherlogik). */}
+      <RainModeOverlay
+        visible={rainMode && phase === 'recording' && !pocketLock}
+        duration={clock(durationSeconds)}
+        distanceLabel={`${Math.round(distanceMeters)} m`}
+        objectCount={gegenstaende}
+        materials={GEGENSTAND_MATERIALS.filter(m => !isTrainingJoker(m.material)).map(m => ({ value: m.material, label: m.material === 'gummi' ? t('track.materialRubber') : m.label }))}
+        jokers={GEGENSTAND_MATERIALS.filter(m => isTrainingJoker(m.material)).map(m => ({ value: m.material, label: m.material === 'ball' ? t('track.materialBall') : t('track.materialDowel') }))}
+        lastMaterial={lastMaterial}
+        segmentTypes={TRACK_SEGMENT_TYPES.filter(type => type !== 'custom').map(type => ({ value: type, label: segmentLabel(type) }))}
+        activeSegmentLabel={activeSegment ? (activeSegment.type === 'custom' ? segmentDisplayLabel(activeSegment) : segmentLabel(activeSegment.type)) : null}
+        onExit={() => { hapticTap(); setRainMode(false); }}
+        onObject={placeGegenstand}
+        onAngle={placeWinkel}
+        onStartSegment={type => beginTrackSegment(type, '')}
+        onStopSegment={stopTrackSegment}
+        onStop={finishTrack}
+        stopLabel={t('track.stopLaying')}
+      />
 
       <PocketLockOverlay
         visible={pocketLock && phase === 'recording'}
