@@ -4,7 +4,9 @@
 // Badge. Ohne `searchView` bleibt die Karte wie bisher.
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { TrackingMap, type MapMarker, type SearchMapView } from '../TrackingMap';
+import { AccessibilityInfo } from 'react-native';
+import { C } from '@/constants/colors';
+import { TrackingMap, withAlpha, type MapMarker, type SearchMapView } from '../TrackingMap';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -118,32 +120,94 @@ describe('TrackingMap — Absuche-Kartenansicht', () => {
     expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('track_search_zoom_level', 'normal');
   });
 
-  it('Kürzel stehen NEBEN der Linie mit Punkt und Verbindungsstrich; Text «90 R»', () => {
+  it('normaler Winkel ohne Kreis, Strich und Kürzel; Gegenstände stehen NEBEN der Linie mit Punkt und Strich', () => {
     render(view());
-    const angle = markerWithLabel('90 R');
-    const offset = meters(angle.props.coordinate);
-    expect(Math.hypot(offset.x - 0, offset.y - 40)).toBeGreaterThan(2);       // nicht auf dem Knick
-    expect(offset.x).toBeLessThan(0);                                         // Aussenseite (Nordwest)
-    expect(offset.y).toBeGreaterThan(40);
-    // G2 liegt 3 m hinter dem Winkel → steht daneben, nicht darüber, und wird nicht zum Sammelmarker.
+    expect(host('marker').filter(m => m.props.markerLabel === '90 R')).toHaveLength(0);
+    // kein Punkt am Knick mehr
+    expect(host('circle').map(c => meters(c.props.center)).filter(c => Math.hypot(c.x, c.y - 40) < 0.1)).toHaveLength(0);
     const g2 = meters(markerWithLabel('G2').props.coordinate);
-    expect(Math.hypot(g2.x - offset.x, g2.y - offset.y)).toBeGreaterThan(3.5);
+    expect(Math.hypot(g2.x - 3, g2.y - 40)).toBeGreaterThan(2);              // G2 nicht auf seinem Punkt
+    // je Gegenstands-Kürzel ein Punkt und ein Verbindungsstrich (G1, G2), kein Sammelmarker
+    expect(host('circle')).toHaveLength(2);
+    expect(host('polyline').filter(p => p.props.coordinates.length === 2 && p.props.strokeWidth === 2)).toHaveLength(2);
     expect(host('marker').filter(m => m.props.markerLabel === '2')).toHaveLength(0);
-    // je Kürzel ein Punkt am Knick und ein Verbindungsstrich dorthin
-    expect(host('circle')).toHaveLength(3);
-    const knick = host('circle').map(c => meters(c.props.center)).find(c => Math.hypot(c.x, c.y - 40) < 0.1);
-    expect(knick).toBeDefined();
-    expect(host('polyline').filter(p => p.props.coordinates.length === 2 && p.props.strokeWidth === 2)).toHaveLength(3);
   });
 
   it('passierte Kürzel sind blasser, kommende nicht; die Linie ist breiter mit Kontur', () => {
     render(view({ handlerProgressM: 25, dogProgressM: 30 }));
     const faded = (label: string) => markerWithLabel(label).findAll(n => typeof n.type === 'string' && n.props.style?.opacity === 0.45).length > 0;
     expect(faded('G1')).toBe(true);
-    expect(faded('90 R')).toBe(false);
     expect(faded('G2')).toBe(false);
     const widths = host('polyline').filter(p => p.props.coordinates.length > 2).map(p => p.props.strokeWidth);
     expect(widths).toEqual(expect.arrayContaining([6, 9]));
+  });
+
+  it('Ist-Suchspur: weiss mit dunkler Kontur, genau so breit wie die gelegte Linie in der Absuche', () => {
+    act(() => { tree = TestRenderer.create(<TrackingMap layPoints={line} runPoints={line.slice(0, 20)} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={view()} follow />); });
+    const run = host('search-run-trace');
+    expect(run).toHaveLength(1);
+    expect(run[0].props.strokeColor).toBe('#FFFFFF');
+    expect(run[0].props.strokeWidth).toBe(6);
+    const outline = host('polyline').find(p => p.props.coordinates === run[0].props.coordinates && p.props.strokeWidth === 9);
+    expect(outline?.props.strokeColor).toBe('#04110F');
+  });
+
+  it('leuchtende Ecke: Schein in der Fährtenfarbe über dem Eckstück, pulsiert langsam (iOS)', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest.useFakeTimers();
+    try {
+      const glow = [[{ latitude: at(0, 33).lat, longitude: at(0, 33).lng }, { latitude: at(0, 40).lat, longitude: at(0, 40).lng }, { latitude: at(7, 40).lat, longitude: at(7, 40).lng }]];
+      await act(async () => { tree = TestRenderer.create(<TrackingMap layPoints={line} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={view()} follow cornerGlow={glow} />); });
+      const glowLines = () => host('search-corner-glow');
+      expect(glowLines()).toHaveLength(1);
+      expect(glowLines()[0].props.strokeWidth).toBe(14);
+      const first = glowLines()[0].props.strokeColor;
+      expect(first).toBe(`${C.trackPrimary}F2`);   // Fährtenfarbe (Standard), hell
+      act(() => { jest.advanceTimersByTime(700); });
+      expect(glowLines()[0].props.strokeColor).toBe(`${C.trackPrimary}66`); // gedämpft
+      act(() => { jest.advanceTimersByTime(700); });
+      expect(glowLines()[0].props.strokeColor).toBe(first);
+    } finally {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('leuchtende Ecke bei «Bewegung reduzieren»: ruhig hell, kein Puls', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    jest.useFakeTimers();
+    try {
+      const glow = [[{ latitude: at(0, 33).lat, longitude: at(0, 33).lng }, { latitude: at(0, 40).lat, longitude: at(0, 40).lng }]];
+      await act(async () => { tree = TestRenderer.create(<TrackingMap layPoints={line} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={view()} follow cornerGlow={glow} />); });
+      expect(host('search-corner-glow')[0].props.strokeColor).toBe(`${C.trackPrimary}F2`);
+      act(() => { jest.advanceTimersByTime(2100); });
+      expect(host('search-corner-glow')[0].props.strokeColor).toBe(`${C.trackPrimary}F2`);
+    } finally {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('Absuchestart: Kontur und Fährtenfarbe werden gemeinsam neu aufgebaut, Farbe zuletzt (Apple Maps legt Neues obenauf)', () => {
+    const order: string[] = [];
+    act(() => { tree = TestRenderer.create(<TrackingMap layPoints={line} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={null} follow />); });
+    const laidBefore = host('polyline').filter(p => p.props.coordinates.length > 2);
+    expect(laidBefore.map(p => p.props.strokeWidth)).toEqual([4]);
+    act(() => { tree.update(<TrackingMap layPoints={line} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={view()} follow />); });
+    const laidAfter = host('polyline').filter(p => p.props.coordinates.length > 2 && p.props.testID !== 'search-run-trace');
+    laidAfter.forEach(p => order.push(p.props.strokeColor));
+    // Neu gemountet (nicht nur aktualisiert): die alte farbige Linie ist ersetzt.
+    expect(laidAfter).not.toContain(laidBefore[0]);
+    expect(order.slice(0, 2)).toEqual(['#04110F', C.trackPrimary]);
+    expect(laidAfter.slice(0, 2).map(p => p.props.strokeWidth)).toEqual([9, 6]);
+  });
+
+  it('leuchtende Ecke nur in der Absuche, nicht ohne searchView', () => {
+    const glow = [[{ latitude: at(0, 33).lat, longitude: at(0, 33).lng }, { latitude: at(0, 40).lat, longitude: at(0, 40).lng }]];
+    act(() => { tree = TestRenderer.create(<TrackingMap layPoints={line} markers={markers} currentPosition={at(0, 0)} smartFollow searchView={null} follow cornerGlow={glow} />); });
+    expect(host('search-corner-glow')).toHaveLength(0);
+    // ausserhalb der Absuche bleibt der Winkel als «90 R» auf seinem Punkt
+    expect(host('marker').filter(m => m.props.markerLabel === '90 R')).toHaveLength(1);
   });
 
   it('ohne searchView: Marker exakt auf ihrem Punkt, bisherige Bedienelemente, keine Zoomvorgabe', () => {
@@ -155,5 +219,13 @@ describe('TrackingMap — Absuche-Kartenansicht', () => {
     expect(labels()).not.toContain('track.mapView.title');
     expect(mockMapApi.animateCamera.mock.calls.every(c => c[0].altitude == null && c[0].zoom == null)).toBe(true);
     expect(host('polyline').filter(p => p.props.coordinates.length > 2).map(p => p.props.strokeWidth)).toEqual([4]);
+  });
+});
+
+describe('withAlpha — Fährtenfarbe mit Deckkraft', () => {
+  it('ergänzt oder ersetzt den Alpha-Wert, andere Formate bleiben unverändert', () => {
+    expect(withAlpha('#FFB341', '66')).toBe('#FFB34166');
+    expect(withAlpha('#FFB341E0', 'F2')).toBe('#FFB341F2');
+    expect(withAlpha('rgb(1,2,3)', '66')).toBe('rgb(1,2,3)');
   });
 });

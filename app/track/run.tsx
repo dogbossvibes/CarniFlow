@@ -1,7 +1,7 @@
 import { isScoredObject, isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners, projectAngleMarkers, specialAngleBadge } from '@/features/tracking/utils/specialAngleGeometry';
 import { ANGLE_LABEL, ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
-import { nextSearchEvents, nextEventArcM, type SearchEvent } from '@/features/tracking/utils/searchMapView';
+import { cornerGlowRange, nextSearchEvents, nextEventArcM, type SearchEvent } from '@/features/tracking/utils/searchMapView';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
@@ -746,6 +746,13 @@ export default function TrackRunScreen() {
     const toM = nextEventArcM(searchEvents, s.progressM, s.dogProgressM, laidArc.total);
     return laidLineParts(laidDisplay.points, laidDisplay.cum, s.progressM, toM);
   }, [s.recording, s.estimatedDogPosition, s.progressM, s.dogProgressM, searchEvents, laidDisplay, laidArc]);
+  // Absuche: die nächste Ecke vor dem Hund leuchtet auf (statt Kreis und Kürzel). Nur Anzeige.
+  const cornerGlow = useMemo(() => {
+    if (!s.recording || !s.estimatedDogPosition) return [];
+    const corners = mapMarkers.filter(m => m.type === 'winkel' && m.arcM != null).map(m => m.arcM as number);
+    const range = cornerGlowRange(corners, s.dogProgressM, laidArc.total);
+    return range ? laidLineParts(laidDisplay.points, laidDisplay.cum, range.fromM, range.toM) : [];
+  }, [s.recording, s.estimatedDogPosition, s.dogProgressM, mapMarkers, laidDisplay, laidArc]);
   const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
@@ -795,6 +802,8 @@ export default function TrackRunScreen() {
     return () => { current = false; };
   }, [id]);
   const guidanceVisible = searchGuidanceActive && !blindSearch;
+  // Blind absuchen und Anlauf: weder Hundebereich noch Betonung der gelegten Linie.
+  const hideLaidOverlays = blindSearch || arming;
 
   // Search-Recovery-State: Seeds (bereits angesagt/ausgelöst in DIESEM Run) aus dem
   // Snapshot; jede neue Ansage/Auslösung wird sofort in den Run-State gespiegelt.
@@ -1395,9 +1404,10 @@ export default function TrackRunScreen() {
               runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
-              dogRange={blindSearch || arming ? null : dogRange}
-              laidDone={blindSearch || arming ? null : laidDone}
-              laidNext={blindSearch || arming ? null : laidNext}
+              dogRange={hideLaidOverlays ? null : dogRange}
+              laidDone={hideLaidOverlays ? null : laidDone}
+              laidNext={hideLaidOverlays ? null : laidNext}
+              cornerGlow={hideLaidOverlays ? null : cornerGlow}
               // Pfote als Punkt nur noch in der Blindsuche (dort gibt es weder Linie noch Band).
               // Sonst zeigt das Band den Hundebereich; bei 1 m, am Gegenstand und am Ziel steht nichts davor.
               dogPosition={!arming && blindSearch && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}

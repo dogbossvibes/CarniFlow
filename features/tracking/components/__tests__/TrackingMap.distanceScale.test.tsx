@@ -57,10 +57,12 @@ const REFS: TrackReferenceOverlay[] = [
 ];
 const TICK_COLORS = new Set(Object.values(DISTANCE_TICK_STROKE).map(s => s.strokeColor));
 
-type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex?: number };
+type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex?: number; testID?: string };
+// Die Ist-Suchspur ist weiss wie frühere Distanzmarken; über ihre testID von Marken unterschieden.
+const isRunTrace = (p: PolyProps) => p.testID === 'search-run-trace';
 const polys = (n: ReactTestRenderer): PolyProps[] => (n.root as any).findAllByType(RNMaps!.Polyline).map((x: any) => x.props);
-const ticks = (n: ReactTestRenderer) => polys(n).filter(p => TICK_COLORS.has(p.strokeColor));
-const nonTicks = (n: ReactTestRenderer) => polys(n).filter(p => !TICK_COLORS.has(p.strokeColor) && p.strokeColor !== DISTANCE_TICK_HALO);
+const ticks = (n: ReactTestRenderer) => polys(n).filter(p => TICK_COLORS.has(p.strokeColor) && !isRunTrace(p));
+const nonTicks = (n: ReactTestRenderer) => polys(n).filter(p => isRunTrace(p) || (!TICK_COLORS.has(p.strokeColor) && p.strokeColor !== DISTANCE_TICK_HALO));
 const labels = (n: ReactTestRenderer) => (n.root as any).findAll((x: any) => x.props?.testID === 'distance-scale-label' && typeof x.type === 'string');
 const mapView = (n: ReactTestRenderer) => (n.root as any).findByType(RNMaps!.default);
 const outer = (n: ReactTestRenderer) => (n.root as any).findAll((x: any) => typeof x.props?.onLayout === 'function')[0];
@@ -100,7 +102,7 @@ describe('TrackingMap — no rulers or distance ticks', () => {
     const after = nonTicks(renderMap({ referenceOverlays: REFS, showMapScale: true, distanceScaleLine: REF_LINE }));
     expect(after).toEqual(base);
     expect(base.some(p => p.strokeColor === C.trackPrimary)).toBe(true);
-    expect(base.some(p => p.strokeColor === C.trackBlue)).toBe(true);
+    expect(base.some(p => p.testID === 'search-run-trace')).toBe(true);
     expect(base.some(p => p.strokeColor === referenceTrackStroke('orange').strokeColor)).toBe(true);
     expect(base.some(p => p.strokeColor === REFERENCE_TRACK_HALO.strokeColor)).toBe(true);
   });
@@ -305,8 +307,10 @@ it('preserves iOS49 Apple Maps and recorded lay/search gaps alongside compact gr
     markers: [{ id: 'object', type: 'gegenstand', objectIndex: 1, lat: 47, lng: 8 }] });
   expect(mapView(n).props.provider).toBe(RNMaps!.PROVIDER_DEFAULT);
   const coords = (points: typeof lay) => points.map(p => ({ latitude: p.lat, longitude: p.lng }));
+  // Suchspur je Abschnitt als dunkle Kontur + weisse Linie; Lücken bleiben in beiden Linien erhalten.
   expect(polys(n).map(p => p.coordinates)).toEqual([
-    coords(lay.slice(0, 2)), coords(lay.slice(2)), coords(run.slice(0, 2)), coords(run.slice(2)),
+    coords(lay.slice(0, 2)), coords(lay.slice(2)),
+    coords(run.slice(0, 2)), coords(run.slice(0, 2)), coords(run.slice(2)), coords(run.slice(2)),
   ]);
   expect(JSON.stringify({ lay, run })).toBe(input);
 });
