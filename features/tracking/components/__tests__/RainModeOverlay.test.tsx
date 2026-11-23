@@ -133,13 +133,16 @@ describe('RainModeOverlay — dieselben Einträge wie das normale Menü', () => 
     expect(p.onObject).toHaveBeenCalledWith('duebel');
   });
 
-  it.each(['gw', 'ow', 'bw'] as const)('%s + spitz rechts liefert dieselbe Geometrie wie SpecialAnglePicker', kind => {
+  // T-219: OW/GW/BW sind immer rund 90° → nur links/rechts, keine Spitz-Auswahl.
+  it.each(['gw', 'ow', 'bw'] as const)('%s + rechts liefert dieselbe Geometrie wie SpecialAnglePicker, ohne Spitz-Auswahl', kind => {
     const p = render();
     hold('rain-angle'); hold(`rain-angle-${kind}`);
     expect(p.onAngle).not.toHaveBeenCalled();
-    hold('rain-dir-spitz-rechts');
+    expect(has('rain-dir-spitz-links')).toBe(false);
+    expect(has('rain-dir-spitz-rechts')).toBe(false);
+    hold('rain-dir-rechts');
     expect(p.onAngle).toHaveBeenCalledTimes(1);
-    expect(p.onAngle).toHaveBeenCalledWith(kind, { geometryDirection: 'rechts', geometrySharpness: 'sharp', geometrySource: 'manual' });
+    expect(p.onAngle).toHaveBeenCalledWith(kind, { geometryDirection: 'rechts', geometrySharpness: 'normal', geometrySource: 'manual' });
   });
 
   it('Abriss bietet nur links/rechts (unresolved), keine Automatik', () => {

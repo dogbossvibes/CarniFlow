@@ -3,10 +3,13 @@ import type { AngleKind } from '@/features/tracking/store/trackingStore';
 
 // Schätzt aus den letzten Spur-Punkten den Winkel-Typ:
 //  - Drehrichtung (Bearing-Differenz, +=rechts / −=links)
-//  - Schärfe (Betrag der Richtungsänderung: deutlich >90° → Spitzwinkel)
+//  - Schärfe (Betrag der Richtungsänderung: ab 120° → Spitzwinkel)
 // Gibt null zurück, wenn zu wenige Punkte oder (noch) kein klarer Knick —
 // dann zeigt die UI keinen Vorschlag und der Nutzer wählt manuell.
 // „Absatz" wird nie automatisch vorgeschlagen.
+/** Kursschwenk, ab dem ein Spitzwinkel vorgeschlagen wird (= Innenwinkel ≤ 60°). */
+export const SPITZ_MIN_TURN_DEG = 120;
+
 export function suggestAngleKind(points: Pick<LatLng, 'lat' | 'lng'>[]): AngleKind | null {
   if (points.length < 3) return null;
   const c = points[points.length - 1];
@@ -22,7 +25,10 @@ export function suggestAngleKind(points: Pick<LatLng, 'lat' | 'lng'>[]): AngleKi
   const mag = Math.abs(diff);
   if (mag < 25) return null;            // kein nennenswerter Knick
   const dir: AngleKind = diff > 0 ? 'rechts' : 'links'; // im Uhrzeigersinn = rechts
-  if (mag > 100) return dir === 'rechts' ? 'spitz_rechts' : 'spitz_links'; // spitzer als ~90°
+  // T-219: dieselbe Grenze wie die GPS-Erkennung (autoCornerDetection): spitz erst ab
+  // Innenwinkel ≤ 60° (Kursschwenk ≥ 120°). Vorher reichte ein Schwenk über 100°, dann
+  // konnte ein verrauschter 90°-Winkel als Spitzwinkel vorgeschlagen werden.
+  if (mag >= SPITZ_MIN_TURN_DEG) return dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
   return dir;                           // rechtwinkliger Winkel nach links/rechts
 }
 

@@ -26,7 +26,7 @@ import { fr as frFR } from '@/i18n/locales/fr';
 import { it as itIT } from '@/i18n/locales/it';
 
 // Die Sprechtexte werden direkt gegen die Wörterbücher geprüft — das ist die
-// Quelle, aus der phraseFor()/objectPhrase() in useTrackVoiceGuidance ihre
+// Quelle, aus der anglePhrase()/objectPhrase() in useTrackVoiceGuidance ihre
 // Texte holen. Damit wird nicht die Lookup-Logik nachgebaut, sondern der
 // tatsächlich ausgelieferte Inhalt geprüft.
 const DICTS: Record<string, Record<string, string>> = {
@@ -115,7 +115,7 @@ describe('Fachliche Richtung ist kamera-unabhängig', () => {
 });
 
 // Sprechtext-VORLAGE eines Winkel-Events aus dem Wörterbuch — exakt die
-// Schlüssel, die phraseFor() in useTrackVoiceGuidance verwendet.
+// Schlüssel, die anglePhrase() in useTrackVoiceGuidance verwendet.
 function voicePhrase(kind: AngleKind, _steps: number, locale: string): string {
   return DICTS[locale][trackEventGuidanceKey(angleEvent(kind))];
 }

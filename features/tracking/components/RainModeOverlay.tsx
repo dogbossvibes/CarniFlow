@@ -179,7 +179,7 @@ function RainModeContent({
     );
   } else if (page === 'angleDir' && angleKind) {
     const kind = angleKind;
-    const pick = (direction: 'links' | 'rechts', sharpness: 'normal' | 'sharp' | 'unresolved', label: string) =>
+    const pick = (direction: 'links' | 'rechts', sharpness: 'normal' | 'unresolved', label: string) =>
       done(onAngle(kind, { geometryDirection: direction, geometrySharpness: sharpness, geometrySource: 'manual' }), `${angleName(kind)} ${label}`);
     body = (
       <>
@@ -189,12 +189,7 @@ function RainModeContent({
             <RainHoldButton testID="rain-dir-links" icon="return-up-back-outline" label={t('track.detailLeft')} onHold={() => pick('links', kind === 'abriss' ? 'unresolved' : 'normal', t('track.detailLeft'))} />
             <RainHoldButton testID="rain-dir-rechts" icon="return-up-forward-outline" label={t('track.detailRight')} onHold={() => pick('rechts', kind === 'abriss' ? 'unresolved' : 'normal', t('track.detailRight'))} />
           </View>
-          {kind !== 'abriss' && (
-            <View style={s.row}>
-              <RainHoldButton testID="rain-dir-spitz-links" label={t('track.detailSharpLeft')} onHold={() => pick('links', 'sharp', t('track.detailSharpLeft'))} />
-              <RainHoldButton testID="rain-dir-spitz-rechts" label={t('track.detailSharpRight')} onHold={() => pick('rechts', 'sharp', t('track.detailSharpRight'))} />
-            </View>
-          )}
+          {/* T-219: OW/GW/BW sind immer rund 90° → keine Spitz-Auswahl. */}
           {kind !== 'abriss' && (
             <View style={s.row}>
               <RainHoldButton testID="rain-dir-auto" label={tr('fromTrack')} onHold={() => done(onAngle(kind), angleName(kind))} />
