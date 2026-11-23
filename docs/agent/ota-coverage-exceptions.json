@@ -799,5 +799,11 @@
     "reason": "Nutzerentscheid 23.11.2026: «Trainingskarten ohne rote Ecken» (alte Runtime 1.0.6-map49-v1). Die Regel (swipeActionOpacity, SwipeActionReveal) wurde mit PR 243 aus components/training/SwipeableTrainingItem.tsx nach components/ui/SwipeActionReveal.tsx verschoben und gilt nun auch für Journal-Karten; SwipeableTrainingItem nutzt sie weiter, die Tests dazu laufen durch. Der Zeilenabgleich schlägt wegen der Verschiebung an. Im Code geprüft, nicht auf Gerät.",
     "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-23)",
     "date": "2026-11-23"
+  },
+  {
+    "group": "f971a961-3f9f-4c12-9436-3b6426e29ddf",
+    "reason": "Nutzerentscheid 23.11.2026: «Explicit step calibration …» (alte Runtime 1.0.3). Die dort eingeführte Rückfrage vor «Auf Standard zurücksetzen» in app/track/kalibrierung.tsx wurde mit der Rückgängig-Charge (PR 237) absichtlich durch «Erledigt · Rückgängig» ersetzt (gespeichert erst nach Ablauf der Frist, nie während Aufnahme/Absuche). Kalibrierung und gespeicherte Schrittlänge bleiben erhalten; der Zeilenabgleich schlägt nur wegen der entfernten Rückfrage an. Im Code geprüft, nicht auf Gerät.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-23)",
+    "date": "2026-11-23"
   }
 ]
