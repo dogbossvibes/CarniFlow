@@ -13,17 +13,20 @@ registerGroupResources('specialAngles', {
 // T-219: OW/GW/BW sind immer rund 90° nach links oder rechts → keine Spitz-Auswahl.
 // Ältere Marker mit gespeicherter Schärfe «sharp» bleiben unverändert lesbar.
 type Kind='gw'|'ow'|'bw'|'abriss'|'absatz';
+// Eigene Komponente statt Render-Helfer: Handler mit Doppel-Tipp-Schutz laufen nur beim Tippen.
+function ChoiceButton({label,onPress}:{label:string;onPress:()=>void}) {
+ return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{minHeight:48,minWidth:90,padding:12,borderRadius:12,backgroundColor:C.trackCardAlt,justifyContent:'center'}}><Text style={{color:C.trackText,fontWeight:'700'}}>{label}</Text></Pressable>;
+}
 export function SpecialAnglePicker({onSelect}:{onSelect:(kind:Kind,geometry?:SpecialGeometry)=>void}) {
  const [kind,setKind]=useState<Kind|null>(null),{t}=useT(),{t:tr}=useTranslation('specialAngles');
  const submitted=useRef(false);
  const select=(value:Kind,geometry?:SpecialGeometry)=>{if(submitted.current)return;submitted.current=true;if(geometry)onSelect(value,geometry);else onSelect(value);};
- const button=(label:string,press:()=>void)=><Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={press} style={{minHeight:48,minWidth:90,padding:12,borderRadius:12,backgroundColor:C.trackCardAlt,justifyContent:'center'}}><Text style={{color:C.trackText,fontWeight:'700'}}>{label}</Text></Pressable>;
  return <ScrollView><View style={{gap:8}}>
-  {!kind?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{(['gw','ow','bw','abriss'] as const).map(k=>button(k==='abriss'?t('track.angleBreak'):k.toUpperCase(),()=>setKind(k)))}{button(t('track.angleStep'),()=>select('absatz'))}</View>:<>
+  {!kind?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{(['gw','ow','bw','abriss'] as const).map(k=><ChoiceButton key={k} label={k==='abriss'?t('track.angleBreak'):k.toUpperCase()} onPress={()=>setKind(k)} />)}<ChoiceButton label={t('track.angleStep')} onPress={()=>select('absatz')} /></View>:<>
    <Text accessibilityRole="header" style={{color:C.trackText,fontSize:16,fontWeight:'700'}}>{kind==='abriss'?t('track.angleBreak'):kind.toUpperCase()} · {tr('choose')}</Text>
-   <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{(['links','rechts'] as const).map(direction=>button(t(direction==='links'?'track.detailLeft':'track.detailRight'),()=>select(kind,{geometryDirection:direction,geometrySharpness:kind==='abriss'?'unresolved':'normal',geometrySource:'manual'})))}</View>
-   {kind!=='abriss'&&button(tr('auto'),()=>select(kind))}
-   {button(tr('back'),()=>setKind(null))}
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{(['links','rechts'] as const).map(direction=><ChoiceButton key={direction} label={t(direction==='links'?'track.detailLeft':'track.detailRight')} onPress={()=>select(kind,{geometryDirection:direction,geometrySharpness:kind==='abriss'?'unresolved':'normal',geometrySource:'manual'})} />)}</View>
+   {kind!=='abriss'&&<ChoiceButton label={tr('auto')} onPress={()=>select(kind)} />}
+   <ChoiceButton label={tr('back')} onPress={()=>setKind(null)} />
   </>}
  </View></ScrollView>;
 }
