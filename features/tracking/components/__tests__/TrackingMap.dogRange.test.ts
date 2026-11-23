@@ -23,33 +23,35 @@ describe('Hundebereich auf der Absuche-Karte (T-217)', () => {
     expect(run()).toContain('dogPosition={!arming && blindSearch && s.estimatedDogPosition ?');
   });
 
-  it('abgesuchter Teil und Stück bis zum nächsten Ereignis: über der Lay-Linie, unter Suchspur und Markern', () => {
+  it('abgesuchter Teil über der Lay-Linie, unter Suchspur und Markern; kein dünner Strich fürs nächste Stück', () => {
     const src = map();
     const done = src.indexOf('{!comparison && laidDone?.map(');
-    const next = src.indexOf('{!comparison && laidNext?.map(');
     expect(done).toBeGreaterThan(src.indexOf('{/* Gelegte Fährte (Soll-Linie)'));
-    expect(next).toBeGreaterThan(done);
-    expect(next).toBeLessThan(src.indexOf('{/* Gelaufene Ist-Suchspur'));
-    expect(next).toBeLessThan(src.indexOf('{/* Marker: Winkel'));
+    expect(done).toBeLessThan(src.indexOf('{/* Gelaufene Ist-Suchspur'));
+    expect(done).toBeLessThan(src.indexOf('{/* Marker: Winkel'));
+    // Gelegte Linie und Suchspur sollen gleich breit wirken: das «nächste Stück» wird nicht mehr gezeichnet.
+    expect(src).not.toContain('laidNext?.map(');
   });
 
-  it('abgesuchter Teil und Betonung fehlen in der Blindsuche und vor dem Start', () => {
-    expect(run()).toContain('laidDone={blindSearch || arming ? null : laidDone}');
-    expect(run()).toContain('laidNext={blindSearch || arming ? null : laidNext}');
+  it('abgesuchter Teil, Betonung und leuchtende Ecke fehlen in der Blindsuche und vor dem Start', () => {
+    expect(run()).toContain('const hideLaidOverlays = blindSearch || arming;');
+    expect(run()).toContain('laidDone={hideLaidOverlays ? null : laidDone}');
+    expect(run()).toContain('laidNext={hideLaidOverlays ? null : laidNext}');
+    expect(run()).toContain('cornerGlow={hideLaidOverlays ? null : cornerGlow}');
   });
 
   it('wird in der Blindsuche und vor dem Start nicht gezeichnet', () => {
-    expect(run()).toContain('dogRange={blindSearch || arming ? null : dogRange}');
+    expect(run()).toContain('dogRange={hideLaidOverlays ? null : dogRange}');
     expect(run()).toMatch(/s\.recording && s\.estimatedDogPosition\s*\? dogRangeLine\(laidDisplay\.points, laidDisplay\.cum, s\.progressM, s\.dogProgressM\)/);
     // Band, abgesuchtes und nächstes Stück folgen der Eckenführung der Anzeige; Bogenlängen bleiben die der gespeicherten Linie.
     expect(run()).toContain('cornerDisplayLine(snapData.laidPoints, cornerPointsFromMarkers(snapData.laidMarkers), laidArc.cum)');
     expect(run()).toContain('laidLineParts(laidDisplay.points, laidDisplay.cum, 0, s.progressM)');
   });
-  it('Android-Stapelung: blaue Suchspur liegt eine Stufe über dem abgesuchten und dem nächsten Stück', () => {
+  it('Android-Stapelung: Suchspur (Kontur und Weiss) liegt eine Stufe über dem abgesuchten und dem nächsten Stück', () => {
     const src = map();
     expect(src).toContain('export const RUN_TRACE_Z = 5;');
-    expect(src).toMatch(/key=\{`run-\$\{index\}`\}[^\n]*zIndex=\{RUN_TRACE_Z\}/);
+    const runBlock = src.slice(src.indexOf('key={`run-${index}`}'), src.indexOf('key={`run-${index}`}') + 600);
+    expect(runBlock.match(/zIndex=\{RUN_TRACE_Z\}/g)).toHaveLength(2);
     expect(src).toMatch(/key=\{`laid-done-\$\{index\}`\}[\s\S]{0,200}zIndex=\{4\}/);
-    expect(src).toMatch(/key=\{`laid-next-\$\{index\}`\}[\s\S]{0,200}zIndex=\{4\}/);
   });
 });
