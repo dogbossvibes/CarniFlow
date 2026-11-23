@@ -18,6 +18,27 @@ describe('Absuche-Ansage mit Richtung für Fachwinkel und Abriss (T-219)', () =>
     expect(anglePhrase('abriss', 3, 'de', 'rechts')).toBe('Abriss rechts in ca. 3 Schritten.');
   });
 
+  // T-220: Ein spitzer Fachwinkel darf nie ohne «spitz» und Richtung angesagt werden.
+  it('als spitz gespeicherter OW/GW/BW sagt «spitz» und die Richtung an', () => {
+    expect(anglePhrase('bw', 5, 'de', 'links', true)).toBe('Bodenwinkel spitz links in ca. 5 Schritten.');
+    expect(anglePhrase('gw', 5, 'de', 'rechts', true)).toBe('Geschlossener Winkel spitz rechts in ca. 5 Schritten.');
+    expect(anglePhrase('ow', 2, 'de', 'links', true)).toBe('Offener Winkel spitz links in ca. 2 Schritten.');
+  });
+
+  it('Abriss kennt kein «spitz»', () => {
+    expect(anglePhrase('abriss', 3, 'de', 'links', true)).toBe('Abriss links in ca. 3 Schritten.');
+  });
+
+  it.each(['de', 'gsw', 'en', 'fr', 'it'] as AppLocale[])('%s: spitz unterscheidet sich von normal, ohne offenen Platzhalter', locale => {
+    for (const kind of ['gw', 'ow', 'bw'] as const) {
+      for (const dir of ['links', 'rechts'] as const) {
+        const sharp = anglePhrase(kind, 4, locale, dir, true);
+        expect(sharp).not.toBe(anglePhrase(kind, 4, locale, dir));
+        expect(sharp).not.toMatch(/[{}]|track\.|\s{2}/);
+      }
+    }
+  });
+
   it('ohne gewählte Richtung bleibt die bisherige Ansage', () => {
     expect(anglePhrase('bw', 5, 'de')).toBe('Bodenwinkel in ca. 5 Schritten.');
     expect(anglePhrase('abriss', 5, 'de', null)).toBe('Abriss in ca. 5 Schritten.');
