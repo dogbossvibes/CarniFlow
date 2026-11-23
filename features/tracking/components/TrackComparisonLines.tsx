@@ -13,73 +13,36 @@ const NO_CORNERS: readonly CornerPoint[] = [];
 const OUTLINE = '#F5F7FA';
 const SEPARATOR = '#101820';
 
-// Gelaufene Absuche in der Vergleichsansicht: dunkler Körper so breit wie die gelegte Linie, darauf eine
-// helle Linie, die sich von Start bis Ende aufbaut, kurz stehen bleibt und neu beginnt («Aufbau»).
-// Hell auf dunkel hebt sich von jeder Fährtenfarbe eines Hundes ab (auch von Blau). Reine Anzeige.
+// Gelaufene Absuche in der Vergleichsansicht: dunkler Körper so breit wie die gelegte Linie, darauf
+// helle Striche, die in Laufrichtung wandern («Laufband»). Die Spur bleibt dabei immer in voller Länge
+// sichtbar. Hell auf dunkel hebt sich von jeder Fährtenfarbe eines Hundes ab (auch von Blau). Reine Anzeige.
 export const SEARCH_RUN_COLOR = '#FFFFFF';
 export const SEARCH_RUN_WIDTH = 6;          // = Breite der gelegten Linie (normaler Abschnitt)
-export const SEARCH_RUN_BUILD = { width: 3.5, drawSteps: 28, holdSteps: 12, tickMs: 110 } as const;
-const BUILD_CYCLE = SEARCH_RUN_BUILD.drawSteps + SEARCH_RUN_BUILD.holdSteps;
+export const SEARCH_RUN_FLOW = { width: 3.5, dash: [10, 14] as number[], stepPt: 3, tickMs: 110 } as const;
+const FLOW_CYCLE = SEARCH_RUN_FLOW.dash[0] + SEARCH_RUN_FLOW.dash[1];
 
-type Coordinate = { latitude: number; longitude: number };
-type Coordinates = Coordinate[];
-
-const M_PER_DEG = 111320;
-const stepM = (a: Coordinate, b: Coordinate) => Math.hypot(
-  (b.latitude - a.latitude) * M_PER_DEG,
-  (b.longitude - a.longitude) * M_PER_DEG * Math.cos((a.latitude * Math.PI) / 180),
-);
+type Coordinates = { latitude: number; longitude: number }[];
 
 /**
- * Anfangsstück der Suchspur bis zum Anteil `fraction` (0..1) der Gesamtlänge, über alle Teilstücke
- * hinweg; Lücken zwischen Teilstücken bleiben Lücken. Gibt bei `fraction >= 1` die Eingabe zurück.
+ * Die wandernden Striche. Eigene Komponente, damit pro Schritt nur diese schmale Linie neu gezeichnet
+ * wird (MapKit setzt eine Linie bei jeder Stiländerung neu ein). `lineDashPhase` gibt es nur auf iOS
+ * (Apple Maps); auf Android, bei «Bewegung reduzieren» und solange die Karte nicht sichtbar ist
+ * (`paused`), stehen die Striche still und es läuft kein Timer.
  */
-export function searchRunBuildParts(parts: Coordinates[], fraction: number): Coordinates[] {
-  if (!(fraction < 1)) return parts;
-  if (!(fraction > 0)) return [];
-  const total = parts.reduce((sum, part) => sum + part.slice(1).reduce((n, p, i) => n + stepM(part[i], p), 0), 0);
-  let left = total * fraction;
-  const out: Coordinates[] = [];
-  for (const part of parts) {
-    if (left <= 1e-6) break;
-    const built: Coordinates = [part[0]];
-    for (let i = 1; i < part.length; i++) {
-      if (left <= 1e-6) break;   // Rundungsrest: kein Zusatzpunkt
-      const d = stepM(part[i - 1], part[i]);
-      if (d <= left) { built.push(part[i]); left -= d; continue; }
-      const t = d > 0 ? left / d : 0;
-      built.push({
-        latitude: part[i - 1].latitude + (part[i].latitude - part[i - 1].latitude) * t,
-        longitude: part[i - 1].longitude + (part[i].longitude - part[i - 1].longitude) * t,
-      });
-      left = 0;
-      break;
-    }
-    if (built.length > 1) out.push(built);
-  }
-  return out;
-}
-
-/**
- * Die sich aufbauende helle Linie. Eigene Komponente, damit pro Schritt nur diese schmale Linie neu
- * gezeichnet wird (MapKit setzt eine Linie bei jeder Änderung neu ein). Bei «Bewegung reduzieren»
- * steht die Linie in voller Länge still. Nur iOS: auf Android ist das Verhalten nicht geprüft.
- */
-const SearchRunBuild = memo(function SearchRunBuild({ Polyline, parts, paused }: { Polyline: ComponentType<MapPolylineProps>; parts: Coordinates[]; paused: boolean }) {
+const SearchRunFlow = memo(function SearchRunFlow({ Polyline, parts, paused }: { Polyline: ComponentType<MapPolylineProps>; parts: Coordinates[]; paused: boolean }) {
   const reduceMotion = useReduceMotion();
-  // `paused`: die Karte ist nicht sichtbar (anderer Bildschirm darüber, Vollbild offen) – kein Timer.
   const animate = Platform.OS === 'ios' && !reduceMotion && !paused && parts.length > 0;
-  const [step, setStep] = useState(0);
+  const [phase, setPhase] = useState(0);
   useEffect(() => {
     if (!animate) return undefined;
-    const timer = setInterval(() => setStep(current => (current + 1) % BUILD_CYCLE), SEARCH_RUN_BUILD.tickMs);
+    // Kleinere Phase = Striche rücken in Zeichenrichtung (Start → Ende) vor.
+    const timer = setInterval(() => setPhase(current => (current - SEARCH_RUN_FLOW.stepPt + FLOW_CYCLE) % FLOW_CYCLE), SEARCH_RUN_FLOW.tickMs);
     return () => clearInterval(timer);
   }, [animate]);
-  const fraction = animate ? Math.min(1, step / SEARCH_RUN_BUILD.drawSteps) : 1;
-  const built = useMemo(() => searchRunBuildParts(parts, fraction), [parts, fraction]);
   return <>
-    {built.map((part, i) => <Polyline key={`run-build-${i}`} testID="track-comparison-run-build" coordinates={part}
-      strokeColor={SEARCH_RUN_COLOR} strokeWidth={SEARCH_RUN_BUILD.width} zIndex={13} lineCap="round" lineJoin="round" />)}
+    {parts.map((part, i) => <Polyline key={`run-flow-${i}`} testID="track-comparison-run-flow" coordinates={part}
+      strokeColor={SEARCH_RUN_COLOR} strokeWidth={SEARCH_RUN_FLOW.width} lineDashPattern={SEARCH_RUN_FLOW.dash}
+      lineDashPhase={phase} zIndex={13} lineCap="butt" lineJoin="round" />)}
   </>;
 });
 
@@ -88,7 +51,7 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
   Polyline: ComponentType<MapPolylineProps>; layPoints: LatLng[]; runPoints: LatLng[]; segments: TrackSegment[]; layColor: string;
   /** Erkannte Winkelpunkte: die gelegte Linie läuft in der Anzeige durch sie (reine Darstellung). */
   cornerPoints?: readonly CornerPoint[];
-  /** Aufbau der Suchspur anhalten, solange die Karte nicht sichtbar ist (spart Akku). */
+  /** Laufband der Suchspur anhalten, solange die Karte nicht sichtbar ist (spart Akku). */
   paused?: boolean;
 }) {
   const snapshot = useMemo(() => {
@@ -110,6 +73,6 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
       strokeColor={part.color} strokeWidth={part.width} zIndex={11} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-${i}`} testID="track-comparison-run" coordinates={part}
       strokeColor={SEPARATOR} strokeWidth={SEARCH_RUN_WIDTH} zIndex={12} lineCap="round" lineJoin="round" />)}
-    <SearchRunBuild Polyline={Polyline} parts={snapshot.run} paused={paused} />
+    <SearchRunFlow Polyline={Polyline} parts={snapshot.run} paused={paused} />
   </Fragment>;
 });
