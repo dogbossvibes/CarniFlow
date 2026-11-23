@@ -22,6 +22,7 @@ import { uploadAudio } from '@/services/mediaService';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
+import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import type { AudioNote } from '@/types';
 
@@ -39,9 +40,11 @@ interface Props {
   undoScope?: string | null;
   /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
   undoLocked?: boolean;
+  /** Meldet true, solange aufgenommen oder hochgeladen wird (z. B. um den Hundewechsel zu sperren). */
+  onBusyChange?: (busy: boolean) => void;
 }
 
-export function AudioRecorder({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
+export function AudioRecorder({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked, onBusyChange }: Props) {
   const { t } = useT();
   const [isRecording, setIsRecording] = useState(false);
   const [uploading,   setUploading]   = useState(false);
@@ -51,6 +54,9 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
   // Rückgängig nur, solange keine Aufnahme läuft, gestoppt oder hochgeladen wird:
   // sonst würde eine als zurückgeholt gemeldete Notiz still wieder entfernt.
   const busy = isRecording || finishing || uploading;
+  // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Stopp-Tipp.
+  const latest = useLatestRef({ value, onChange });
+  useBusyReport(busy, onBusyChange);
   const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || busy });
   const [seconds,     setSeconds]     = useState(0);
   const [playingIdx,  setPlayingIdx]  = useState<number | null>(null);
@@ -132,7 +138,7 @@ export function AudioRecorder({ value, onChange, readOnly = false, removal: remo
       const now  = new Date();
       const zeit = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-      onChange([...value, { url, duration: dur, createdAt: `Heute ${zeit}` }]);
+      latest.current.onChange([...latest.current.value, { url, duration: dur, createdAt: `Heute ${zeit}` }]);
     } catch (e: any) {
       console.error('[Recording Stop]', e);
       Alert.alert(t('share.notReadyTitle'), t('audio.recordingSaveFailed'));

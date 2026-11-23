@@ -469,6 +469,11 @@ function DocumentForm() {
 
   // Each dog keeps its own unit/request identities and complete local form.
   // Inactive drafts stay inside the existing account-scoped durable draft.
+  const mediaBusy = useRef(new Set<string>());
+  const setMediaBusy = useCallback((kind: string, busy: boolean) => { if (busy) mediaBusy.current.add(kind); else mediaBusy.current.delete(kind); }, []);
+  const onPhotoBusy = useCallback((busy: boolean) => setMediaBusy('photo', busy), [setMediaBusy]);
+  const onVideoBusy = useCallback((busy: boolean) => setMediaBusy('video', busy), [setMediaBusy]);
+  const onAudioBusy = useCallback((busy: boolean) => setMediaBusy('audio', busy), [setMediaBusy]);
   const emptyDogDraft = (targetDog: string): Omit<DocumentDraft, 'otherDogs'> => ({
     unitId: Crypto.randomUUID(), operationId: Crypto.randomUUID(), focusId: Crypto.randomUUID(),
     dogId: targetDog, activeDisc, selected: [], description: '', score: 0, date: new Date().toISOString(),
@@ -476,6 +481,9 @@ function DocumentForm() {
     shared: profile?.share_trainings_default ?? false, atomic: true, workflowStep: 0,
   });
   const changeDog = (targetDog: string) => {
+    // Läuft noch eine Aufnahme oder ein Upload, gehört das Ergebnis zum aktuellen Hund:
+    // erst danach wechseln, sonst landet das Medium beim anderen Hund.
+    if (mediaBusy.current.size) return;
     if (dogSwitchLock.current || dogId === targetDog || editing || saving || pendingSave || remoteCompleted) return;
     dogSwitchLock.current = true;
     const snapshot = draftSnapshot();
@@ -865,11 +873,11 @@ function DocumentForm() {
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.mediaLabel')}</Text>
           <View style={s.mediaCard}>
             <Text style={s.mediaSubLabel}>{t('training.photosLabel')}</Text>
-            <PhotoPicker value={photos} onChange={setPhotos} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} />
+            <PhotoPicker value={photos} onChange={setPhotos} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onPhotoBusy} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.videosLabel')}</Text>
-            <MultiVideoUpload value={videos} onChange={setVideos} />
+            <MultiVideoUpload value={videos} onChange={setVideos} onBusyChange={onVideoBusy} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.voiceRecordingsLabel')}</Text>
-            <AudioRecorder value={audio} onChange={setAudio} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} />
+            <AudioRecorder value={audio} onChange={setAudio} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} onBusyChange={onAudioBusy} />
           </View>
 
           </>}
