@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { UNDO_TOAST_DURATION_MS, getUndoToastSnapshot, undoToast } from '@/lib/undoToast';
 import StepCalibrationScreen from '../kalibrierung';
 
 const mockBack = jest.fn(), mockToast = jest.fn(), mockSave = jest.fn(), mockReload = jest.fn();
@@ -45,13 +45,46 @@ it('does not permit calibration while personal data is loading or a track is act
   expect(button('track.startCalibration').props.disabled).toBe(true);
   expect(mockSave).not.toHaveBeenCalled();
 });
-it('resets only after the explicit destructive alert confirmation', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  await render(); act(() => button('track.resetToDefault').props.onPress());
-  expect(mockSave).not.toHaveBeenCalled();
-  const actions = alert.mock.calls[0][2]!;
-  await act(async () => { actions[1].onPress?.(); });
-  expect(mockSave).toHaveBeenCalledWith(null); expect(mockBack).not.toHaveBeenCalled();
+describe('reset with undo instead of a confirmation alert', () => {
+  const shown = () => tree.root.findAll(n => typeof n.props.children === 'string').map(n => n.props.children);
+  const reset = () => act(() => button('track.resetToDefault').props.onPress());
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => { const open = getUndoToastSnapshot(); if (open) undoToast(open.id); jest.useRealTimers(); });
+
+  it('shows the default at once but saves nothing during the undo period', async () => {
+    await render(); reset();
+    expect(shown()).toContain('profile.stepLengthDefault');
+    expect(getUndoToastSnapshot()).toMatchObject({ message: 'undo.stepLengthReset' });
+    // App closed now: no write happened, the personal value is still stored.
+    act(() => { jest.advanceTimersByTime(UNDO_TOAST_DURATION_MS - 1); });
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+  it('undo keeps the personal value and never saves', async () => {
+    await render(); reset();
+    act(() => { undoToast(getUndoToastSnapshot()!.id); });
+    act(() => { jest.runAllTimers(); });
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(shown()).toContain('profile.stepLengthPersonal');
+    expect(button('track.resetToDefault')).toBeTruthy();
+  });
+  it('saves the reset once the undo period is over', async () => {
+    await render(); reset();
+    await act(async () => { jest.advanceTimersByTime(UNDO_TOAST_DURATION_MS); });
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(mockSave).toHaveBeenCalledWith(null); expect(mockBack).not.toHaveBeenCalled();
+  });
+  it('saves the reset when the screen is left during the undo period', async () => {
+    await render(); reset();
+    await act(async () => { tree.unmount(); });
+    expect(mockSave).toHaveBeenCalledWith(null);
+    await render();
+  });
+  it('never saves the reset while a track is being recorded', async () => {
+    await render(); reset();
+    mockBlocked = true;
+    await act(async () => { jest.advanceTimersByTime(UNDO_TOAST_DURATION_MS); });
+    expect(mockSave).not.toHaveBeenCalled();
+  });
 });
 it('shows save failure and keeps the result available for retry', async () => {
   mockMeasurement = { ...mockMeasurement, phase: 'result', distanceM: 37.5, stepLengthM: .75 };

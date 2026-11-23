@@ -4,6 +4,7 @@ import { ActiveDogSwitcher } from "@/components/dogs/ActiveDogSwitcher";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { UnitListCard } from "@/components/training/UnitListCard";
+import { AnyvoActionMenu, actionMenuA11y, type AnyvoMenuAction } from "@/components/ui/AnyvoActionMenu";
 import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
 import { ActiveTrialGate } from "@/components/subscription/ActiveTrialGate";
 import { C } from "@/constants/colors";
@@ -29,9 +30,10 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -100,6 +102,35 @@ export default function HomeScreen() {
     else                              router.push(`/training/${item.id}` as never);
   };
 
+  // Schnellmenü (langer Druck) für «Letzte Einheiten»: nur Abkürzungen zu
+  // bestehenden Wegen. Bearbeiten nutzt dieselben Routen wie das Logbuch
+  // (Fährten haben kein Bearbeiten); Löschen zeigt dieselbe Rückfrage wie
+  // das Wischen und ruft danach denselben Löschweg.
+  const [menuItem, setMenuItem] = useState<FeedItem | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const feedItemActions = (item: FeedItem): AnyvoMenuAction[] => [
+    { key: "open", label: t("common.open"), icon: "open-outline", onPress: () => openFeedItem(item) },
+    ...(item.source === "track" ? [] : [{
+      key: "edit", label: t("common.edit"), icon: "create-outline" as const,
+      onPress: () => {
+        if (item.source === "unit") router.push({ pathname: "/unit/document", params: { id: item.id } } as never);
+        else router.push({ pathname: "/training/[id]", params: { id: item.id, edit: "true" } } as never);
+      },
+    }]),
+    {
+      key: "delete", label: t("common.delete"), icon: "trash-outline", destructive: true,
+      onPress: () => Alert.alert(t("training.deleteTitle"), t("training.deleteConfirm"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => { void deleteItem(item); } },
+      ]),
+    },
+  ];
+  const feedItemTitle = (item: FeedItem) => {
+    const [y, mo, day] = item.session_date.split("-");
+    const date = y && mo && day ? `${day}.${mo}.${y}` : item.session_date;
+    return [date, item.dog?.name].filter(Boolean).join(" · ");
+  };
+
   const heuteIdx = heutigenWochentag();
   const letzteHunde = dogs.slice(0, 3);
   // Vereinheitlichte Zeitleiste (alt + neu) als Aktivitätsbasis.
@@ -143,7 +174,9 @@ export default function HomeScreen() {
                 trainingId={item.id}
                 onDelete={() => deleteItem(item)}
               >
-                <UnitListCard unit={item} onPress={() => openFeedItem(item)} />
+                <UnitListCard unit={item} onPress={() => openFeedItem(item)}
+                  onLongPress={() => { setMenuItem(item); setMenuOpen(true); }}
+                  {...actionMenuA11y(feedItemActions(item))} />
               </SwipeableTrainingItem>
             ))}
           </View>
@@ -360,6 +393,9 @@ export default function HomeScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
+      <AnyvoActionMenu visible={menuOpen} onClose={() => setMenuOpen(false)}
+        title={menuItem ? feedItemTitle(menuItem) : undefined}
+        actions={menuItem ? feedItemActions(menuItem) : []} />
       {toast}
       {/* Proaktives ACTIVE-Trial-Angebot (nur eligible NEWBIE nach 1. Training, mit Cooldown). */}
       <ActiveTrialGate />

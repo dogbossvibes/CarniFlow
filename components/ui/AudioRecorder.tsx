@@ -21,16 +21,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { uploadAudio } from '@/services/mediaService';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import type { AudioNote } from '@/types';
 
 interface Props {
   value:    AudioNote[];
   onChange: (notes: AudioNote[]) => void;
+  /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
+  readOnly?: boolean;
 }
 
-export function AudioRecorder({ value, onChange }: Props) {
+export function AudioRecorder({ value, onChange, readOnly = false }: Props) {
   const { t } = useT();
+  const removal = useUndoableListRemoval(value, onChange);
   const [isRecording, setIsRecording] = useState(false);
   const [uploading,   setUploading]   = useState(false);
   const [seconds,     setSeconds]     = useState(0);
@@ -61,6 +65,7 @@ export function AudioRecorder({ value, onChange }: Props) {
   // ── RECORDING (expo-audio) ────────────────────────────────────────────────
 
   const startRec = async () => {
+    removal.settle();
     try {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) {
@@ -165,16 +170,8 @@ export function AudioRecorder({ value, onChange }: Props) {
     }
   };
 
-  const del = (idx: number) => {
-    Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
-      { text: t('common.back'), style: 'cancel' },
-      {
-        text: t('media.remove'),
-        style: 'destructive',
-        onPress: () => onChange(value.filter((_, i) => i !== idx)),
-      },
-    ]);
-  };
+  // Nimmt die Sprachnotiz nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
+  const del = (idx: number) => { if (!readOnly) removal.remove(idx, t('undo.audioRemoved')); };
 
   return (
     <View>

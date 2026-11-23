@@ -16,10 +16,13 @@ import { uploadFileToStorage } from '@/services/storageUpload';
 import { C } from '@/constants/colors';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useT } from '@/i18n';
+import { useUndoableValueRemoval } from '@/hooks/useUndoableRemoval';
 
 interface Props {
   value?:   string | null;
   onChange: (url: string | null) => void;
+  /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
+  readOnly?: boolean;
 }
 
 function VideoPlayer({ uri, onReplace, onDelete }: {
@@ -60,11 +63,13 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
   );
 }
 
-export function VideoUpload({ value, onChange }: Props) {
+export function VideoUpload({ value, onChange, readOnly = false }: Props) {
   const { t } = useT();
+  const removal = useUndoableValueRemoval(value, onChange);
   const [uploading, setUploading] = useState(false);
 
   const pick = async () => {
+    removal.settle();
     // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
     if (Platform.OS !== 'android') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -110,12 +115,8 @@ export function VideoUpload({ value, onChange }: Props) {
     }
   };
 
-  const del = () => {
-    Alert.alert(t('media.deleteVideoTitle'), t('media.deleteVideoBody'), [
-      { text: t('common.back'), style: 'cancel' },
-      { text: t('media.remove'), style: 'destructive', onPress: () => onChange(null) },
-    ]);
-  };
+  // Nimmt das Video nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
+  const del = () => { if (!readOnly) removal.remove(t('undo.videoRemoved')); };
 
   if (value) {
     return <VideoPlayer uri={value} onReplace={pick} onDelete={del} />;

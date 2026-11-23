@@ -519,6 +519,24 @@ export function resetHomeScreenConfig() {
   setHomeScreenConfig({ ...DEFAULT_HOME_CONFIG });
 }
 
+// Zurücksetzen mit Rückgängig-Frist: die Anzeige wechselt sofort auf Standard,
+// gespeichert wird erst bei `commit`. Wird die App vorher beendet, bleibt der
+// bisherige gespeicherte Stand erhalten. Beide Aktionen wirken nur, solange
+// derselbe Nutzer geladen ist.
+export function resetHomeScreenConfigDeferred(): { commit: () => void; undo: () => void } {
+  const owner = currentUserId;
+  const previous = state;
+  const sameOwner = () => currentUserId === owner && hydratedFor === owner;
+  state = sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG });
+  const resetState = state;
+  emit();
+  return {
+    // Wurde inzwischen etwas geändert, hat setHomeScreenConfig bereits gespeichert.
+    commit: () => { if (sameOwner() && state === resetState) setHomeScreenConfig(resetState); },
+    undo: () => { if (sameOwner()) setHomeScreenConfig(previous); },
+  };
+}
+
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
 const getSnapshot = () => state;
 

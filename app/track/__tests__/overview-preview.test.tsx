@@ -73,7 +73,10 @@ it('ignores a delayed previous-dog preview after a dog switch', async () => {
 
 async function deleteFirst() {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  // Langer Druck öffnet das Schnellmenü; erst «Löschen» darin zeigt die Rückfrage.
   act(() => view.root.findAllByType(TrackRow)[0].props.onLongPress());
+  expect(alert).not.toHaveBeenCalled();
+  act(() => view.root.findAllByProps({ testID: 'action-menu-delete' })[0].props.onPress());
   const buttons = alert.mock.calls.at(-1)![2]!;
   alert.mockRestore();
   await act(async () => { await buttons.find(b => b.style === 'destructive')!.onPress!(); });
@@ -96,7 +99,10 @@ it('does not report success or restore old rows when deletion fails after switch
   mockDeleteLocal.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject; }));
   await mount();
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  // Langer Druck öffnet das Schnellmenü; erst «Löschen» darin zeigt die Rückfrage.
   act(() => view.root.findAllByType(TrackRow)[0].props.onLongPress());
+  expect(alert).not.toHaveBeenCalled();
+  act(() => view.root.findAllByProps({ testID: 'action-menu-delete' })[0].props.onPress());
   const action = alert.mock.calls.at(-1)![2]!.find(b => b.style === 'destructive')!.onPress!;
   alert.mockRestore();
   let pending: unknown;
