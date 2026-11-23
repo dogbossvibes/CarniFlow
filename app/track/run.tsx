@@ -764,7 +764,8 @@ export default function TrackRunScreen() {
   const guidanceAngles = useMemo<GuidanceAngle[]>(
     () => snapData.laidMarkers
       .filter(m => m.type === 'winkel')
-      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind, lat: m.lat, lng: m.lng }]; }),
+      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind, lat: m.lat, lng: m.lng,
+        direction: m.geometryDirection === 'links' || m.geometryDirection === 'rechts' ? m.geometryDirection : null }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
   // Nur reguläre Gegenstände führen die Absuche; optionale Joker bleiben Kartenmarker.

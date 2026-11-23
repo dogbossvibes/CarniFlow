@@ -25,6 +25,19 @@ describe('suggestAngleKind', () => {
     expect(suggestAngleKind([a, b, c])).toBe('spitz_rechts');
   });
 
+  // T-219: verrauschter 90°-Winkel (Schwenk ~110°, Innenwinkel ~70°) bleibt ein normaler Winkel.
+  it('Schwenk von ~110° bleibt ein normaler Winkel, kein Spitzwinkel', () => {
+    const turn = 110 * Math.PI / 180;               // Kurs Nord → 110° nach rechts
+    const c = { lat: 0.001 + 0.001 * Math.cos(turn), lng: 0.001 * Math.sin(turn) };
+    expect(suggestAngleKind([a, b, c])).toBe('rechts');
+  });
+
+  it('Schwenk ab 120° (Innenwinkel ≤ 60°) wird Spitzwinkel', () => {
+    const turn = 125 * Math.PI / 180;
+    const c = { lat: 0.001 + 0.001 * Math.cos(turn), lng: -0.001 * Math.sin(turn) };
+    expect(suggestAngleKind([a, b, c])).toBe('spitz_links');
+  });
+
   it('kein nennenswerter Knick → null', () => {
     const c = { lat: 0.002, lng: 0 };              // geradeaus weiter
     expect(suggestAngleKind([a, b, c])).toBeNull();
