@@ -1,5 +1,20 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #255 und #258 (iOS 60) – 2026-11-23
+
+**Erledigt:** OTA #255 (Regenmodus, iOS 60 und Android). OTA #258 (nur iOS 60: Rückgängig statt
+Rückfrage, Fährten-Darstellung aus PR #256), von der Nutzerin auf dem Gerät abgenommen.
+Production: iOS `6280f74e`, Android `12a9baf7`. Staging: Medien-Buckets `media-images`,
+`media-audio`, `media-videos` angelegt (vorher fehlend, Uploads scheiterten mit 400).
+
+**Offen:**
+- **NEWBIE-Fährte bei abgebrochenem Start verloren** (Kundenmeldung): Fix mit additiver RPC
+  `release_newbie_quota` in Arbeit (eigener PR); Migration nur auf Staging, Production und OTA nur mit
+  Freigabe. Production-Grenze `newbie_quota_limit('track') = 1` lesend bestätigt.
+- **Android:** #258 nicht ausgeliefert; Gerätenachkontrolle für #251, #255, #216 offen (kein Gerät).
+- **Hängende Test-Absuche im Simulator** (Staging-Testkonto) lässt sich nicht verwerfen, Schutz
+  greift wie vorgesehen; kein Kundenbezug.
+
 ## Stand nach OTA #249 (iOS 60) und #251 (Android) – 2026-11-23
 
 **Erledigt:** iOS-OTA #249 (Schnellmenü, Tab-Tipp, Mint, Laufband, Journal-Ecken; ohne Rückgängig),

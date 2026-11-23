@@ -1,5 +1,27 @@
 # ANYVO Master Status
 
+## Stand nach OTA #255 und #258 (iOS 60) – 2026-11-23
+
+Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf den Release-Karten #255 und #258.
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `6280f74e4bcc201b8bb08eb94fe0854bbacd3bae`,
+  Update Group `461d502c-3559-4e43-bcdc-ad4a38aeeb8c`, Branch `release/ios60-rueckgaengig2-20261123`,
+  Karte #258 (Veröffentlicht, Gerätetest der Nutzerin bestanden). Vorher: `e45defc0` (#255).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit
+  `12a9baf7ae5d034339d18e6473dd8d441a1c53a8`, Update Group `ff93f5c5-cfb5-4d25-a742-a1dc97375150`,
+  Karte #255. Vorher: `aa3e0546` (#251).
+- Die nächste OTA muss `6280f74e` (iOS) bzw. `12a9baf7` (Android) enthalten.
+
+**Inhalt**
+- **#255 (iOS 60 + Android):** Regenmodus beim Fährte-Legen (PR #246, #253).
+- **#258 (nur iOS 60):** «Erledigt · Rückgängig» statt Rückfrage (PR #237, #244, #247, #250, #254;
+  vierte unabhängige Review PASS) und Fährten-Darstellung (PR #256: Suchspur gleich breit wie die
+  gelegte Linie, Journal ohne Laufband/Blinken, leuchtende Ecke in der Absuche statt Kreis und Kürzel,
+  Fährtenfarbe in der Absuche wieder sichtbar). OTA-Abdeckung mit Ausnahmen aus PR #248 und #257.
+- Android hat #258 nicht. Release-Linien bleiben Cherry-Picks; OTA von `main` weiter STOP bis zum
+  Beleg des Starts ohne natives Google-Modul (PR #196).
+
 ## Stand nach OTA #249 (iOS 60) und #251 (Android) – 2026-11-23
 
 Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf den Release-Karten #249 und #251.
