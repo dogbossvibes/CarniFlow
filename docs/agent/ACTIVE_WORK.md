@@ -1,5 +1,18 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #264 (iOS 60 und Android 53/54) – 2026-11-23
+
+**Erledigt:** OTA #264 «Winkelbegriffe» (T-219, Lint-Fix, T-220) auf iOS 60 und Android 53/54, von der
+Nutzerin auf dem Gerät abgenommen. Production: iOS `893c4fd9`, Android `17f30ed1`. PR #260 (NEWBIE-Rückgabe)
+gemergt.
+
+**Offen:**
+- **NEWBIE-Rückgabe (PR #260):** Gerätetest vor der OTA («Vorher»), danach Production-Migration und OTA –
+  beides nur mit Freigabe. Bereits verlorene Buchungen (Kundenfall) werden nicht rückwirkend zurückgegeben.
+- **Android-Nachzug** der iOS-Änderungen (Rückgängig, Fährten-Darstellung, Schnellmenü/Tab-Tipp/Mint): nicht
+  vorbereitet.
+- **Französisch/Italienisch** der neuen Winkelansage klingt doppelt («Angle ouvert angle aigu à gauche»).
+
 ## Stand nach OTA #255 und #258 (iOS 60) – 2026-11-23
 
 **Erledigt:** OTA #255 (Regenmodus, iOS 60 und Android). OTA #258 (nur iOS 60: Rückgängig statt
