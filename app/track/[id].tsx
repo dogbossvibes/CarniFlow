@@ -270,7 +270,7 @@ export default function TrackAuswertungScreen() {
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
-  // Der Aufbau der Suchspur läuft nur auf einer sichtbaren Karte: nicht, wenn ein anderer Bildschirm
+  // Das Laufband der Suchspur läuft nur auf einer sichtbaren Karte: nicht, wenn ein anderer Bildschirm
   // über der Auswertung liegt, und in der Karte hinter dem Vollbild auch nicht.
   const [screenFocused, setScreenFocused] = useState(true);
   useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
