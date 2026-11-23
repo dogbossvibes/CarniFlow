@@ -130,7 +130,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 
 interface Props {
   comparison?: boolean;
-  /** Vergleichsansicht: Aufbau der Suchspur anhalten, solange diese Karte nicht sichtbar ist. */
+  /** Vergleichsansicht: Laufband der Suchspur anhalten, solange diese Karte nicht sichtbar ist. */
   comparisonPaused?: boolean;
   layColor?: string;
   layPoints:        LatLng[];
