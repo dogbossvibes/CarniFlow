@@ -781,5 +781,23 @@
     "reason": "Nutzerentscheid 16.11.2026: Abo erneuter Kauf/Wiederherstellung (alte Runtime 1.0.5-motion-v2). Inhalt auf der Build-60-Linie vorhanden (alle 52 hinzugefügten Zeilen in app/premium.tsx), Datei seither weiterbearbeitet; Zeilenabgleich schlägt deshalb an. Nicht auf Gerät geprüft.",
     "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-16)",
     "date": "2026-11-16"
+  },
+  {
+    "group": "574f82ad-cd28-43af-a1a0-76c434503099",
+    "reason": "Nutzerentscheid 23.11.2026: «Trainingskarten deckend» (alte Runtime sdk58-customer-ios-v1). Korrektur in components/training/UnitListCard.tsx weiter wirksam (kein Glass-Hintergrund, Karte deckend). Die Zeile wurde durch das Schnellmenü (PR 238) um onLongPress ergänzt; der Zeilenabgleich schlägt deshalb an. Im Code geprüft, nicht auf Gerät.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-23)",
+    "date": "2026-11-23"
+  },
+  {
+    "group": "16afcfa2-dee5-4841-907e-fb997298b898",
+    "reason": "Nutzerentscheid 23.11.2026: «Neuer Begrüssungston und deckende Trainingskarten» (alte Runtime 1.0.6-map49-v1). Offen war nur components/training/UnitListCard.tsx: Karte weiter deckend, Zeile durch das Schnellmenü (PR 238) um onLongPress ergänzt; der Zeilenabgleich schlägt deshalb an. Im Code geprüft, nicht auf Gerät.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-23)",
+    "date": "2026-11-23"
+  },
+  {
+    "group": "337c0fa6-62d5-4609-b062-ebcf0cb29afe",
+    "reason": "Nutzerentscheid 23.11.2026: «Trainingskarten ohne rote Ecken» (alte Runtime 1.0.6-map49-v1). Die Regel (swipeActionOpacity, SwipeActionReveal) wurde mit PR 243 aus components/training/SwipeableTrainingItem.tsx nach components/ui/SwipeActionReveal.tsx verschoben und gilt nun auch für Journal-Karten; SwipeableTrainingItem nutzt sie weiter, die Tests dazu laufen durch. Der Zeilenabgleich schlägt wegen der Verschiebung an. Im Code geprüft, nicht auf Gerät.",
+    "decidedBy": "Nutzerin via Claude-MASTER (Untersuchung 2026-11-23)",
+    "date": "2026-11-23"
   }
 ]
