@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
@@ -19,13 +19,21 @@ function formatDur(sec: number | null): string {
 }
 
 // Einheit-Card für Verlauf, Dashboard und (mit clientName) den Trainer-Feed.
-export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit; onPress: () => void; clientName?: string | null }) {
+// onLongPress/Bedienhilfen-Aktionen sind optional (Schnellmenü auf der Startseite);
+// ohne sie verhält sich die Karte wie bisher.
+export function UnitListCard({ unit, onPress, clientName, onLongPress, accessibilityActions, onAccessibilityAction }: {
+  unit: TrainingUnit; onPress: () => void; clientName?: string | null;
+  onLongPress?: () => void;
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+}) {
   const { t } = useT();
   const exercises = unit.exercises ?? [];
   const disciplines = Array.from(new Set(exercises.map(e => e.discipline)));
 
   return (
-    <AnimatedPressable style={s.card} scale={0.98} onPress={onPress}>
+    <AnimatedPressable style={s.card} scale={0.98} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}
+      accessibilityActions={accessibilityActions} onAccessibilityAction={onAccessibilityAction}>
       {clientName ? (
         <View style={s.clientRow}>
           <Ionicons name="person-circle-outline" size={16} color={C.accent} />
