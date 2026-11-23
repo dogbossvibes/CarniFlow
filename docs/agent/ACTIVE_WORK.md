@@ -1,5 +1,30 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #249 (iOS 60) und #251 (Android) – 2026-11-23
+
+**Erledigt:** iOS-OTA #249 (Schnellmenü, Tab-Tipp, Mint, Laufband, Journal-Ecken; ohne Rückgängig),
+von der Nutzerin abgenommen. Android-OTA #251 (Nachzug der Fährten-Anzeige und Journal-Ecken).
+Production: iOS `0bc41835`, Android `aa3e0546`.
+
+**Offen:**
+- **Rückgängig-Funktion** (#237, #244, #247 auf `main`): neue unabhängige Review, bevor sie in eine
+  OTA oder einen Build kommt. Weil sie auf `main` liegt, betrifft das auch den nächsten nativen Build.
+- **PR #250** (Medien-Upload bei Hundewechsel) auf `main`, in keiner OTA, nicht durchgesehen.
+- **PR #246 Regenmodus:** Simulator-Test läuft; Entscheid der Nutzerin zum Testweg ausstehend
+  (Simulator zuerst, versteckt im Testmodus, offen an alle).
+- **Release-Linien weichen von `main` ab:** iOS ohne #237/#244/#247/#250/#246; Android zusätzlich
+  ohne #238, #239, #241. OTA von `main` weiter STOP, bis der Start ohne natives Google-Modul belegt
+  ist (PR #196).
+- **Gerätenachkontrolle:** #251 und #216 auf Android (kein Gerät vorhanden), #197, dazu #190, #187,
+  #186, #180, #176, #163, #165, #167, #168.
+- **Befunde ohne Auftrag:** Winkelerkennung hängt an den Linienpunkten; gespeicherte Linie bei
+  schlechtem GPS zu lang (Simulation); zwei Längen derselben Fährte; Suchspur in Replay und PDF noch
+  blau; fest eingebaute deutsche Texte im Hunde-Menü und in der Fährten-Historie.
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach Geräteabnahme #204, #207, #217, #220 – 2026-11-23
 
 **Erledigt:** Nutzerin hat #204, #207, #217 und #220 abgenommen (iPhone), Karten stehen auf
