@@ -865,11 +865,11 @@ function DocumentForm() {
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.mediaLabel')}</Text>
           <View style={s.mediaCard}>
             <Text style={s.mediaSubLabel}>{t('training.photosLabel')}</Text>
-            <PhotoPicker value={photos} onChange={setPhotos} />
+            <PhotoPicker value={photos} onChange={setPhotos} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.videosLabel')}</Text>
             <MultiVideoUpload value={videos} onChange={setVideos} />
             <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.voiceRecordingsLabel')}</Text>
-            <AudioRecorder value={audio} onChange={setAudio} />
+            <AudioRecorder value={audio} onChange={setAudio} removal={editing ? 'confirm' : 'undo'} undoScope={dogId} undoLocked={saving || remoteCompleted} />
           </View>
 
           </>}

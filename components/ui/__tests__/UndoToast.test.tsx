@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, AppState, Keyboard, type AppStateStatus } from 'react-native';
 import { UndoToastHost } from '@/components/ui/UndoToast';
 import { getUndoToastSnapshot, showUndoToast, undoToast } from '@/lib/undoToast';
 
@@ -9,8 +9,15 @@ jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({
 jest.mock('@/hooks/useReduceMotion', () => ({ useReduceMotion: () => true }));
 
 let tree: ReactTestRenderer;
+let appStateListener: ((state: AppStateStatus) => void) | undefined;
 beforeEach(async () => {
   jest.useFakeTimers();
+  appStateListener = undefined;
+  jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+    appStateListener = listener as (state: AppStateStatus) => void;
+    return { remove: jest.fn() } as never;
+  });
+  jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
   jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
   jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
   await act(async () => { tree = TestRenderer.create(<UndoToastHost />); });
@@ -52,4 +59,20 @@ it('verschwindet nach der Frist von selbst', () => {
   act(() => { showUndoToast({ message: 'Foto entfernt', onUndo: jest.fn() }); });
   act(() => { jest.runAllTimers(); });
   expect(tree.toJSON()).toBeNull();
+});
+
+it('B3: schreibt fest, sobald die App in den Hintergrund geht', () => {
+  const onUndo = jest.fn(), onCommit = jest.fn();
+  act(() => { showUndoToast({ message: 'Startbildschirm zurückgesetzt', onUndo, onCommit }); });
+  act(() => { appStateListener?.('inactive'); });
+  expect(onCommit).not.toHaveBeenCalled();
+  act(() => { appStateListener?.('background'); });
+  expect(onCommit).toHaveBeenCalledTimes(1);
+  expect(onUndo).not.toHaveBeenCalled();
+  expect(tree.toJSON()).toBeNull();
+});
+
+it('N3: schliesst die Tastatur, damit sie den Hinweis nicht verdeckt', () => {
+  act(() => { showUndoToast({ message: 'Foto entfernt', onUndo: jest.fn() }); });
+  expect(Keyboard.dismiss).toHaveBeenCalledTimes(1);
 });
