@@ -1,5 +1,43 @@
 # ANYVO Master Status
 
+## Stand nach Geräteabnahme #204, #207, #217, #220 – 2026-11-23
+
+Production unverändert, frisch aus EAS gelesen am 23.11.2026: iOS 60 `1b3fd491`
+(Group `c4a59ad6-…`, Karte #233), Android 53/54 `03ca16d1` (#216). Keine neue OTA.
+
+**Geräteabnahme durch die Nutzerin, Karten auf «Veröffentlicht»**
+- **#220** Testmodus-Mitschrift (iOS 60) und **#217** Absuche-Beschriftungen (iOS 60): «passt».
+- **#207** Zoom-Stufen und **#204** Abstand je Hund, Hundebereich, Dokument speichern: «passt».
+  Beide Karten gelten für iOS 60 und Android 53. Abgenommen ist der iPhone-Teil; die Nutzerin
+  hat kein Android-Gerät, der Android-Teil ist auf keinem echten Gerät geprüft.
+- Zu allen vier liegen dem MASTER keine Bilder vor; die Einzelpunkte wurden nicht einzeln
+  rückgemeldet. Der Vermerk steht jeweils als Kommentar auf der Karte.
+
+**Android-Emulator-Test zu #207** (Samsung_Galaxy_S23, Entwicklungs-Build, JS-Stand `03ca16d1`, Staging)
+- Bestätigt: Zoom-Knopf der Absuche schaltet normal → nah → weit → normal; die Stufe bleibt
+  nach erneutem Öffnen gemerkt.
+- Nicht prüfbar: Kartenbild, Zoom-Wirkung, Satellitenbild. Die Google-Karte bleibt im
+  Entwicklungs-Build leer (Maps-Schlüssel für die Signatur dieses Builds nicht freigeschaltet).
+- Der Emulator taugt nicht für GPS-Verhalten: Eine gesendete Strecke mit scharfem 90°-Winkel kam
+  geglättet und verzögert an (Winkel über etwa 24 s verschmiert, seitliches Schwanken rund 1 m),
+  die Erkennung meldete 0 Winkel. Mit exakten Positionen erkennt die Lege-Logik des
+  Android-Stands denselben Winkel im Fährten-Simulator in 16 von 16 Varianten. Das native
+  Android-Modul (`modules/anyvo-precision-location`) reicht die System-Positionen unverändert
+  weiter; die Glättung stammt damit sehr wahrscheinlich vom Emulator. Auf einem echten
+  Android-Gerät nicht geprüft.
+- Im Staging-Testkonto ist womöglich noch eine Emulator-Testfährte aktiv (nur Testdaten).
+
+**Auf `main`, in keiner OTA** (aus dem Ideen-Chat der Nutzerin, je eigene Aufgaben-Sitzung)
+- PR #237 (`2985a1cf`): «Erledigt · Rückgängig» statt Rückfrage bei sechs gefahrlosen Aktionen.
+- PR #238 (`8589d070`): einheitliches Schnellmenü bei langem Druck (Einheit, Hund, Fährte).
+- Offen: PR #239 (Tab nochmals antippen scrollt nach oben, spürbare Rückmeldung); Konflikt mit
+  #237 wird von der Aufgaben-Sitzung gelöst.
+- Vom MASTER nicht durchgesehen. Für iOS/Android nur als Cherry-Pick auslieferbar; vor einer OTA
+  ansehen und Freigabe der Nutzerin für die konkrete Charge einholen.
+
+**Geräteprüfung weiter offen**
+- #216 auf Android, #197 und die älteren Karten (#190, #187, #186, #180, #176, #163, #165, #167, #168).
+
 ## Stand nach Geräteabnahme #224, #229, #233 – 2026-11-22 (spät)
 
 Production unverändert gegenüber dem Abschnitt «nach OTA #233» darunter: iOS 60 `1b3fd491`

@@ -1,5 +1,31 @@
 # ANYVO – Active Work
 
+## Stand nach Geräteabnahme #204, #207, #217, #220 – 2026-11-23
+
+**Erledigt:** Nutzerin hat #204, #207, #217 und #220 abgenommen (iPhone), Karten stehen auf
+«Veröffentlicht». Android-Emulator-Test zu #207 durchgeführt. Production unverändert: iOS
+`1b3fd491`, Android `03ca16d1`.
+
+**Offen:**
+- **Android ohne echtes Gerät:** Die Nutzerin hat kein Android-Gerät. Android-Teile von #204,
+  #207 und #216 sind auf keinem echten Gerät geprüft; der Emulator zeigt keine Karte und liefert
+  kein brauchbares GPS.
+- **Bedienungs-PRs auf `main`, in keiner OTA:** #237 (Rückgängig), #238 (Schnellmenü); #239
+  offen. Vor einer OTA durchsehen, Charge von der Nutzerin freigeben lassen.
+- **Gerätenachkontrolle:** #216 auf Android, #197, dazu #190, #187, #186, #180, #176, #163,
+  #165, #167, #168.
+- **Winkelerkennung hängt an den Linienpunkten**, **gespeicherte Linie bei schlechtem GPS zu
+  lang** (Simulation), **zwei Längen derselben Fährte**: Befunde ohne Auftrag.
+- **Suchspur an anderen Stellen noch blau:** Replay-Bildschirm und PDF-Bericht. Kein Auftrag.
+- **Android:** PR #219, #222, #227, #228, #231, #232 fehlen dort; nur als Cherry-Pick möglich.
+- **Nächste OTA:** Release-Linien sind Cherry-Picks und weichen von `main` ab. OTA von `main`
+  weiter STOP, bis der Start ohne natives Google-Modul belegt ist (PR #196).
+- **Nächster nativer Build** (Nutzerin wartet): `versionCode` festlegen (main 51, live 53,
+  Build 54 existiert), Checkliste #195.
+- **Abdeckungsprüfung verbessern:** Aufgaben-Sitzung, PR folgt.
+- **Gesundheitsakte:** Gewicht speichern auf einem Gerät gegenprüfen.
+- **Android Build 54:** weitergeben, Push prüfen, dann #141 schliessen. **Issue #7** offen.
+
 ## Stand nach Geräteabnahme #224, #229, #233 – 2026-11-22 (spät)
 
 **Erledigt:** Nutzerin hat #224, #229 und #233 auf dem iPhone abgenommen, Karten stehen auf
