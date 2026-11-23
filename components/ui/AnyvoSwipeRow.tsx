@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ReanimatedSwipeable, { SwipeDirection, type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { C } from '@/constants/colors';
 import { captureError } from '@/lib/monitoring';
+import type { SharedValue } from 'react-native-reanimated';
+import { SwipeActionReveal } from '@/components/ui/SwipeActionReveal';
 
 // ANYVO Gesture UX v1 — Phase P1a (29.09.2026), hardened for async actions
 // (30.09.2026 — before rollout to Training/Health/Backpack/Documents).
@@ -183,19 +185,25 @@ export function AnyvoSwipeRow({
       });
   }, [close]);
 
-  const renderRightActions = useCallback(() => (
+  // Die Aktionen liegen dauerhaft hinter der Karte und schauten an deren runden Ecken hervor
+  // (rote Ecken im Journal). SwipeActionReveal blendet sie aus, solange nicht gewischt wird.
+  const renderRightActions = useCallback((_progress: SharedValue<number>, translation: SharedValue<number>) => (
     rightActions.length ? (
-      <View style={s.actionsRow}>
-        {rightActions.map(action => <ActionButton key={action.key} action={action} pending={pendingKeys.has(action.key)} onPress={() => runAction(action)} />)}
-      </View>
+      <SwipeActionReveal translation={translation} side="right">
+        <View style={s.actionsRow}>
+          {rightActions.map(action => <ActionButton key={action.key} action={action} pending={pendingKeys.has(action.key)} onPress={() => runAction(action)} />)}
+        </View>
+      </SwipeActionReveal>
     ) : null
   ), [rightActions, pendingKeys, runAction]);
 
-  const renderLeftActions = useCallback(() => (
+  const renderLeftActions = useCallback((_progress: SharedValue<number>, translation: SharedValue<number>) => (
     leftActions.length ? (
-      <View style={s.actionsRow}>
-        {leftActions.map(action => <ActionButton key={action.key} action={action} pending={pendingKeys.has(action.key)} onPress={() => runAction(action)} />)}
-      </View>
+      <SwipeActionReveal translation={translation} side="left">
+        <View style={s.actionsRow}>
+          {leftActions.map(action => <ActionButton key={action.key} action={action} pending={pendingKeys.has(action.key)} onPress={() => runAction(action)} />)}
+        </View>
+      </SwipeActionReveal>
     ) : null
   ), [leftActions, pendingKeys, runAction]);
 
