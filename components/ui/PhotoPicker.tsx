@@ -36,8 +36,9 @@ interface Props {
 
 export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
   const { t } = useT();
-  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked });
   const [uploading, setUploading] = useState(false);
+  // Während eines Uploads kein Rückgängig: der Upload schreibt mit dem alten Stand zurück.
+  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || uploading });
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
 
   const pick = async () => {
