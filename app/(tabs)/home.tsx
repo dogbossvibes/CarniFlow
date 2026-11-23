@@ -29,6 +29,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
 import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
@@ -79,6 +80,7 @@ function hatEinheitAnTag(
 
 export default function HomeScreen() {
   const router = useRouter();
+  const scrollRef = useTabScrollToTop();
   const { t } = useT();
   const { user } = useSession();
   const { profile: homeProfile, loading: profileLoading } = useProfile();
@@ -258,6 +260,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <ScrollView
+        ref={scrollRef}
         style={s.scroll}
         contentContainerStyle={s.inhalt}
         showsVerticalScrollIndicator={false}

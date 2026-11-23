@@ -111,7 +111,7 @@ function TimerForm() {
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     router.replace('/(tabs)/home');
     } catch {
-      if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));
+      if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally { saveLock.current = false; }
   };
 
@@ -128,7 +128,7 @@ function TimerForm() {
   // „Fertig" → Wahl: dokumentieren, ohne Doku speichern oder verwerfen. Der
   // bekannte Kontext (Hund/Sparte/Notiz) wird an die Dokumentation weitergereicht.
   const finish = () => {
-    tapHaptic();
+    haptic.medium();   // Training stoppen
     Alert.alert(t('timer.endTitle'), t('timer.trainedDuration', { duration: formatTime(elapsed) }), [
       { text: t('timer.document'), onPress: () => router.replace({ pathname: '/unit/document', params: {
         duration: String(elapsed),

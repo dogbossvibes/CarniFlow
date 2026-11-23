@@ -20,7 +20,7 @@ import { readTrainingSaveIntent, retryTrainingSave } from '@/features/training/d
 import type { DocumentSave } from '@/services/trainingDocumentService';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { successHaptic, tapHaptic } from '@/lib/haptics';
+import { successHaptic, tapHaptic, haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
 
 function formatDur(sec: number): string {
@@ -118,6 +118,7 @@ function SummaryForm() {
 
     if (error) {
       if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
+      haptic.error();
       Alert.alert(t('common.error'), t(['CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? 'trainingDoc.reviewSave' : 'training.saveError'));
       return;
     }
@@ -127,7 +128,7 @@ function SummaryForm() {
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     router.replace('/(tabs)/home');
     } catch {
-      if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));
+      if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally {
       if (alive.current && session?.user.id && active.unitId) {
         const saved = await readTrainingSaveIntent(session.user.id, active.unitId).catch(() => null);

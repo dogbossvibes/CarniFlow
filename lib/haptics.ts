@@ -67,8 +67,8 @@ function selection(): void {
  * Zentrale Haptik-API. Mapping siehe Team-Konvention:
  *   selection – Tab/Segment/Filter/Toggle/Auswahl
  *   light     – normale Buttons, Karten öffnen, Navigation, Bottom-Sheet-Aktion
- *   medium    – Start (Training/Fährte/Absuche), Speichern, Gegenstand/Winkel, Termin
- *   heavy     – Beenden (Fährte/Training), destruktive Bestätigung
+ *   medium    – Start/Stopp (Training/Fährte/Absuche), Gegenstand/Winkel gesetzt
+ *   heavy     – destruktive Bestätigung
  *   success   – gespeichert/hochgeladen/verbunden/Kauf erfolgreich
  *   warning   – Abbruchdialog, fehlende Berechtigung, ausverkauft, offline
  *   error     – Speichern/Upload/Kauf/Netzwerk endgültig fehlgeschlagen

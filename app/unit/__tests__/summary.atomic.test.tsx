@@ -20,7 +20,7 @@ jest.mock('@/components/ui/AnimatedPressable', () => { const { View } = jest.req
 jest.mock('@/components/training/HeroImage', () => { const { View } = jest.requireActual('react-native'); return { HeroImage: ({ children }: any) => <View>{children}</View> }; });
 jest.mock('@/components/training/MetricsInput', () => ({ MetricsInput: () => null }));
 jest.mock('@/lib/queryClient', () => ({ queryClient: { invalidateQueries: jest.fn() } }));
-jest.mock('@/lib/haptics', () => ({ successHaptic: jest.fn(), tapHaptic: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({ successHaptic: jest.fn(), tapHaptic: jest.fn(), haptic: { medium: jest.fn(), error: jest.fn(), success: jest.fn() } }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 let node: ReactTestRenderer;
 const root = () => node.root as unknown as { findByProps: (p: object) => { props: any }; findAllByType: (type: unknown) => { props: any }[] };

@@ -12,6 +12,7 @@ import { queryClient } from '@/lib/queryClient';
 import { checkUsernameAvailable, mapUsernameCheckResult, updateDisplayName, updatePhoneNumber, updateUsername, validateUsername } from '@/services/profileService';
 import type { UsernameValidationError } from '@/services/profileService';
 import { useT, type TranslationKey } from '@/i18n';
+import { haptic } from '@/lib/haptics';
 
 const PROVIDER_LABEL: Record<string, string> = { apple: 'Apple', google: 'Google' };
 
@@ -111,6 +112,7 @@ export default function EditProfileScreen() {
       const { error: uerr, taken } = await updateUsername(user.id, res.username);
       if (uerr) {
         setSavingName(false);
+        haptic.error();
         Alert.alert(t('common.error'), taken ? t('profile.usernameTaken') : t('profile.saveFailed'));
         return;
       }
@@ -119,12 +121,14 @@ export default function EditProfileScreen() {
       const { error: phoneError } = await updatePhoneNumber(user.id, phone);
       if (phoneError) {
         setSavingName(false);
+        haptic.error();
         Alert.alert(t('common.error'), t('profile.saveFailed'));
         return;
       }
     }
     setSavingName(false);
-    if (error) { Alert.alert(t('common.error'), t('profile.saveFailed')); return; }
+    if (error) { haptic.error(); Alert.alert(t('common.error'), t('profile.saveFailed')); return; }
+    haptic.success();
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     router.back();
   };
