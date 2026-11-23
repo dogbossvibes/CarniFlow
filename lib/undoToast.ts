@@ -8,8 +8,9 @@
 //   • Rückgängig getippt            → `onUndo`
 //   • Frist abgelaufen / flush()    → `onCommit`
 //   • cancel()                      → weder noch
-// Wird die App in der Frist beendet, läuft `onCommit` nie: der gespeicherte
-// Stand bleibt der alte, es geht nichts verloren.
+// Geht die App in den Hintergrund, schreibt der Host sofort fest
+// (`flushUndoToast`), damit eine als erledigt gezeigte Aktion auch gespeichert
+// ist. Stürzt die App vorher ab, bleibt der alte gespeicherte Stand erhalten.
 // ──────────────────────────────────────────────────────────────────────────
 
 /** Sichtbar genug zum Lesen und Antippen. */
@@ -79,6 +80,9 @@ export function undoToast(id: number): boolean {
   finish(id, 'undo');
   return true;
 }
+
+/** Offenen Hinweis sofort festschreiben (z. B. App geht in den Hintergrund). */
+export function flushUndoToast() { if (active) finish(active.id, 'commit'); }
 
 export function setUndoToastScreenReader(enabled: boolean) { screenReader = enabled; }
 

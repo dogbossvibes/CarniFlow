@@ -23,11 +23,20 @@ interface Props {
   maxPhotos?: number;
   /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
   readOnly?: boolean;
+  /**
+   * 'confirm' (Standard): Rückfrage vor dem Entfernen, z. B. bei gespeicherten Einträgen.
+   * 'undo': sofort entfernen mit «Rückgängig» (nur für noch nicht gespeicherte Formulare).
+   */
+  removal?: 'confirm' | 'undo';
+  /** Nur für 'undo': Kennung des Formulars (z. B. Hunde-ID); bei Wechsel schliesst der Hinweis. */
+  undoScope?: string | null;
+  /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
+  undoLocked?: boolean;
 }
 
-export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false }: Props) {
+export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
   const { t } = useT();
-  const removal = useUndoableListRemoval(value, onChange);
+  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked });
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
 
@@ -85,8 +94,23 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false 
     </View>
   );
 
-  // Nimmt das Foto nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
-  const del = (idx: number) => { if (!readOnly) removal.remove(idx, t('undo.photoRemoved')); };
+  // Nimmt das Foto nur aus der Auswahl (keine Datei wird gelöscht).
+  const del = (idx: number) => {
+    if (readOnly) return;
+    if (removalMode === 'undo') {
+      // Während eines Uploads nicht entfernen: der Upload schreibt mit dem alten Stand zurück.
+      if (!uploading) removal.remove(idx, t('undo.photoRemoved'));
+      return;
+    }
+    Alert.alert(t('media.removePhotoTitle'), t('media.removePhotoBody'), [
+      { text: t('common.back'), style: 'cancel' },
+      {
+        text: t('media.remove'),
+        style: 'destructive',
+        onPress: () => onChange(value.filter((_, i) => i !== idx)),
+      },
+    ]);
+  };
 
   if (value.length === 0) {
     return (

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C } from '@/constants/colors';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useT } from '@/i18n';
 import {
-  getUndoToastSnapshot, setUndoToastScreenReader, showUndoToast, subscribeUndoToast, undoToast,
+  flushUndoToast, getUndoToastSnapshot, setUndoToastScreenReader, showUndoToast, subscribeUndoToast, undoToast,
   type UndoToastHandle, type UndoToastOptions,
 } from '@/lib/undoToast';
 
@@ -42,11 +42,20 @@ export function UndoToastHost() {
     return () => { alive = false; subscription.remove(); };
   }, []);
 
+  // iOS hält JS-Timer im Hintergrund an und kann die App danach beenden: eine als
+  // erledigt gezeigte Aktion deshalb beim Wechsel in den Hintergrund festschreiben.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => { if (state === 'background') flushUndoToast(); });
+    return () => subscription.remove();
+  }, []);
+
   const id = entry?.id;
   const message = entry?.message;
   const durationMs = entry?.durationMs;
   useEffect(() => {
     if (id == null || message == null || durationMs == null) return;
+    // Der Hinweis sitzt am unteren Rand: eine offene Tastatur würde «Rückgängig» verdecken.
+    Keyboard.dismiss();
     // Android sagt den Hinweis über accessibilityLiveRegion an, iOS braucht den direkten Aufruf.
     if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(`${message}. ${t('undo.action')}`);
     progress.setValue(1);
