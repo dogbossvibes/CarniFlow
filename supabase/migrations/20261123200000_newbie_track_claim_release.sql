@@ -28,6 +28,7 @@ declare
   v_uid    uuid := auth.uid();
   v_period text := to_char(timezone('utc', now()), 'YYYY-MM');
   v_count  int;
+  v_ref    uuid;
 begin
   if v_uid is null or p_kind is distinct from 'track' or p_ref is null or p_ref = '' then
     return false;
@@ -36,8 +37,11 @@ begin
   -- Gleiche Sperre wie claim_newbie_quota → kein Wettlauf zwischen Buchen und Freigeben.
   perform pg_advisory_xact_lock(hashtext(v_uid::text || ':' || p_kind));
 
-  -- Gibt es die Fährte unter dieser ID, zählt die Buchung weiter.
-  if exists (select 1 from training_sessions where id::text = p_ref) then
+  -- Fährten-IDs sind UUIDs; eine andere ID kann zu keiner Fährte gehören.
+  begin v_ref := p_ref::uuid; exception when invalid_text_representation then v_ref := null; end;
+
+  -- Gibt es die Fährte unter dieser ID, zählt die Buchung weiter (Primärschlüssel-Zugriff).
+  if v_ref is not null and exists (select 1 from training_sessions where id = v_ref) then
     return false;
   end if;
 

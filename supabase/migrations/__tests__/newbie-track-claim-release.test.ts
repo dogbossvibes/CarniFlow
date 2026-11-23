@@ -22,7 +22,8 @@ describe('Migration release_newbie_quota', () => {
   it('nur Fährten, nur angemeldet, nie wenn eine Fährte unter der ID existiert', () => {
     expect(body).toContain("p_kind is distinct from 'track'");
     expect(body).toContain('v_uid is null');
-    expect(body.indexOf('from training_sessions where id::text = p_ref')).toBeLessThan(body.indexOf('delete from'));
+    expect(body).toContain('v_ref := p_ref::uuid');
+    expect(body.indexOf('from training_sessions where id = v_ref')).toBeLessThan(body.indexOf('delete from'));
   });
   it('dieselbe Sperre wie claim_newbie_quota; Rechte nur für authenticated', () => {
     expect(body).toContain("pg_advisory_xact_lock(hashtext(v_uid::text || ':' || p_kind))");
