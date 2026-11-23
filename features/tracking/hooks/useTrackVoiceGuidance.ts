@@ -16,7 +16,9 @@ export const SPEECH_AVAILABLE = Speech != null;
 const SPEAK_GAP_MS     = 3500;   // Entprellung zwischen zwei Ansagen
 
 // arcM = Bogenlänge des Winkels entlang der gelegten Fährte (= marker.distance_from_start).
-export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null; lat?: number | null; lng?: number | null }
+// direction: beim Legen gewählte Richtung eines Fachwinkels (OW/GW/BW) oder Abrisses
+// (T-219). Normale Winkel tragen die Richtung bereits in angleKind.
+export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null; lat?: number | null; lng?: number | null; direction?: 'links' | 'rechts' | null }
 export interface VoicePhysicalContext {
   handlerPosition: { latitude: number; longitude: number } | null;
   configuredDogLeadM: number;
@@ -70,11 +72,18 @@ function inStepsText(steps: number, locale: AppLocale) {
 
 // Sprechtext: Winkel/Spitzwinkel/Abriss inkl. Richtung, Distanz in GESCHÄTZTEN
 // Schritten („ca.", da aus GPS-Distanz abgeleitet — kein echter Pedometer).
-function phraseFor(kind: AngleKind | null, steps: number, locale: AppLocale = getCurrentLocale()): string {
+// T-219: OW/GW/BW und Abriss sagen die beim Legen gewählte Richtung mit an
+// («Bodenwinkel links in ca. 5 Schritten»); ohne Richtung bleibt der Text wie bisher.
+const DIRECTED_KINDS: readonly (AngleKind | null)[] = ['gw', 'ow', 'bw', 'abriss'];
+export function anglePhrase(kind: AngleKind | null, steps: number, locale: AppLocale = getCurrentLocale(),
+  direction?: 'links' | 'rechts' | null): string {
   const inSteps = inStepsText(steps, locale);
+  const dir = DIRECTED_KINDS.includes(kind) && (direction === 'links' || direction === 'rechts')
+    ? `${translateKey(direction === 'links' ? 'track.detailLeft' : 'track.detailRight', {}, locale)} `
+    : '';
   // Zuordnung Event → Schlüssel liegt zentral in trackEventVoice.ts, damit
   // Legen und Absuche dieselben fachlichen Begriffe verwenden (Punkt 3).
-  return translateKey(trackEventGuidanceKey(angleEvent(kind)), { inSteps }, locale);
+  return translateKey(trackEventGuidanceKey(angleEvent(kind)), { inSteps, dir }, locale);
 }
 
 // Gegenstand-Ansage (dog-basiert). Dübel wird namentlich angesagt, sonst „Gegenstand".
@@ -167,7 +176,7 @@ export function useTrackVoiceGuidance(
       // Distanz → geschätzte Schritte über die zentrale Utility (persönliche Schrittlänge optional).
       const steps = Math.max(1, metersToSteps(Math.max(0, bestD - SPEECH_TRAVEL_M), stepLengthM));
       requestVoice({
-        eventType: best.kind, text: best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale),
+        eventType: best.kind, text: best.kind === 'angle' ? anglePhrase(best.angleKind, steps, locale, angles.find(a => a.id === best.id)?.direction) : objectPhrase(best.material, steps, locale),
         language: speechLanguage(locale), priority: 4, onceKey: `feature:${best.id}`, phase: 'search',
         progressM: dogProgressM, distanceM: bestD,
         valid: () => { const latest = latestRef.current;

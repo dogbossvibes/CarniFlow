@@ -7,10 +7,17 @@ jest.mock('@/features/training-groups/registerResources',()=>({registerGroupReso
 let tree:ReturnType<typeof Renderer.create>;
 afterEach(()=>act(()=>tree?.unmount()));
 function press(label:string){act(()=>tree.root.findAll(n=>n.props.accessibilityRole==='button'&&n.props.accessibilityLabel===label)[0].props.onPress());}
-it.each(['BW','OW','GW'])('%s selects type then sharp-right geometry without creating an extra marker',label=>{
+it.each(['BW','OW','GW'])('%s selects type then right geometry without creating an extra marker',label=>{
  const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});
- press(label);expect(onSelect).not.toHaveBeenCalled();press('track.detailSharpRight');
- expect(onSelect).toHaveBeenCalledTimes(1);expect(onSelect).toHaveBeenCalledWith(label.toLowerCase(),{geometryDirection:'rechts',geometrySharpness:'sharp',geometrySource:'manual'});
+ press(label);expect(onSelect).not.toHaveBeenCalled();press('track.detailRight');
+ expect(onSelect).toHaveBeenCalledTimes(1);expect(onSelect).toHaveBeenCalledWith(label.toLowerCase(),{geometryDirection:'rechts',geometrySharpness:'normal',geometrySource:'manual'});
+});
+// T-219: OW/GW/BW sind immer rund 90° nach links oder rechts.
+it.each(['BW','OW','GW'])('%s offers no sharp choice',label=>{
+ act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={jest.fn()}/>);});press(label);
+ const labels=tree.root.findAll(n=>n.props.accessibilityRole==='button').map(n=>n.props.accessibilityLabel);
+ expect(labels).toContain('track.detailLeft');expect(labels).toContain('track.detailRight');
+ expect(labels).not.toContain('track.detailSharpLeft');expect(labels).not.toContain('track.detailSharpRight');
 });
 it('Abriss offers explicit left/right only; returning creates nothing',()=>{
  const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});press('track.angleBreak');
@@ -29,7 +36,6 @@ it('accepts a direction once even when a queued second tap arrives',()=>{
 
 it.each(['BW','OW','GW'].flatMap(kind => [
  ['track.detailLeft','links','normal'], ['track.detailRight','rechts','normal'],
- ['track.detailSharpLeft','links','sharp'], ['track.detailSharpRight','rechts','sharp'],
 ].map(([label,direction,sharpness]) => [kind,label,direction,sharpness])))('%s retains %s with its independent geometry', (kind,label,direction,sharpness) => {
  const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});
  press(kind);press(label);expect(onSelect).toHaveBeenCalledWith(kind.toLowerCase(),{geometryDirection:direction,geometrySharpness:sharpness,geometrySource:'manual'});
