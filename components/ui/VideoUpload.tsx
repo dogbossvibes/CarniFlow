@@ -23,6 +23,15 @@ interface Props {
   onChange: (url: string | null) => void;
   /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
   readOnly?: boolean;
+  /**
+   * 'confirm' (Standard): Rückfrage vor dem Entfernen, z. B. bei gespeicherten Einträgen.
+   * 'undo': sofort entfernen mit «Rückgängig» (nur für noch nicht gespeicherte Formulare).
+   */
+  removal?: 'confirm' | 'undo';
+  /** Nur für 'undo': Kennung des Formulars (z. B. Hunde-ID); bei Wechsel schliesst der Hinweis. */
+  undoScope?: string | null;
+  /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
+  undoLocked?: boolean;
 }
 
 function VideoPlayer({ uri, onReplace, onDelete }: {
@@ -63,9 +72,9 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
   );
 }
 
-export function VideoUpload({ value, onChange, readOnly = false }: Props) {
+export function VideoUpload({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
   const { t } = useT();
-  const removal = useUndoableValueRemoval(value, onChange);
+  const removal = useUndoableValueRemoval(value, onChange, { scope: undoScope, locked: undoLocked });
   const [uploading, setUploading] = useState(false);
 
   const pick = async () => {
@@ -115,8 +124,15 @@ export function VideoUpload({ value, onChange, readOnly = false }: Props) {
     }
   };
 
-  // Nimmt das Video nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
-  const del = () => { if (!readOnly) removal.remove(t('undo.videoRemoved')); };
+  // Nimmt das Video nur aus der Auswahl (keine Datei wird gelöscht).
+  const del = () => {
+    if (readOnly) return;
+    if (removalMode === 'undo') { removal.remove(t('undo.videoRemoved')); return; }
+    Alert.alert(t('media.deleteVideoTitle'), t('media.deleteVideoBody'), [
+      { text: t('common.back'), style: 'cancel' },
+      { text: t('media.remove'), style: 'destructive', onPress: () => onChange(null) },
+    ]);
+  };
 
   if (value) {
     return <VideoPlayer uri={value} onReplace={pick} onDelete={del} />;

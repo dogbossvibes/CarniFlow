@@ -38,11 +38,26 @@ describe('Startbildschirm zurücksetzen mit Rückgängig', () => {
     let reset!: ReturnType<typeof resetHomeScreenConfigDeferred>;
     act(() => { reset = resetHomeScreenConfigDeferred(); });
     expect(homeCfg.layout).toBe(DEFAULT_HOME_CONFIG.layout);
-    // App wird jetzt beendet: auf dem Gerät liegt weiterhin die alte Einstellung.
+    // Bis zum Festschreiben (Fristablauf oder App geht in den Hintergrund) bleibt der alte Stand gespeichert.
     expect((await stored(homeKey(USER))).layout).toBe('list');
     act(() => reset.commit());
     await flush();
     expect((await stored(homeKey(USER))).layout).toBe(DEFAULT_HOME_CONFIG.layout);
+    tree.unmount();
+  });
+
+  it('N1: zweimal Zurücksetzen, dann Rückgängig stellt die eigene Anordnung wieder her', async () => {
+    const tree = await mount(USER);
+    act(() => setHomeScreenConfig(custom()));
+    let first!: ReturnType<typeof resetHomeScreenConfigDeferred>;
+    let second!: ReturnType<typeof resetHomeScreenConfigDeferred>;
+    act(() => { first = resetHomeScreenConfigDeferred(); });
+    // Der zweite Hinweis schreibt den ersten fest (wie lib/undoToast).
+    act(() => { second = resetHomeScreenConfigDeferred(); first.commit(); });
+    act(() => second.undo());
+    await flush();
+    expect(homeCfg.layout).toBe('list');
+    expect((await stored(homeKey(USER))).layout).toBe('list');
     tree.unmount();
   });
 
@@ -87,6 +102,14 @@ describe('Hilfe-Hinweise zurücksetzen mit Rückgängig', () => {
     act(() => reset.undo());
     await flush();
     expect(seen).toEqual([topicA, topicB, topicC]);
+    expect(await stored(helpKey('help-user'))).toEqual([topicA, topicB, topicC]);
+
+    // N1: zweimal Zurücksetzen, dann Rückgängig stellt alle gesehenen Hinweise wieder her.
+    let second!: ReturnType<typeof resetHelpSeenDeferred>;
+    act(() => { reset = resetHelpSeenDeferred(); });
+    act(() => { second = resetHelpSeenDeferred(); reset.commit(); });
+    act(() => second.undo());
+    await flush();
     expect(await stored(helpKey('help-user'))).toEqual([topicA, topicB, topicC]);
 
     act(() => { reset = resetHelpSeenDeferred(); });

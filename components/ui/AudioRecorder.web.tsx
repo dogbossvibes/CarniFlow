@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,13 +20,33 @@ interface Props {
   onChange: (notes: AudioNote[]) => void;
   /** Nur anzeigen: Entfernen ist wirkungslos (kein Hinweis). */
   readOnly?: boolean;
+  /**
+   * 'confirm' (Standard): Rückfrage vor dem Entfernen, z. B. bei gespeicherten Einträgen.
+   * 'undo': sofort entfernen mit «Rückgängig» (nur für noch nicht gespeicherte Formulare).
+   */
+  removal?: 'confirm' | 'undo';
+  /** Nur für 'undo': Kennung des Formulars (z. B. Hunde-ID); bei Wechsel schliesst der Hinweis. */
+  undoScope?: string | null;
+  /** Nur für 'undo': true während des Speicherns; sperrt Entfernen und schliesst den Hinweis. */
+  undoLocked?: boolean;
 }
 
-export function AudioRecorder({ value, onChange, readOnly = false }: Props) {
+export function AudioRecorder({ value, onChange, readOnly = false, removal: removalMode = 'confirm', undoScope, undoLocked }: Props) {
   const { t } = useT();
-  const removal = useUndoableListRemoval(value, onChange);
-  // Nimmt die Sprachnotiz nur aus der Auswahl (keine Datei wird gelöscht) – mit Rückgängig.
-  const del = (idx: number) => { if (!readOnly) removal.remove(idx, t('undo.audioRemoved')); };
+  const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked });
+  // Nimmt die Sprachnotiz nur aus der Auswahl (keine Datei wird gelöscht).
+  const del = (idx: number) => {
+    if (readOnly) return;
+    if (removalMode === 'undo') { removal.remove(idx, t('undo.audioRemoved')); return; }
+    Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
+      { text: t('common.back'), style: 'cancel' },
+      {
+        text: t('media.remove'),
+        style: 'destructive',
+        onPress: () => onChange(value.filter((_, i) => i !== idx)),
+      },
+    ]);
+  };
 
   return (
     <View>

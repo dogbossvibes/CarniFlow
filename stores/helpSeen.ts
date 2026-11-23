@@ -59,22 +59,32 @@ export function resetHelpSeen() {
 
 // Zurücksetzen mit Rückgängig-Frist: Anzeige sofort leer, gespeichert wird erst
 // bei `commit`. Wird die App vorher beendet, bleibt der gespeicherte Stand erhalten.
-export function resetHelpSeenDeferred(): { commit: () => void; undo: () => void } {
+type DeferredReset = { commit: () => void; undo: () => void };
+let pendingReset: { resetState: HelpTopicId[]; handle: DeferredReset } | null = null;
+
+export function resetHelpSeenDeferred(): DeferredReset {
+  // Erneutes Zurücksetzen, solange die Liste noch leer ist: dieselbe Rücknahme
+  // behalten, sonst gingen die bisher gesehenen Hinweise verloren.
+  if (pendingReset && state === pendingReset.resetState) return pendingReset.handle;
   const owner = currentUserId;
   const previous = state;
   const sameOwner = () => currentUserId === owner && hydratedFor === owner;
-  state = [];
+  const resetState: HelpTopicId[] = [];
+  state = resetState;
   emit();
-  return {
+  const handle: DeferredReset = {
     // Auch später gesehene Hinweise (markHelpSeen) bleiben dabei erhalten.
     commit: () => { if (sameOwner()) persist(); },
     undo: () => {
+      if (pendingReset?.handle === handle) pendingReset = null;
       if (!sameOwner()) return;
       state = [...previous, ...state.filter(id => !previous.includes(id))];
       emit();
       persist();
     },
   };
+  pendingReset = { resetState, handle };
+  return handle;
 }
 
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };

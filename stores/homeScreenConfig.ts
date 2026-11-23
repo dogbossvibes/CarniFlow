@@ -523,18 +523,32 @@ export function resetHomeScreenConfig() {
 // gespeichert wird erst bei `commit`. Wird die App vorher beendet, bleibt der
 // bisherige gespeicherte Stand erhalten. Beide Aktionen wirken nur, solange
 // derselbe Nutzer geladen ist.
-export function resetHomeScreenConfigDeferred(): { commit: () => void; undo: () => void } {
+type DeferredReset = { commit: () => void; undo: () => void };
+let pendingReset: { resetState: HomeScreenConfig; handle: DeferredReset } | null = null;
+
+export function resetHomeScreenConfigDeferred(): DeferredReset {
+  // Erneutes Zurücksetzen, solange der Standard noch unverändert angezeigt wird:
+  // dieselbe Rücknahme behalten, sonst ginge die eigene Anordnung verloren.
+  if (pendingReset && state === pendingReset.resetState) return pendingReset.handle;
   const owner = currentUserId;
   const previous = state;
   const sameOwner = () => currentUserId === owner && hydratedFor === owner;
-  state = sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG });
-  const resetState = state;
+  const resetState = sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG });
+  state = resetState;
   emit();
-  return {
+  const handle: DeferredReset = {
     // Wurde inzwischen etwas geändert, hat setHomeScreenConfig bereits gespeichert.
-    commit: () => { if (sameOwner() && state === resetState) setHomeScreenConfig(resetState); },
-    undo: () => { if (sameOwner()) setHomeScreenConfig(previous); },
+    commit: () => {
+      if (!sameOwner() || state !== resetState) return;
+      AsyncStorage.setItem(keyForUser(currentUserId), JSON.stringify(state)).catch(() => { /* best-effort */ });
+    },
+    undo: () => {
+      if (pendingReset?.handle === handle) pendingReset = null;
+      if (sameOwner()) setHomeScreenConfig(previous);
+    },
   };
+  pendingReset = { resetState, handle };
+  return handle;
 }
 
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };

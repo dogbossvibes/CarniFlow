@@ -1,6 +1,6 @@
 import {
   UNDO_TOAST_DURATION_MS, UNDO_TOAST_SCREEN_READER_DURATION_MS,
-  getUndoToastSnapshot, setUndoToastScreenReader, showUndoToast, undoToast,
+  flushUndoToast, getUndoToastSnapshot, setUndoToastScreenReader, showUndoToast, undoToast,
 } from '@/lib/undoToast';
 
 beforeEach(() => { jest.useFakeTimers(); setUndoToastScreenReader(false); });
@@ -30,13 +30,18 @@ it('Rückgängig nimmt zurück und schreibt nie fest', () => {
   expect(undoToast(1)).toBe(false);
 });
 
-it('App wird in der Frist beendet: nichts wird festgeschrieben', () => {
+it('B3: geht die App in den Hintergrund, wird sofort festgeschrieben (flushUndoToast)', () => {
   const cb = callbacks();
   showUndoToast({ message: 'Erledigt', ...cb });
   jest.advanceTimersByTime(UNDO_TOAST_DURATION_MS / 2);
-  // Prozessende = keine weiteren Timer. Bis dahin lief weder Commit noch Undo.
-  expect(cb.onCommit).not.toHaveBeenCalled();
+  flushUndoToast();
+  expect(cb.onCommit).toHaveBeenCalledTimes(1);
   expect(cb.onUndo).not.toHaveBeenCalled();
+  expect(getUndoToastSnapshot()).toBeNull();
+  // Ohne offenen Hinweis wirkungslos.
+  flushUndoToast();
+  jest.runAllTimers();
+  expect(cb.onCommit).toHaveBeenCalledTimes(1);
 });
 
 it('flush schreibt sofort fest, cancel tut nichts, beides nur einmal', () => {
