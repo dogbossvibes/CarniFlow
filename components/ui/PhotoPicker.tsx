@@ -16,7 +16,7 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { uploadImage } from '@/services/mediaService';
 import { useUndoableListRemoval } from '@/hooks/useUndoableRemoval';
-import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
+import { useBusyHold, useLatestRef } from '@/hooks/useLatestRef';
 
 interface Props {
   value:      string[];
@@ -42,7 +42,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false,
   const [uploading, setUploading] = useState(false);
   // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Start.
   const latest = useLatestRef({ value, onChange });
-  useBusyReport(uploading, onBusyChange);
+  const holdBusy = useBusyHold(onBusyChange);
   // Während eines Uploads kein Rückgängig: der Upload schreibt mit dem alten Stand zurück.
   const removal = useUndoableListRemoval(value, onChange, { scope: undoScope, locked: undoLocked || uploading });
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
@@ -75,6 +75,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false,
     });
     if (result.canceled) return;
 
+    const releaseBusy = holdBusy();
     setUploading(true);
     setProgress(0);
     const newUrls: string[] = [];
@@ -89,6 +90,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false,
     } catch (e: any) {
       Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
+      releaseBusy();
       setUploading(false);
       setProgress(0);
     }
@@ -114,7 +116,12 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10, readOnly = false,
       {
         text: t('media.remove'),
         style: 'destructive',
-        onPress: () => onChange(value.filter((_, i) => i !== idx)),
+        // Mit dem aktuellen Stand entfernen: ein in der Zwischenzeit fertiger Upload bleibt erhalten.
+        onPress: () => {
+          const current = latest.current.value;
+          const at = current.indexOf(value[idx]);
+          if (at >= 0) latest.current.onChange(current.filter((_, i) => i !== at));
+        },
       },
     ]);
   };

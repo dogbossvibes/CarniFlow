@@ -297,6 +297,37 @@ describe('DocumentScreen dog selection', () => {
     expect(photo().value).toEqual(['foto-yam', 'foto-neu']);
   });
 
+  // Review OTA «Rückgängig» (B5, N2): Während eines Uploads darf weder das Einklappen
+  // der Details (hängt die Medienbausteine aus) noch Speichern möglich sein.
+  it('sperrt «Optionale Details» und Speichern, solange ein Medium hochgeladen wird', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }];
+    mockCreateDocumentedUnit.mockResolvedValue({ data: { id: 'u1' }, error: null });
+    const node = render();
+    await flush();
+    await selectExercise(node);
+    tap(node, 'trainingFlow.optionalDetails');
+    await flush();
+    const photo = () => mockPhotoPicker.mock.calls.at(-1)![0];
+    act(() => photo().onBusyChange!(true));
+    await flush();
+    const callsBefore = mockPhotoPicker.mock.calls.length;
+    tap(node, 'trainingFlow.optionalDetails');
+    await flush();
+    expect(mockPhotoPicker.mock.calls.length).toBeGreaterThan(callsBefore - 1);
+    expect(strings(node)).toContain('training.photosLabel');
+    expect(saveButton(node).props.disabled).toBe(true);
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+    expect(mockAtomicSave).not.toHaveBeenCalled();
+
+    act(() => photo().onBusyChange!(false));
+    await flush();
+    expect(saveButton(node).props.disabled).toBe(false);
+    tap(node, 'trainingFlow.optionalDetails');
+    await flush();
+    expect(strings(node)).not.toContain('training.photosLabel');
+  });
+
   it('keeps multiple dogs selectable instead of auto-selecting one', async () => {
     mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }];
     const node = render();

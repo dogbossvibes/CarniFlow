@@ -8,7 +8,7 @@ import { uploadVideo } from '@/services/mediaService';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { tapHaptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
-import { useBusyReport, useLatestRef } from '@/hooks/useLatestRef';
+import { useBusyHold, useLatestRef } from '@/hooks/useLatestRef';
 
 interface Props {
   value:    string[];
@@ -38,7 +38,7 @@ export function MultiVideoUpload({ value, onChange, onBusyChange }: Props) {
   const [progress, setProgress]   = useState(0);
   // Nach dem Upload mit dem aktuellen Stand zurückschreiben, nicht mit dem vom Start.
   const latest = useLatestRef({ value, onChange });
-  useBusyReport(uploading, onBusyChange);
+  const holdBusy = useBusyHold(onBusyChange);
 
   const pick = async () => {
     // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
@@ -54,6 +54,7 @@ export function MultiVideoUpload({ value, onChange, onBusyChange }: Props) {
     });
     if (result.canceled) return;
 
+    const releaseBusy = holdBusy();
     setUploading(true);
     setProgress(0);
     try {
@@ -63,6 +64,7 @@ export function MultiVideoUpload({ value, onChange, onBusyChange }: Props) {
     } catch (e: any) {
       Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
+      releaseBusy();
       setUploading(false);
       setProgress(0);
     }
@@ -71,7 +73,12 @@ export function MultiVideoUpload({ value, onChange, onBusyChange }: Props) {
   return (
     <View style={s.wrap}>
       {value.map((uri, i) => (
-        <VideoCell key={uri} uri={uri} onRemove={() => onChange(value.filter((_, idx) => idx !== i))} />
+        <VideoCell key={uri} uri={uri} onRemove={() => {
+          // Mit dem aktuellen Stand entfernen: ein in der Zwischenzeit fertiger Upload bleibt erhalten.
+          const current = latest.current.value;
+          const at = current.indexOf(uri);
+          if (at >= 0) latest.current.onChange(current.filter((_, idx) => idx !== at));
+        }} />
       ))}
       <TouchableOpacity style={s.add} onPress={pick} disabled={uploading} activeOpacity={0.7}>
         {uploading ? (
