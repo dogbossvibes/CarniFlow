@@ -108,18 +108,18 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
   it('1. dogId + sessionId → richtige Fährte', async () => {
     await mount({ id: 'sess-A', dogId: 'dog-A' });
     expect(useTrackingStore.getState()).toMatchObject({ dogId: 'dog-A', currentSessionId: 'sess-A' });
-    expect(texts()).toContain('111');
+    expect(texts()).toContain('111 m');
   });
   it('2/3/4. nur sessionId (Deep-Link) → Hund aus der Session; NICHT der jüngste fremde Puffer (B)', async () => {
     await mount({ id: 'sess-A' });
     expect(useTrackingStore.getState()).toMatchObject({ dogId: 'dog-A', currentSessionId: 'sess-A' });
-    expect(texts()).toContain('111');
-    expect(texts()).not.toContain('222');
+    expect(texts()).toContain('111 m');
+    expect(texts()).not.toContain('222 m');
   });
   it('3. mehrere liegende Hunde: Deep-Link auf B zeigt B', async () => {
     await mount({ id: 'sess-B' });
     expect(useTrackingStore.getState()).toMatchObject({ dogId: 'dog-B', currentSessionId: 'sess-B' });
-    expect(texts()).toContain('222');
+    expect(texts()).toContain('222 m');
   });
   it('5. unbekannte sessionId → fail closed (Hinweis, keine Fährte, Store unberührt)', async () => {
     await mount({ id: 'sess-UNBEKANNT' });

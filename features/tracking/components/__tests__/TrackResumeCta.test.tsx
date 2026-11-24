@@ -342,6 +342,26 @@ describe('Recovery-Async-Isolation', () => {
     expect(alertSpy).toHaveBeenCalled(); expect(mockPush).not.toHaveBeenCalled();
     expect(byId(r, 'track-resume-cta').props.disabled).toBe(false);
   });
+  it('Wechsel auf eine andere Fährte: alte Karte und Sperre verschwinden sofort, neue Entscheidung wird geladen', async () => {
+    mockEvaluate.mockResolvedValueOnce({ ok: true });
+    let finishApply!: (value: unknown) => void;
+    mockApply.mockImplementation(() => new Promise(resolve => { finishApply = resolve; }));
+    const r = await mount();
+    let pending: Promise<void>;
+    act(() => { pending = byId(r, 'track-resume-cta').props.onPress(); });   // Aktion läuft noch (busy + Sperre)
+    let finishEval!: (value: unknown) => void;
+    mockEvaluate.mockImplementationOnce(() => new Promise(resolve => { finishEval = resolve; }));
+    act(() => { r.update(<TrackResumeCta sessionId="sess-B" dogId="dog-A" hasRemoteSearchRun={false} onVisibleChange={mockVisible} />); });
+    expect(r.toJSON()).toBeNull();   // nie die Entscheidung der vorherigen Fährte
+    await act(async () => { finishEval({ ok: true }); await Promise.resolve(); });
+    expect(mockEvaluate).toHaveBeenLastCalledWith(expect.objectContaining({ sessionId: 'sess-B' }));
+    expect(byId(r, 'track-resume-cta').props.disabled).toBe(false);
+    await act(async () => { finishApply({ ok: true, target: '/alt' }); await pending; });
+    expect(mockPush).not.toHaveBeenCalled();   // alte Aktion navigiert nicht mehr
+    mockApply.mockResolvedValueOnce({ ok: true, target: '/neu' });
+    await act(async () => { await byId(r, 'track-resume-cta').props.onPress(); });
+    expect(mockPush).toHaveBeenCalledWith('/neu');   // Sperre der alten Aktion ist gelöst
+  });
 });
 
 

@@ -85,13 +85,21 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, s
   const generation = useRef(0);
   const [diagOpen, setDiagOpen] = useState(false);   // interne Diagnosedetails (nur QA-Modus), standardmässig zu
 
+  // Andere Fährte/anderer Kontext: Anzeigezustand schon beim Rendern zurücksetzen (React-Muster
+  // «State bei Prop-Wechsel anpassen»), damit nie die Entscheidung der vorherigen Fährte sichtbar ist.
+  const [shownFor, setShownFor] = useState({ sessionId, dogId, hasRemoteSearchRun, userId });
+  if (shownFor.sessionId !== sessionId || shownFor.dogId !== dogId
+    || shownFor.hasRemoteSearchRun !== hasRemoteSearchRun || shownFor.userId !== userId) {
+    setShownFor({ sessionId, dogId, hasRemoteSearchRun, userId });
+    setBusy(null);
+    setDecision(null);
+    setDone(false);
+  }
+
   useEffect(() => {
     let alive = true;
     const token = ++generation.current;
     actionLock.current = false;
-    setBusy(null);
-    setDecision(null);
-    setDone(false);
     evaluateTrackRecovery({ sessionId, dogId, hasRemoteSearchRun, ...(userId ? { userId } : {}) })
       .then(d => { if (alive) setDecision(d); })
       .catch(() => {});

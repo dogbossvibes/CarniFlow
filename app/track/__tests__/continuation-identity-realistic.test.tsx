@@ -112,7 +112,7 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     await afterLaying();
     await mount({ id: 'sess-A', dogId: 'dog-A' });
     expect(missing()).toBe(false);
-    expect(texts()).toContain('111');
+    expect(texts()).toContain('111 m');
   });
 
   it('1/3/4/5. Legen → Im Hintergrund weiterlaufen → Übersicht → Fortsetzen (Karte/Logbuch/DogHub = reopenTarget) → dieselbe Session/derselbe Hund', async () => {
@@ -127,7 +127,7 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     expect(routeParams(href)).toEqual({ dogId: 'dog-A', id: 'sess-A' });
     await mount(routeParams(href));
     expect(missing()).toBe(false);
-    expect(texts()).toContain('111');
+    expect(texts()).toContain('111 m');
     expect(useTrackingStore.getState().dogId).toBe('dog-A');
   });
 
@@ -137,7 +137,7 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     await mount({ id: 'sess-A', dogId: 'dog-A' });
     expect(missing()).toBe(false);
     expect(useTrackingStore.getState().dogId).toBe('dog-A');
-    expect(texts()).toContain('111');
+    expect(texts()).toContain('111 m');
   });
 
   it('10/13. Benachrichtigung/Live Activity (nur id) → Hund aus der Session, Puffer über Registry-Beleg', async () => {
@@ -170,12 +170,12 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     useActiveFaehrten.getState().upsert('dog-A', { status: 'resting', sessionId: 'sess-A' });
     useActiveFaehrten.getState().upsert('dog-B', { status: 'resting', sessionId: 'sess-B' });
     await mount({ id: 'sess-A' });
-    expect(texts()).toContain('111');
-    expect(texts()).not.toContain('222');
+    expect(texts()).toContain('111 m');
+    expect(texts()).not.toContain('222 m');
     act(() => { renderer.unmount(); }); renderer = null;
     useTrackingStore.setState({ dogId: null, currentSessionId: null, trackPoints: [], layStartedAt: null } as never);
     await mount({ id: 'sess-B', dogId: 'dog-B' });
-    expect(texts()).toContain('222');
+    expect(texts()).toContain('222 m');
     expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ sessionId: 'sess-A', status: 'resting' });
   });
 
