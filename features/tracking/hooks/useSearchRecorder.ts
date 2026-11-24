@@ -37,7 +37,7 @@ import {
 import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { getOffTrackThreshold, stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
-import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
+import { searchObjectKey, type SearchRunState, type SearchRunShortcut } from '@/features/tracking/store/searchRunState';
 import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
 import { dogProgressWithObjectHold } from '@/features/tracking/utils/dogObjectHold';
@@ -212,6 +212,10 @@ export interface SearchRecorder {
   manualLossActive: boolean;
   /** T-213: Fährtenverlust des Hundes melden (1. Antippen) bzw. «wieder auf der Fährte» (2. Antippen). */
   toggleManualLoss: () => void;
+  /** T-222: Anzahl der in dieser Absuche per Taste gemeldeten Abkürzungen. */
+  shortcutCount: number;
+  /** T-222: Abkürzung des Hundes melden (jedes Antippen = eine Meldung). */
+  markShortcut: () => void;
   dismissAutoObject: (id: string) => void;
   confirmEnd: () => void;
 }
@@ -228,6 +232,8 @@ export type SearchResult = {
   // statt es aus Distanzwerten zu schätzen.
   foundObjectIndices: number[];
   autoDwellObjectIds: string[];
+  /** T-222: per Taste «Abgekürzt» gemeldete Abkürzungen (reine Meldung, ohne Wirkung auf Score/Abweichung). */
+  shortcuts: SearchRunShortcut[];
   objectStatuses: ReferenceObjectStatus[];
   objectScoreBasis?: TrackObjectScoreBasis;
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
@@ -357,6 +363,8 @@ export function useSearchRecorder(opts: {
   const breaksRef = useRef<Break[]>([]);
   const manualLossRef = useRef(false);
   const [manualLossActive, setManualLossActive] = useState(false);
+  const shortcutsRef = useRef<SearchRunShortcut[]>([]);
+  const [shortcutCount, setShortcutCount] = useState(0);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
   // Anker-Recovery (Root-Cause-Fix, siehe searchFix.ts ANCHOR_RESET_*): die
@@ -1321,6 +1329,9 @@ export function useSearchRecorder(opts: {
       manualLossRef.current = !!lastBreak && lastBreak.manual === true && lastBreak.recoveredAtSec == null;
       setManualLossActive(manualLossRef.current);
     }
+    // T-222: gemeldete Abkürzungen bleiben beim Fortsetzen erhalten.
+    shortcutsRef.current = rs?.shortcuts ? rs.shortcuts.map(x => ({ ...x })) : [];
+    setShortcutCount(shortcutsRef.current.length);
     offTrackWarningSinceRef.current = null;
     offTrackReliableRef.current = false;
     offTrackRef.current = { ...initialOffTrack(), state: rs?.offTrackState ?? 'on_track' };
@@ -1456,6 +1467,7 @@ export function useSearchRecorder(opts: {
       analyticsSamples: analyticsSamplesRef.current.slice(),
       foundObjectIndices: Array.from(foundRef.current),
       autoDwellObjectIds: Array.from(autoDwellIdsRef.current),
+      shortcuts: shortcutsRef.current.slice(),
       objectStatuses: objectStatusesRef.current.slice(),
       pointsTimeSec: pointsTimeRef.current.slice(),
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
@@ -1528,6 +1540,18 @@ export function useSearchRecorder(opts: {
     pushSnapshot();
   }, [pushSnapshot]);
 
+  // T-222: Taste «Abgekürzt». Jedes Antippen hält eine Abkürzung des Hundes mit Zeit und
+  // Fortschritt entlang der Fährte fest. Reine Meldung: GPS-Verarbeitung, Cursor, Abweichung
+  // und Punktzahl bleiben unberührt. Sofort persistiert (übersteht Abbruch/Fortsetzen).
+  const markShortcut = useCallback(() => {
+    if (!recordingRef.current) return;
+    const nowSec = Math.max(0, (Date.now() - startMsRef.current) / 1000);
+    const mark: SearchRunShortcut = { tSec: Math.round(nowSec * 10) / 10, progressM: Math.round(maxCursorMRef.current * 10) / 10 };
+    shortcutsRef.current.push(mark);
+    setShortcutCount(shortcutsRef.current.length);
+    useTrackingStore.getState().noteSearchShortcut(mark);
+  }, []);
+
   const dismissAutoObject = useCallback((id: string) => {
     if (!autoDwellIdsRef.current.has(id)) return;
     const i = laidObjects.findIndex((o, index) => searchObjectKey(o, index) === id);
@@ -1573,6 +1597,7 @@ export function useSearchRecorder(opts: {
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, flushRawCapture, setPaused, markObject, manualLossActive, toggleManualLoss, dismissAutoObject, confirmEnd,
+    start, stop, flushRawCapture, setPaused, markObject, manualLossActive, toggleManualLoss,
+    shortcutCount, markShortcut, dismissAutoObject, confirmEnd,
   };
 }

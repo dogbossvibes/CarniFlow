@@ -208,3 +208,19 @@ describe('Continuity assessment', () => {
     expect(events[0].durationSec).toBe(6);
   });
 });
+
+describe('T-222: gemeldete Abkürzungen', () => {
+  it('werden sortiert, auf die Fährtenlänge begrenzt übernommen und ändern Score und Abweichung nicht', () => {
+    const without = computeTrackAnalyticsV3(input(straight()));
+    const withShortcuts = computeTrackAnalyticsV3(input(straight(), { shortcuts: [{ tSec: 30, progressM: 99 }, { tSec: 12.34, progressM: 11.26 }] }));
+    expect(withShortcuts.reportedShortcuts).toEqual([{ tSec: 12.3, alongTrackM: 11.3 }, { tSec: 30, alongTrackM: 38 }]);
+    expect('reportedShortcuts' in without).toBe(false);
+    const { reportedShortcuts: _ignored, ...rest } = withShortcuts;
+    expect(rest).toEqual(without);
+  });
+
+  it('ohne Meldung oder mit ungültigen Werten gibt es kein Feld', () => {
+    expect('reportedShortcuts' in computeTrackAnalyticsV3(input(straight(), { shortcuts: [] }))).toBe(false);
+    expect('reportedShortcuts' in computeTrackAnalyticsV3(input(straight(), { shortcuts: [{ tSec: Number.NaN, progressM: 3 }] }))).toBe(false);
+  });
+});

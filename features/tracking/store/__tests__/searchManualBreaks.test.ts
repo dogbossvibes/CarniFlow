@@ -26,3 +26,19 @@ it('der Sanitizer behält «manual» und erfindet es bei alten Einträgen nicht'
   expect('manual' in clean.breaks[2]).toBe(false);
   expect(clean.breaks[1]).toMatchObject({ recoveredAtSec: 40, durationSec: 12 });
 });
+
+// T-222: per Taste «Abgekürzt» gemeldete Abkürzungen.
+it('noteSearchShortcut hängt an und lässt den übrigen Suchzustand unverändert', () => {
+  const before = useTrackingStore.getState().searchRunState;
+  useTrackingStore.getState().noteSearchShortcut({ tSec: 12, progressM: 8 });
+  useTrackingStore.getState().noteSearchShortcut({ tSec: 20, progressM: 14 });
+  const after = useTrackingStore.getState().searchRunState;
+  expect(after).toEqual({ ...before, shortcuts: [{ tSec: 12, progressM: 8 }, { tSec: 20, progressM: 14 }] });
+});
+
+it('der Sanitizer behält gültige Abkürzungen, verwirft kaputte und erfindet bei alten Puffern keine', () => {
+  const clean = sanitizeSearchRunState({ shortcuts: [{ tSec: 12, progressM: 8 }, { tSec: 'x', progressM: 3 }, null, { tSec: -1, progressM: -2 }] });
+  expect(clean.shortcuts).toEqual([{ tSec: 12, progressM: 8 }, { tSec: 0, progressM: 0 }]);
+  expect('shortcuts' in sanitizeSearchRunState({ breaks: [] })).toBe(false);
+  expect('shortcuts' in sanitizeSearchRunState({ shortcuts: 'kaputt' })).toBe(false);
+});

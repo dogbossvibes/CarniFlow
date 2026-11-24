@@ -1,7 +1,7 @@
 // T-197: Messunsicherheit der Linienabweichung — reine Anzeigehilfe.
 import { computeTrackAnalyticsV3 } from '../../engine/trackAnalyticsV3';
 import type { AnalyticsSample } from '../../engine/trackAnalytics';
-import { DEVIATION_UNCERTAINTY_FACTOR, deviationUncertaintyM, medianAccuracyM } from '../deviationUncertainty';
+import { DEVIATION_UNCERTAINTY_FACTOR, deviationUncertaintyM, isWithinDeviationUncertainty, medianAccuracyM } from '../deviationUncertainty';
 import { formatDeviationUncertaintyM } from '../formatDeviation';
 
 describe('deviationUncertaintyM', () => {
@@ -50,5 +50,23 @@ describe('computeTrackAnalyticsV3', () => {
   });
   test('ohne gelegte Referenz zählt die Absuche allein', () => {
     expect(computeTrackAnalyticsV3(input(5, false)).deviationUncertaintyM).toBe(2);
+  });
+});
+
+describe('isWithinDeviationUncertainty (T-222)', () => {
+  test('gleiche Schwelle wie die Anzeige: ganze Meter, mindestens 1 m', () => {
+    // Fährte vom 23.11.: Genauigkeit ~3 m beim Legen und Suchen → ±2 m; 1,6 m am Knick liegt darin.
+    expect(isWithinDeviationUncertainty(1.6, 1.7)).toBe(true);
+    expect(isWithinDeviationUncertainty(2, 1.7)).toBe(true);
+    expect(isWithinDeviationUncertainty(2.1, 1.7)).toBe(false);
+    expect(isWithinDeviationUncertainty(0.9, 0.3)).toBe(true);
+    expect(isWithinDeviationUncertainty(1.2, 0.3)).toBe(false);
+  });
+  test('ohne Unsicherheit oder ohne Wert wird nichts behauptet', () => {
+    expect(isWithinDeviationUncertainty(0.5, null)).toBe(false);
+    expect(isWithinDeviationUncertainty(0.5, undefined)).toBe(false);
+    expect(isWithinDeviationUncertainty(null, 2)).toBe(false);
+    expect(isWithinDeviationUncertainty(Number.NaN, 2)).toBe(false);
+    expect(isWithinDeviationUncertainty(-1, 2)).toBe(false);
   });
 });

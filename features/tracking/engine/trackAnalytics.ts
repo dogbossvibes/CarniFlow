@@ -121,6 +121,12 @@ export interface TrackAnalyticsInput {
    * Analyse-Konfidenz exakt wie bisher.
    */
   referenceLine?: { latitude: number; longitude: number; accuracy: number | null }[];
+  /**
+   * Nur v3 (T-222): per Taste «Abgekürzt» gemeldete Abkürzungen (Sekunden seit Start,
+   * Fortschritt entlang der Fährte). Werden nur übernommen und angezeigt; sie ändern
+   * weder Score noch Abweichung noch Konfidenz.
+   */
+  shortcuts?: { tSec: number; progressM: number }[];
 }
 
 // ── Ausgaben ──────────────────────────────────────────────────────────────
