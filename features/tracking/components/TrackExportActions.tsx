@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { INDICATION_LABEL_KEYS, TRACK_INDICATIONS } from '@/features/tracking/dogTrackSettings/model';
 import { AccessibilityInfo, ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -59,6 +60,8 @@ export function TrackExportActions({ data, extraHint }: { data: unknown; extraHi
         status: Object.fromEntries((['found','not_found','unobserved','unknown'] as const).map(status => [status, t(`track.review.${status}`)])) };
       labels.confidenceLabels={ excellent:t('track.replay.legend.confidenceExcellent'), good:t('track.replay.legend.confidenceGood'), limited:t('track.replay.legend.confidenceLimited'), unreliable:t('track.replay.legend.confidenceUnreliable') };
       labels.materialLabels={ holz:t('track.materialWood'), duebel:t('track.materialDowel'), ball:t('track.materialBall'), gummi:t('track.materialRubber'), stoff:t('track.materialFabric'), filz:t('track.materialFelt'), leder:t('track.materialLeather'), plastik:t('track.materialPlastic'), metall:t('track.materialMetal'), teppich:t('track.materialCarpet'), diverses:t('track.materialOther'), gegenstand:t('track.object'), winkel:t('track.angle') };
+      labels.indication=t('track.settings.indication.title');
+      labels.indicationLabels=Object.fromEntries(TRACK_INDICATIONS.map(v=>[v,t(INDICATION_LABEL_KEYS[v])]));
       labels.lying=t('track.lyingTime'); labels.deviation=t('track.analysisLineDeviation'); labels.angles=t('track.angle');
       labels.outcomeLabels=Object.fromEntries((['found','not_found','unobserved','unknown'] as const).map(status=>[status,t(`track.review.${status}`)]));
       labels.angleLabels={ links:t('track.angleLeftFull'), rechts:t('track.angleRightFull'), spitz_links:t('track.angleAcuteLeftFull'), spitz_rechts:t('track.angleAcuteRightFull'), spitz:t('track.angleAcute'), absatz:t('track.angleStep'), abriss:t('track.angleBreak'), gw:t('track.angleGw'), ow:t('track.angleOw'), bw:t('track.angleBw') };

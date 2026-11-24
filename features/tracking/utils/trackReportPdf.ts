@@ -15,6 +15,8 @@ export interface ReportLabels {
   /** Optional additions (older callers keep the previous layout). */
   lying?: string; deviation?: string; angles?: string;
   outcomeLabels?: Record<string, string>; angleLabels?: Record<string, string>;
+  /** Anzeige am Gegenstand: Überschrift und Namen je Wert (ohne: keine Zeile). */
+  indication?: string; indicationLabels?: Record<string, string>;
 }
 const color = (hex: string): RGB => rgb(
   parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255,
@@ -228,6 +230,8 @@ export async function buildTrackReportPdf(
     const status = outcome.get(m.label);
     return `${m.label} · ${labels.materialLabels?.[m.material ?? m.kind] ?? m.material ?? m.kind}${status ? ` · ${status}` : ''}`;
   }).join('   /   ');
+  const indicationName = data.indication ? labels.indicationLabels?.[data.indication] : undefined;
+  const indication = indicationName && labels.indication ? `${labels.indication}: ${indicationName}` : '';
   const angleCounts = new Map<string, number>();
   for (const m of angleMarkers) {
     const name = labels.angleLabels?.[m.angleKind ?? ''] ?? labels.unknown;
@@ -235,7 +239,7 @@ export async function buildTrackReportPdf(
   }
   const angles = angleMarkers.length ? `${angleMarkers.length} · ${[...angleCounts].map(([name, n]) => `${n}× ${name}`).join(', ')}` : '';
   const colW = (width - 36) / 2;
-  const sections = [{ title: labels.conditions, body: conditions }, ...(objects ? [{ title: labels.objects, body: objects }] : []),
+  const sections = [{ title: labels.conditions, body: conditions }, ...(objects || indication ? [{ title: labels.objects, body: [indication, objects].filter(Boolean).join('\n') }] : []),
     ...(angles && labels.angles ? [{ title: labels.angles, body: angles }] : [])];
   const columns = sections.map(s => ({ title: wrap(s.title, 9, colW), body: wrap(s.body, 9, colW) }));
   const columnH = Math.max(...columns.map(col => col.title.length * 13 + 8 + col.body.length * 13));
