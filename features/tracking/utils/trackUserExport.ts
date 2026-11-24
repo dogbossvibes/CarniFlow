@@ -6,16 +6,24 @@ import { restoreLayContinuity } from './trackContinuity';
 /** User export contract. Deliberately separate from anonymised QA exports. */
 export interface ExportPoint { lat: number; lng: number; time?: string }
 export interface ExportContinuity { version: 1; hasGaps: true; searchHasGaps?: boolean; referenceHasGaps?: boolean }
-export interface ExportMarker { label: string; kind: string; lat: number; lng: number; material: string | null }
+export interface ExportMarker { label: string; kind: string; lat: number; lng: number; material: string | null; angleKind?: string }
+/** Recorded per-object outcome of the search (only when it maps safely onto G1…Gn). */
+export interface ExportObjectOutcome { label: string; status: 'found' | 'not_found' | 'unobserved' | 'unknown' }
 export interface TrackUserExport {
   format: 'anyvo-track'; version: 1; exportedAt: string;
   date: string | null; title: string; notes: string | null;
   reference: ExportPoint[][]; search: ExportPoint[][]; markers: ExportMarker[];
   summary: { referenceM: number | null; searchM: number | null; durationS: number | null;
-    found: number | null; total: number | null; analysisScore: number | null; confidence: string | null };
+    found: number | null; total: number | null; analysisScore: number | null; confidence: string | null;
+    /** Stored aging time in minutes; absent/null when not recorded. */
+    lyingMinutes?: number | null;
+    /** Mean deviation of the recorded search from the laid line in metres. */
+    deviationAvgM?: number | null };
   conditions: { temperatureC: number | null; humidityPercent: number | null; windSpeed: number | null; weather: string | null };
   /** Present only for explicit gap evidence; absent does not prove full observation. */
   continuity?: ExportContinuity;
+  /** Recorded per-object outcomes; omitted when a confirmed review exists or the mapping is unsafe. */
+  objectOutcomes?: ExportObjectOutcome[];
   /** Confirmed review projection; original measurements and analysis are unchanged. */
   objectReview?: { version: 1; revision: number; totalScore: number | null; auditTruncated: boolean;
     objects: { label: string; recordedStatus: string; effectiveStatus: string }[];
@@ -102,8 +110,10 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
     const kind = text(m.marker_type) ?? 'marker';
     const label = kind === 'gegenstand' ? isTrainingJoker(text(m.material)) ? `Joker: ${m.material}` : `G${++objectNo}` : kind;
     if (!point) continue;
-    markers.push({ ...point, label, kind, material: text(m.material) });
+    const angleKind = kind === 'winkel' ? text(m.angle_kind) : null;
+    markers.push({ ...point, label, kind, material: text(m.material), ...(angleKind ? { angleKind } : {}) });
   }
+  const objectOutcomes = objectReview ? undefined : recordedOutcomes(d, run, row, markers);
   const articleSummary = scoredObjectSummary(d);
   const legacyJokerAnalysis = array(analytics.objects).some(o => isTrainingJoker(text(record(o).material)));
   return {
@@ -111,10 +121,14 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
     date: text(d.session_date), notes: includeNotes ? text(d.notes) : null,
     reference, search, markers,
     summary: { referenceM: nonnegative(d.distance_meters), searchM: nonnegative(row.distance_meters ?? (runMatches ? run.distance_meters : undefined)),
-      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)), found: corrected ? corrected.completeFound : articleSummary.hasJokers ? articleSummary.found : nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
+      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)),
+      lyingMinutes: nonnegative(d.lying_time_minutes),
+      deviationAvgM: nonnegative(record(analytics.deviation).meanM ?? row.average_deviation_meters ?? (runMatches ? run.average_deviation_meters : undefined)),
+      found: corrected ? corrected.completeFound : articleSummary.hasJokers ? articleSummary.found : nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
       total: corrected ? corrected.total : articleSummary.total, analysisScore: !legacyJokerAnalysis && !continuity && typeof analytics.trackScore === 'number' && analytics.trackScore <= 100 ? nonnegative(analytics.trackScore) : null, confidence: text(analytics.analysisConfidenceBand) },
     conditions: { temperatureC: number(d.temperature), humidityPercent: number(d.humidity), windSpeed: nonnegative(d.wind_speed), weather: text(d.weather_condition ?? d.wetter) },
     ...(continuity ? { continuity } : {}),
+    ...(objectOutcomes ? { objectOutcomes } : {}),
     ...(objectReview ? { objectReview: { version: 1 as const, revision: objectReview.revision,
       totalScore: objectReview.totalScore, auditTruncated: objectReview.auditTruncated,
       objects: objectReview.objects.map(o => ({ label: reviewObjectLabel(objectReview!, o.objectId), recordedStatus: o.recordedStatus, effectiveStatus: o.effectiveStatus })),
@@ -124,6 +138,23 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
     } } : {}),
     positionMeaning: 'recorded-receiver-position',
   };
+}
+const OUTCOME: Record<string, ExportObjectOutcome['status']> = {
+  manual_found: 'found', auto_dwell_found: 'found', missed: 'not_found', user_removed: 'not_found', unobserved: 'unobserved', pending: 'unknown',
+};
+/** Read-only: maps the run's object snapshot onto G1…Gn only when order, count and material agree. */
+function recordedOutcomes(d: Record<string, unknown>, run: Record<string, unknown>, row: Record<string, unknown>, markers: ExportMarker[]): ExportObjectOutcome[] | undefined {
+  const hasRow = Array.isArray(d.runs) && d.runs.length > 0;
+  if (hasRow && !(typeof row.id === 'string' && row.id === run.run_id)) return undefined;
+  const snapshot = record(run.object_snapshot);
+  if (snapshot.version !== 1 || !Array.isArray(snapshot.objects)) return undefined;
+  const entries = snapshot.objects.map(record);
+  if (!entries.every((e, i) => e.index === i && typeof e.id === 'string')) return undefined;
+  const scored = entries.filter(e => !isTrainingJoker(text(e.material)));
+  const objects = markers.filter(m => /^G\d+$/.test(m.label));
+  if (!scored.length || scored.length !== objects.length) return undefined;
+  if (scored.some((e, i) => text(e.material) !== objects[i].material)) return undefined;
+  return objects.map((m, i) => ({ label: m.label, status: OUTCOME[String(scored[i].recordedStatus)] ?? 'unknown' }));
 }
 export function escapeXml(value: string): string {
   return value.replace(/[\uD800-\uDFFF]/gu, '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
@@ -136,5 +167,5 @@ export function trackExportGpx(data: TrackUserExport): string {
   const namespace = continuity ? ' xmlns:anyvo="urn:anyvo:track-continuity:1"' : '';
   const extension = continuity ? `<extensions><anyvo:continuity version="1" hasGaps="true"${typeof continuity.referenceHasGaps === 'boolean' ? ` referenceHasGaps="${continuity.referenceHasGaps}"` : ''}${typeof continuity.searchHasGaps === 'boolean' ? ` searchHasGaps="${continuity.searchHasGaps}"` : ''}/></extensions>` : '';
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ANYVO" xmlns="http://www.topografix.com/GPX/1/1"${namespace}><metadata><name>${escapeXml(data.title)}</name>${data.notes ? `<desc>${escapeXml(data.notes)}</desc>` : ''}${extension}</metadata>${data.markers.map(m =>
-    `<wpt lat="${m.lat}" lon="${m.lng}"><name>${escapeXml(m.label)}</name><type>${escapeXml(m.kind)}</type></wpt>`).join('')}${track(data.reference, 'Reference')}${track(data.search, 'Recorded search')}</gpx>\n`;
+    `<wpt lat="${m.lat}" lon="${m.lng}"><name>${escapeXml(m.label)}</name>${m.material || m.angleKind ? `<cmt>${escapeXml((m.angleKind ?? m.material)!)}</cmt>` : ''}<type>${escapeXml(m.kind)}</type></wpt>`).join('')}${track(data.reference, 'Reference')}${track(data.search, 'Recorded search')}</gpx>\n`;
 }

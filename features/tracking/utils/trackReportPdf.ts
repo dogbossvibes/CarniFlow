@@ -12,6 +12,9 @@ export interface ReportLabels {
   materialLabels?: Record<string, string>;
   reviewLabels?: { title: string; history: string; truncated: string; score: string; noScore: string; status: Record<string, string>; original: string };
   glyphNotice: string; partialNotice?: string;
+  /** Optional additions (older callers keep the previous layout). */
+  lying?: string; deviation?: string; angles?: string;
+  outcomeLabels?: Record<string, string>; angleLabels?: Record<string, string>;
 }
 const color = (hex: string): RGB => rgb(
   parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255,
@@ -121,6 +124,9 @@ export async function buildTrackReportPdf(
     [labels.reference, fmt(data.summary.referenceM, ' m')],
     [labels.search, fmt(data.summary.searchM, ' m')],
     [labels.duration, duration],
+    ...(labels.lying ? [[labels.lying, data.summary.lyingMinutes == null ? labels.unknown : `${Math.round(data.summary.lyingMinutes)} min`]] : []),
+    ...(labels.deviation ? [[labels.deviation, data.summary.deviationAvgM == null ? labels.unknown
+      : data.summary.deviationAvgM < 0.5 ? '< 1 m' : `${Math.round(data.summary.deviationAvgM)} m`]] : []),
     [data.objectReview && labels.reviewLabels ? labels.reviewLabels.title : labels.objects, `${fmt(data.summary.found)} / ${fmt(data.summary.total)}`],
   ].map(([label, value]) => {
     const numeric = /^[\d .:/min]+$/.test(value);
@@ -216,12 +222,25 @@ export async function buildTrackReportPdf(
   y -= scoreH + 20;
 
   const conditions = `${fmt(data.conditions.temperatureC, ' °C')} · ${data.conditions.weather ?? labels.unknown}\n${fmt(data.conditions.humidityPercent, ' %')} · ${fmt(data.conditions.windSpeed, ' km/h')}`;
-  const objects = data.markers.map(m => `${m.label} · ${labels.materialLabels?.[m.material ?? m.kind] ?? m.material ?? m.kind}`).join('   /   ');
+  const outcome = new Map((data.objectOutcomes ?? []).map(o => [o.label, labels.outcomeLabels?.[o.status]]));
+  const angleMarkers = labels.angles ? data.markers.filter(m => m.kind === 'winkel') : [];
+  const objects = data.markers.filter(m => !angleMarkers.includes(m)).map(m => {
+    const status = outcome.get(m.label);
+    return `${m.label} · ${labels.materialLabels?.[m.material ?? m.kind] ?? m.material ?? m.kind}${status ? ` · ${status}` : ''}`;
+  }).join('   /   ');
+  const angleCounts = new Map<string, number>();
+  for (const m of angleMarkers) {
+    const name = labels.angleLabels?.[m.angleKind ?? ''] ?? labels.unknown;
+    angleCounts.set(name, (angleCounts.get(name) ?? 0) + 1);
+  }
+  const angles = angleMarkers.length ? `${angleMarkers.length} · ${[...angleCounts].map(([name, n]) => `${n}× ${name}`).join(', ')}` : '';
   const colW = (width - 36) / 2;
-  const sections = [{ title: labels.conditions, body: conditions }, ...(objects ? [{ title: labels.objects, body: objects }] : [])];
+  const sections = [{ title: labels.conditions, body: conditions }, ...(objects ? [{ title: labels.objects, body: objects }] : []),
+    ...(angles && labels.angles ? [{ title: labels.angles, body: angles }] : [])];
   const columns = sections.map(s => ({ title: wrap(s.title, 9, colW), body: wrap(s.body, 9, colW) }));
   const columnH = Math.max(...columns.map(col => col.title.length * 13 + 8 + col.body.length * 13));
-  if (columnH <= 76) {
+  // Two short sections side by side; more sections or long text use the paginating flow.
+  if (columnH <= 76 && columns.length <= 2) {
     ensure(columnH);
     columns.forEach((col, i) => {
       const x = margin + i * (colW + 36);
