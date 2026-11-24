@@ -1,6 +1,6 @@
 import { C } from '@/constants/colors';
 import { GUIDED_TOUR_KEY } from '@/features/help/helpRegistry';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -8,11 +8,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // „ANYVO kennenlernen" — kurzer geführter Rundgang aus der Help-Registry.
 // Startet KEIN echtes Training; reines Info-Overlay mit Zurück/Weiter/Fertig.
-export function GuidedTour({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function GuidedTour({ visible, onClose, steps = GUIDED_TOUR_KEY }: {
+  visible: boolean;
+  onClose: () => void;
+  /** Andere Schrittfolge aus der Registry (z. B. erste Fährte); Standard = Rundgang. */
+  steps?: { titleKey: TranslationKey; textKey: TranslationKey }[];
+}) {
   const { t } = useT();
   const [step, setStep] = useState(0);
-  const total = GUIDED_TOUR_KEY.length;
-  const current = GUIDED_TOUR_KEY[step];
+  const total = steps.length;
+  const current = steps[step];
   const isLast = step === total - 1;
 
   const finish = () => { setStep(0); onClose(); };
@@ -38,7 +43,7 @@ export function GuidedTour({ visible, onClose }: { visible: boolean; onClose: ()
 
             {/* Fortschritts-Punkte */}
             <View style={s.dots}>
-              {GUIDED_TOUR_KEY.map((_, i) => (
+              {steps.map((_, i) => (
                 <View key={i} style={[s.dot, i === step && s.dotActive]} />
               ))}
             </View>

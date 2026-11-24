@@ -4,6 +4,7 @@ import { C } from '@/constants/colors';
 import {
   HELP_CATEGORY_LABEL_KEY,
   HELP_CATEGORY_ORDER,
+  FIRST_TRACK_GUIDE_ALL,
   HELP_TOPIC_TITLE_KEY,
   topicsByCategory,
   type HelpTopic,
@@ -28,6 +29,7 @@ export default function HelpCenterScreen() {
   const { t } = useT();
   const [topic, setTopic] = useState<HelpTopic | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  const [firstTrackOpen, setFirstTrackOpen] = useState(false);
   const showUndo = useUndoToast();
 
   const onReset = () => {
@@ -71,6 +73,26 @@ export default function HelpCenterScreen() {
             <Text style={s.tourSub}>{t('help.tourSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.accentText} />
+        </TouchableOpacity>
+
+        {/* ── ERSTE FÄHRTE (geführte Schritte, hier nur zum Nachlesen) ── */}
+        <TouchableOpacity
+          testID="help-first-track"
+          style={s.guideCard}
+          onPress={() => setFirstTrackOpen(true)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('help.firstGuideTitle')}
+          accessibilityHint={t('help.firstGuideSub')}
+        >
+          <View style={s.guideIcon}>
+            <Ionicons name="paw-outline" size={22} color={C.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.guideTitle}>{t('help.firstGuideTitle')}</Text>
+            <Text style={s.guideSub}>{t('help.firstGuideSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.subtle} />
         </TouchableOpacity>
 
         {/* ── KATEGORIEN ── */}
@@ -131,6 +153,7 @@ export default function HelpCenterScreen() {
 
       <HelpSheet visible={topic != null} topic={topic} onClose={() => setTopic(null)} showDetails />
       <GuidedTour visible={tourOpen} onClose={() => setTourOpen(false)} />
+      <GuidedTour visible={firstTrackOpen} onClose={() => setFirstTrackOpen(false)} steps={FIRST_TRACK_GUIDE_ALL} />
     </SafeAreaView>
   );
 }
@@ -162,6 +185,16 @@ const s = StyleSheet.create({
   },
   tourTitle: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: -0.2 },
   tourSub: { fontSize: 13, color: `${C.accentText}b0`, fontWeight: '600', marginTop: 2 },
+  guideCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginTop: 4, marginBottom: 8,
+  },
+  guideIcon: {
+    width: 42, height: 42, borderRadius: 12, backgroundColor: C.cardAlt,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  guideTitle: { fontSize: 16, color: C.white, fontWeight: '800', letterSpacing: -0.2 },
+  guideSub: { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 2 },
 
   abschnitt: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginTop: 24, marginBottom: 10 },
   karte: {

@@ -6,14 +6,14 @@ import {
   useHomeScreenConfig, type HomeScreenConfig,
 } from '@/stores/homeScreenConfig';
 import { keyForUser as helpKey, markHelpSeen, resetHelpSeenDeferred, useHelpSeen } from '@/stores/helpSeen';
-import { HELP_TOPICS, type HelpTopicId } from '@/features/help/helpRegistry';
+import { HELP_TOPICS, type HelpSeenId, type HelpTopicId } from '@/features/help/helpRegistry';
 
 const USER = 'user-1';
 const flush = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
 const stored = async (key: string) => JSON.parse((await AsyncStorage.getItem(key)) ?? 'null');
 
 let homeCfg: HomeScreenConfig;
-let seen: HelpTopicId[];
+let seen: HelpSeenId[];
 function Probe({ userId }: { userId: string }) {
   const cfg = useHomeScreenConfig(userId);
   const topics = useHelpSeen(userId);

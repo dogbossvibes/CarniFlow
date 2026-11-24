@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HELP_TOPICS, type HelpTopicId } from '@/features/help/helpRegistry';
+import { HELP_GUIDE_SEEN_IDS, HELP_TOPICS, type HelpSeenId } from '@/features/help/helpRegistry';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Pro-Nutzer „gesehen"-Status für Coachmarks/Hilfe. Lokal (AsyncStorage),
@@ -11,20 +11,21 @@ import { HELP_TOPICS, type HelpTopicId } from '@/features/help/helpRegistry';
 
 export const keyForUser = (userId?: string | null) => `help_seen_topics:${userId || 'anon'}`;
 
-const VALID = new Set<HelpTopicId>(Object.keys(HELP_TOPICS) as HelpTopicId[]);
+// Themen-IDs plus Schritt-für-Schritt-Anleitungen (z. B. erste Fährte).
+const VALID = new Set<HelpSeenId>([...(Object.keys(HELP_TOPICS) as HelpSeenId[]), ...HELP_GUIDE_SEEN_IDS]);
 
 // Nur gültige, deduplizierte Topic-IDs — nie crashen.
-export function sanitizeSeen(raw: unknown): HelpTopicId[] {
-  const out: HelpTopicId[] = [];
+export function sanitizeSeen(raw: unknown): HelpSeenId[] {
+  const out: HelpSeenId[] = [];
   if (Array.isArray(raw)) {
-    for (const x of raw) if (VALID.has(x as HelpTopicId) && !out.includes(x as HelpTopicId)) out.push(x as HelpTopicId);
+    for (const x of raw) if (VALID.has(x as HelpSeenId) && !out.includes(x as HelpSeenId)) out.push(x as HelpSeenId);
   }
   return out;
 }
 
 let currentUserId: string | null = null;
 let hydratedFor: string | null | undefined = undefined;
-let state: HelpTopicId[] = [];
+let state: HelpSeenId[] = [];
 const listeners = new Set<() => void>();
 const emit = () => { for (const l of listeners) l(); };
 
@@ -43,7 +44,7 @@ function persist() {
 }
 
 // Topic als gesehen markieren (idempotent).
-export function markHelpSeen(id: HelpTopicId) {
+export function markHelpSeen(id: HelpSeenId) {
   if (!VALID.has(id) || state.includes(id)) return;
   state = [...state, id];
   emit();
@@ -60,7 +61,7 @@ export function resetHelpSeen() {
 // Zurücksetzen mit Rückgängig-Frist: Anzeige sofort leer, gespeichert wird erst
 // bei `commit`. Wird die App vorher beendet, bleibt der gespeicherte Stand erhalten.
 type DeferredReset = { commit: () => void; undo: () => void };
-let pendingReset: { resetState: HelpTopicId[]; handle: DeferredReset } | null = null;
+let pendingReset: { resetState: HelpSeenId[]; handle: DeferredReset } | null = null;
 
 export function resetHelpSeenDeferred(): DeferredReset {
   // Erneutes Zurücksetzen, solange die Liste noch leer ist: dieselbe Rücknahme
@@ -69,7 +70,7 @@ export function resetHelpSeenDeferred(): DeferredReset {
   const owner = currentUserId;
   const previous = state;
   const sameOwner = () => currentUserId === owner && hydratedFor === owner;
-  const resetState: HelpTopicId[] = [];
+  const resetState: HelpSeenId[] = [];
   state = resetState;
   emit();
   const handle: DeferredReset = {
@@ -95,7 +96,7 @@ const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listen
 const getSnapshot = () => state;
 
 // Hook: hydriert pro Nutzer und liefert die reaktive „gesehen"-Liste.
-export function useHelpSeen(userId: string | null | undefined): HelpTopicId[] {
+export function useHelpSeen(userId: string | null | undefined): HelpSeenId[] {
   const seen = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   useEffect(() => {
     const uid = userId ?? null;
@@ -107,7 +108,7 @@ export function useHelpSeen(userId: string | null | undefined): HelpTopicId[] {
 // Wie useHelpSeen, liefert zusätzlich `hydrated`: erst true, wenn der Storage
 // für diesen Nutzer geladen wurde. Verhindert, dass Auto-Coachmarks vor dem
 // Laden fälschlich erscheinen (Snapshot startet leer).
-export function useHelpSeenState(userId: string | null | undefined): { seen: HelpTopicId[]; hydrated: boolean } {
+export function useHelpSeenState(userId: string | null | undefined): { seen: HelpSeenId[]; hydrated: boolean } {
   const seen = useHelpSeen(userId);
   const hydrated = hydratedFor === (userId ?? null);
   return { seen, hydrated };
