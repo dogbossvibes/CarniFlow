@@ -18,6 +18,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { HelpButton } from '@/components/help/HelpButton';
+import { noteSuccessfulSearch } from '@/features/storeReview/reviewPrompt';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
@@ -1213,6 +1214,8 @@ export default function TrackRunScreen() {
       } catch (e) { console.warn('[trackRun] enqueue', e); }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     }
+    // Bewertung (nur Zähler, best-effort, wartet nicht): erst nach erfolgreichem lokalem Speichern.
+    void noteSuccessfulSearch(transferAuth?.user.id, sessId, runId);
     setFinishing(false);
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
   };

@@ -51,6 +51,7 @@ import { TrackEvaluationLayout } from '@/features/tracking/components/TrackEvalu
 import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { maybeRequestReview } from '@/features/storeReview/reviewPrompt';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
 import {
   TRACK_SEGMENT_COLORS,
@@ -94,6 +95,15 @@ const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['in
 
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Bewertungsdialog: nur wenn nach dieser Absuche vorgemerkt; nie während gelegt/gesucht wird.
+  useEffect(() => {
+    let left = false;
+    void maybeRequestReview(id ? String(id) : null, {
+      isTrackBusy: () => left || useTrackingStore.getState().isRecording
+        || Object.values(useActiveFaehrten.getState().byDog).some(e => e.status === 'laying' || e.status === 'searching'),
+    });
+    return () => { left = true; };
+  }, [id]);
   const router = useRouter();
   const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
   const { session: authenticatedSession } = useSession();
