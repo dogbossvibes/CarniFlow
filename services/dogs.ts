@@ -1,3 +1,4 @@
+import { forgetDogExams } from '@/features/exam-book/store';
 import { supabase } from '@/lib/supabase';
 import type { NewDog } from '@/types';
 import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
@@ -85,6 +86,9 @@ export async function deleteDogWithDependents(dogId: string): Promise<{ error: E
     // Nur wenn die Datenbank das Löschen bestätigt (RLS kann ohne Fehler 0 Zeilen
     // löschen), dürfen die Dateien weg — sonst bleiben sie beim weiter bestehenden Hund.
     if (storageRefs.length > 0 && (data?.length ?? 0) > 0) await removeDogStorageRefs(storageRefs);
+    // Prüfungsbuch: Serverzeilen löscht der Fremdschlüssel mit (on delete cascade);
+    // lokal nur die Zeilen genau dieses Hundes, erst nach bestätigtem Löschen.
+    if (ownerId && (data?.length ?? 0) > 0) await forgetDogExams(ownerId, dogId).catch(() => {});
     return { error: null };
   } finally {
     // Calendar deletion can succeed before a later request fails; invalidate once.
