@@ -86,9 +86,13 @@ create table if not exists public.dog_exam_access_grants (
   dog_id           uuid not null references public.dogs(id) on delete cascade,
   grantee_user_id  uuid not null references auth.users(id) on delete cascade,
   connection_id    uuid not null references public.connections(id) on delete cascade,
+  -- Anzeigename des Hundes für die lesende Person (sie darf public.dogs nicht
+  -- lesen). Von der Besitzerin beim Freigeben gesetzt; kein weiteres Hundedatum.
+  dog_name         text not null,
   created_at       timestamptz not null default now(),
   revoked_at       timestamptz,
-  constraint dog_exam_access_grants_not_self check (grantee_user_id <> owner_id)
+  constraint dog_exam_access_grants_not_self check (grantee_user_id <> owner_id),
+  constraint dog_exam_access_grants_name_len check (length(dog_name) between 1 and 60)
 );
 
 -- Höchstens eine aktive Freigabe je Hund und Person.

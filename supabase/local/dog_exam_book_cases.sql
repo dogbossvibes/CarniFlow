@@ -94,12 +94,12 @@ select pg_temp.ok('owner links own track', (select count(*) from public.dog_exam
 select pg_temp.denied('link to foreign track rejected', $q$insert into public.dog_exam_links(exam_id,kind,target_id) values ('e0000000-0000-4000-8000-000000000001','training_session','5d000000-0000-4000-8000-000000000001')$q$);
 
 -- Freigaben: nur über akzeptierte Verbindung, nur eigener Hund.
-insert into public.dog_exam_access_grants(id,dog_id,grantee_user_id,connection_id) values
- ('9a000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a1','c3333333-3333-4333-8333-333333333333','cc000000-0000-4000-8000-000000000001');
+insert into public.dog_exam_access_grants(id,dog_id,grantee_user_id,connection_id,dog_name) values
+ ('9a000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a1','c3333333-3333-4333-8333-333333333333','cc000000-0000-4000-8000-000000000001','Luna');
 select pg_temp.ok('owner grants to connected trainer (either direction)', (select count(*) from public.dog_exam_access_grants) = 1);
-select pg_temp.denied('grant without accepted connection rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id) values ('a0000000-0000-4000-8000-0000000000a1','e5555555-5555-4555-8555-555555555555','cc000000-0000-4000-8000-000000000002')$q$);
-select pg_temp.denied('grant via someone else''s connection rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id) values ('a0000000-0000-4000-8000-0000000000a1','d4444444-4444-4444-8444-444444444444','cc000000-0000-4000-8000-000000000001')$q$);
-select pg_temp.denied('grant for foreign dog rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id) values ('d0000000-0000-4000-8000-0000000000d1','c3333333-3333-4333-8333-333333333333','cc000000-0000-4000-8000-000000000001')$q$);
+select pg_temp.denied('grant without accepted connection rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id,dog_name) values ('a0000000-0000-4000-8000-0000000000a1','e5555555-5555-4555-8555-555555555555','cc000000-0000-4000-8000-000000000002','Luna')$q$);
+select pg_temp.denied('grant via someone else''s connection rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id,dog_name) values ('a0000000-0000-4000-8000-0000000000a1','d4444444-4444-4444-8444-444444444444','cc000000-0000-4000-8000-000000000001','Luna')$q$);
+select pg_temp.denied('grant for foreign dog rejected', $q$insert into public.dog_exam_access_grants(dog_id,grantee_user_id,connection_id,dog_name) values ('d0000000-0000-4000-8000-0000000000d1','c3333333-3333-4333-8333-333333333333','cc000000-0000-4000-8000-000000000001','Rex')$q$);
 
 -- Trainer liest nur Luna, nur nicht entfernte Einträge, schreibt nichts.
 select pg_temp.as_user('c3333333-3333-4333-8333-333333333333');

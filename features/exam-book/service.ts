@@ -10,7 +10,7 @@ export type ExamLinkKind = 'training_session' | 'training_unit' | 'document';
 export interface ExamLink { id: string; exam_id: string; kind: ExamLinkKind; target_id: string; created_at: string }
 export interface ExamGrant {
   id: string; owner_id: string; dog_id: string; grantee_user_id: string; connection_id: string;
-  created_at: string; revoked_at: string | null;
+  dog_name: string; created_at: string; revoked_at: string | null;
 }
 export type ServiceResult<T> = { data: T; error: null } | { data: null; error: string };
 
@@ -30,16 +30,17 @@ export async function listSharedExams(dogId: string): Promise<ServiceResult<Exam
 // ── Freigaben (nur Besitzerin) ──────────────────────────────
 export async function listExamGrants(dogId: string): Promise<ServiceResult<ExamGrant[]>> {
   const { data, error } = await supabase.from('dog_exam_access_grants')
-    .select('id, owner_id, dog_id, grantee_user_id, connection_id, created_at, revoked_at')
+    .select('id, owner_id, dog_id, grantee_user_id, connection_id, dog_name, created_at, revoked_at')
     .eq('dog_id', dogId).is('revoked_at', null);
   if (error || !Array.isArray(data)) return fail(error);
   return { data: data as ExamGrant[], error: null };
 }
 
 /** Lesefreigabe für eine verbundene Person. Doppelte aktive Freigabe zählt als Erfolg. */
-export async function grantExamAccess(dogId: string, granteeUserId: string, connectionId: string): Promise<ServiceResult<true>> {
+export async function grantExamAccess(dogId: string, granteeUserId: string, connectionId: string, dogName: string): Promise<ServiceResult<true>> {
+  const name = dogName.trim().slice(0, 60) || '–';
   const { error } = await supabase.from('dog_exam_access_grants')
-    .insert({ dog_id: dogId, grantee_user_id: granteeUserId, connection_id: connectionId });
+    .insert({ dog_id: dogId, grantee_user_id: granteeUserId, connection_id: connectionId, dog_name: name });
   if (!error || error.code === '23505') return { data: true, error: null };
   return fail(error, error.code === '42501' ? 'EXAM_GRANT_NOT_ALLOWED' : 'EXAM_SERVICE_FAILED');
 }
@@ -55,7 +56,7 @@ export async function revokeExamAccess(grantId: string): Promise<ServiceResult<t
 /** Hunde anderer Personen, deren Prüfungsbuch ich lesen darf. */
 export async function listExamGrantsToMe(myUserId: string): Promise<ServiceResult<ExamGrant[]>> {
   const { data, error } = await supabase.from('dog_exam_access_grants')
-    .select('id, owner_id, dog_id, grantee_user_id, connection_id, created_at, revoked_at')
+    .select('id, owner_id, dog_id, grantee_user_id, connection_id, dog_name, created_at, revoked_at')
     .eq('grantee_user_id', myUserId).is('revoked_at', null);
   if (error || !Array.isArray(data)) return fail(error);
   return { data: data as ExamGrant[], error: null };
