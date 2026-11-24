@@ -80,13 +80,16 @@ Neue Verknüpfungstabelle `public.dog_exam_links`:
 `exam_id` → `dog_exam_results`, `kind` (`training_session` | `document`),
 `target_id` uuid, `created_at`; unique (`exam_id`, `kind`, `target_id`).
 
-Lokal (SQLite, additive Migration in `lib/localDb/migrations.ts`):
-`local_exam_results` mit denselben Feldern + `sync_status`, `remote_id`,
-`dirty_fields`. Neuer Sync-Typ `exam_result` im bestehenden `sync_queue`.
+Lokal (SQLite, additive Migration in `lib/localDb/migrations.ts`, Version 14):
+eigene Tabelle `local_exam_results` (ganzer Eintrag als JSON + `state`
+pending/synced/conflict, `base_updated_at`) mit eigenem Sync – **nicht** über
+`sync_queue`, weil ältere App-Stände unbekannte Queue-Typen verwerfen (gleiches
+Muster wie die Fährten-Verknüpfungen, Version 13). Änderungen eines anderen
+Geräts werden nie stillschweigend überschrieben (Konflikt, lokale Fassung bleibt).
 
 ## Datenwirkung
 
-- Nur **neue** Tabellen (Server und lokal) und ein neuer Wert im Sync-Typ.
+- Nur **neue** Tabellen (Server und lokal).
   Keine bestehende Tabelle, Spalte oder Datei wird geändert oder migriert.
 - Löschen eines Eintrags = `deleted_at` setzen (mit «Rückgängig»). Verknüpfte
   Dokumente und Fährten bleiben immer erhalten.
