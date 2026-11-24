@@ -52,6 +52,8 @@ import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { HelpButton } from '@/components/help/HelpButton';
+import { FirstTrackGuideCard, GUIDE_TARGET_STYLE, useFirstTrackGuide } from '@/components/help/FirstTrackGuide';
+import { FIRST_LAY_GUIDE } from '@/features/help/helpRegistry';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import type { TrackSegmentType } from '@/features/tracking/utils/trackSegments';
 import {
@@ -187,6 +189,9 @@ export default function LegenScreen() {
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
   // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
+  // Geführte erste Fährte: reine Anzeige, liest/schreibt nur den Hilfe-„gesehen"-Status.
+  const layGuide = useFirstTrackGuide({ guideId: 'guide_first_lay', legacyTopicId: 'track_laying',
+    steps: FIRST_LAY_GUIDE, minStep: phase === 'recording' ? 1 : 0, reached: phase === 'recording' });
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
@@ -812,7 +817,7 @@ export default function LegenScreen() {
             </View>
           )}
           <View className="flex-1" />
-          <HelpButton topicId="track_laying" autoShow tint={FT.text} />
+          <HelpButton topicId="track_laying" autoShow={layGuide.decided && !layGuide.active} tint={FT.text} />
           <View className="flex-row bg-white/10 rounded-[12px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
@@ -1124,6 +1129,8 @@ export default function LegenScreen() {
                       canStart ? t('track.gpsReadyAccuracy', { accuracy: Math.round(gpsAccuracy) }) :
                         t('track.gpsWaitingAccuracy', { accuracy: Math.round(gpsAccuracy) })}
                   </Text>
+                  <FirstTrackGuideCard guide={layGuide} steps={FIRST_LAY_GUIDE} counterKey="help.firstLayCounter"
+                    style={{ alignSelf: 'stretch', marginTop: 12 }} />
                   {/* Start mit brauchbarem Fix; unbrauchbare Warmup-Fixes bleiben Diagnose. */}
                   <Pressable
                     className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
@@ -1137,6 +1144,11 @@ export default function LegenScreen() {
                   </Pressable>
                 </View>
               </ScrollView>
+            </View>
+          )}
+          {phase === 'recording' && layGuide.active && !gsPicker && !winkelSheet && !pocketLock && !rainMode && (
+            <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: mapMetricsHeight + 12 }}>
+              <FirstTrackGuideCard guide={layGuide} steps={FIRST_LAY_GUIDE} counterKey="help.firstLayCounter" />
             </View>
           )}
         </View>
@@ -1224,6 +1236,7 @@ export default function LegenScreen() {
           <Pressable
             className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${gsPicker ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
             accessibilityLabel={t('track.setObjectButton')}
+            style={layGuide.target === 'object' && !gsPicker ? GUIDE_TARGET_STYLE : undefined}
             onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording'}
           >
             <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.accText : FT.text} />
@@ -1232,6 +1245,7 @@ export default function LegenScreen() {
           <Pressable
             accessibilityLabel={t('track.setAngleButton')}
             accessibilityHint={t('track.setAngleHint')}
+            style={layGuide.target === 'angle' && !winkelSheet ? GUIDE_TARGET_STYLE : undefined}
             className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${winkelSheet ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
             onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording'}
           >

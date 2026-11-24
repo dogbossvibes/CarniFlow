@@ -265,3 +265,28 @@ export const GUIDED_TOUR: TourStep[] = [
   { title: 'Absuche',         text: 'Wähle 5 m oder 10 m Abstand zum Hund. ANYVO passt die Hinweise entsprechend an.' },
   { title: 'Smart Analyse',   text: 'ANYVO wertet deine dokumentierten Trainingsdaten deterministisch aus.' },
 ];
+
+// ── Geführte erste Fährte ────────────────────────────────────────────────
+// Schritt-für-Schritt-Hinweise beim ersten Legen und bei der ersten Absuche.
+// Reine Daten; Anzeige über components/help/FirstTrackGuide, „gesehen" über
+// stores/helpSeen (pro Konto, lokal). Blockiert nie GPS oder Aufzeichnung.
+export type HelpGuideId = 'guide_first_lay' | 'guide_first_search';
+export type HelpSeenId = HelpTopicId | HelpGuideId;
+export const HELP_GUIDE_SEEN_IDS: HelpGuideId[] = ['guide_first_lay', 'guide_first_search'];
+
+/** Knopf in der Steuerleiste, der zum Schritt passt (wird hervorgehoben). */
+export type GuideTarget = 'object' | 'angle';
+export interface GuideStep { titleKey: TranslationKey; textKey: TranslationKey; target?: GuideTarget }
+
+export const FIRST_LAY_GUIDE: GuideStep[] = [
+  { titleKey: 'help.firstLayStartTitle', textKey: 'help.firstLayStartText' },
+  { titleKey: 'help.firstLayAngleTitle', textKey: 'help.firstLayAngleText', target: 'angle' },
+  { titleKey: 'help.firstLayObjectTitle', textKey: 'help.firstLayObjectText', target: 'object' },
+  { titleKey: 'help.firstLayEndTitle', textKey: 'help.firstLayEndText' },
+  { titleKey: 'help.firstLayRestTitle', textKey: 'help.firstLayRestText' },
+];
+export const FIRST_SEARCH_GUIDE: GuideStep[] = [
+  { titleKey: 'help.firstSearchTitle', textKey: 'help.firstSearchText' },
+];
+/** Für das Hilfe-Center: alle Schritte der ersten Fährte am Stück. */
+export const FIRST_TRACK_GUIDE_ALL: GuideStep[] = [...FIRST_LAY_GUIDE, ...FIRST_SEARCH_GUIDE];

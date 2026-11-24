@@ -18,6 +18,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { HelpButton } from '@/components/help/HelpButton';
+import { FirstTrackGuideCard, useFirstTrackGuide } from '@/components/help/FirstTrackGuide';
+import { FIRST_SEARCH_GUIDE } from '@/features/help/helpRegistry';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
@@ -139,6 +141,7 @@ export default function TrackRunScreen() {
   const storedColorDogId = useTrackingStore(st => id && st.currentSessionId === id ? st.dogId : null);
   const { color: layColor } = useDogTrackColor(dogId ?? storedColorDogId);
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
+  // Geführte erste Absuche: ein Hinweis beim Weg zum Ansatz; reine Anzeige, kein Start-Gate.
 
   // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
   // befüllt). Wird nach der Recovery-Entscheidung EINMAL gesetzt und bleibt stabil.
@@ -274,6 +277,9 @@ export default function TrackRunScreen() {
   const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
   const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
+  // Geführte erste Absuche: ein Hinweis beim Weg zum Ansatz; reine Anzeige, kein Start-Gate.
+  const searchGuide = useFirstTrackGuide({ guideId: 'guide_first_search', legacyTopicId: 'track_search',
+    steps: FIRST_SEARCH_GUIDE, reached: arming });
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
   const [noStartHandled, setNoStartHandled] = useState(false);   // kontrolliertes „kein Startpunkt" nur einmal
@@ -1341,7 +1347,7 @@ export default function TrackRunScreen() {
             </View>
           )}
           <View className="flex-1" />
-          <HelpButton topicId="track_search" autoShow tint={FT.text} size={18} />
+          <HelpButton topicId="track_search" autoShow={searchGuide.decided && !searchGuide.active} tint={FT.text} size={18} />
           {/* T-216: Abstand zum Hund während der Absuche umschalten (1 → 5 → 10 m). */}
           {!arming && s.recording && !blindSearch && (
             <Pressable
@@ -1571,6 +1577,8 @@ export default function TrackRunScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24 }}
               >
+              <FirstTrackGuideCard guide={searchGuide} steps={FIRST_SEARCH_GUIDE} counterKey="help.firstSearchCounter"
+                style={{ alignSelf: 'stretch', marginBottom: 16 }} />
               <View className="items-center gap-2">
                 <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(0,255,204,0.4)] bg-ft-acc-dim mb-1">
                   <Ionicons name="locate" size={26} color={FT.acc} />
