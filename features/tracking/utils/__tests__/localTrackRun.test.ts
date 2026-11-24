@@ -82,3 +82,12 @@ describe('immutable object review baseline', () => {
     } })).toEqual(buildRunResultPayload(base));
   });
 });
+
+describe('buildRunResultPayload — Anzeige am Gegenstand (Hundeprofil)', () => {
+  it('übernimmt den Vermerk additiv und lässt ihn ohne Angabe weg', () => {
+    expect(buildRunResultPayload(base)).not.toHaveProperty('indication');
+    const p = buildRunResultPayload({ ...base, indication: { version: 1, value: 'down', source: 'dog_profile' } });
+    expect(p.indication).toEqual({ version: 1, value: 'down', source: 'dog_profile' });
+    expect(p.score).toBe(88);   // keine Wirkung auf die Bewertung
+  });
+});

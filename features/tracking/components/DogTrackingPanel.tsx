@@ -5,6 +5,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
+import { useDogTrackSettings } from '@/features/tracking/hooks/useDogTrackSettings';
+import { dogTrackSettingsSummary } from '@/features/tracking/dogTrackSettings/summary';
 import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
 import { TrackColorPicker } from '@/components/dogs/TrackColorPicker';
 import { trackOverlayColorNameKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
@@ -22,6 +24,8 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
   const router = useRouter();
   const active = useDogActiveFaehrte(dogId);
   const { dog, color, colorKey, storedKey, loading: colorLoading, refresh } = useDogTrackColor(dogId);
+  const { settings: trackSettings, reload: reloadTrackSettings } = useDogTrackSettings(dogId);
+  useFocusEffect(useCallback(() => { void reloadTrackSettings(); }, [reloadTrackSettings]));
   const [colorOpen, setColorOpen] = useState(false);
   const [showTracks, setShowTracks] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
@@ -93,6 +97,14 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
         {savingColor && <ActivityIndicator color={color} />}
       </>}
     </View>}
+    <TouchableOpacity testID="dog-track-settings-link" style={s.settingsRow} accessibilityRole="button"
+      onPress={() => router.push({ pathname: '/dog-track-settings/[id]', params: { id: dogId, name: dogName } } as never)}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.settingsTitle}>{t('track.settings.title')}</Text>
+        <Text style={s.hint} numberOfLines={2}>{dogTrackSettingsSummary(trackSettings, t)}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={C.trackPrimary} />
+    </TouchableOpacity>
     {active ? <ActiveFaehrteCard entry={active} dogName={dogName} onOpen={() => router.push(reopenTarget(active) as never)} /> : <>
       {loading ? <ActivityIndicator color={color} /> : failed ? <TouchableOpacity onPress={() => setRevision(v => v + 1)} accessibilityRole="button" style={s.link}><Text style={s.hint}>{t('track.profile.retry')}</Text></TouchableOpacity> : null}
       {loadedScope === scope && tracks.length > 0 && <>
@@ -116,5 +128,7 @@ const s = StyleSheet.create({
   colorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 }, stripe: { width: 5, height: 28, borderRadius: 3, borderWidth: 0.5, borderColor: '#888888' },
   text: { flex: 1, color: C.trackText, fontSize: 13 }, hint: { color: C.trackTextSec, fontSize: 12, lineHeight: 18 },
   savedRow: { flexDirection: 'row', alignItems: 'center', padding: 12, minHeight: 48, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder },
+  settingsTitle: { color: C.trackText, fontSize: 14, fontWeight: '700' },
   selected: { borderColor: C.trackPrimary }, link: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, linkText: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', flexShrink: 1 },
 });

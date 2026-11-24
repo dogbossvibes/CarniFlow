@@ -27,7 +27,7 @@ describe('zentraler Guard', () => {
   });
   it('ACTIVE SEARCH GUIDANCE hängt am Guard: Voice, Haptik, Ende, Segmente, Off-Track', () => {
     expect(block('const voiceRecovery = useMemo', 'const hapticRecovery')).toContain('enabled: searchGuidanceActive,');
-    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);');
+    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible && hapticsEnabled(dogTrackSettings), hapticRecovery);');
     expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain('recording: searchGuidanceActive,');
     for (const field of ['paused: s.paused,', 'sessionId: effectiveId,', 'runId: runIdRef.current,'])
       expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain(field);

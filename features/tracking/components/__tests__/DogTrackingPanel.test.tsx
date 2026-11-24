@@ -12,6 +12,8 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocu
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k, locale: 'de-CH' }) }));
 jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ dog: mockDog, color: '#A78BFA', colorKey: 'violet', storedKey: 'violet', loading: false, refresh: mockRefresh }) }));
+const mockTrackSettings = { settings: { indication: 'down', handlerDistanceM: 10 }, loaded: true, userId: 'owner-1', reload: async () => {} };
+jest.mock('@/features/tracking/hooks/useDogTrackSettings', () => ({ useDogTrackSettings: () => mockTrackSettings }));
 jest.mock('@/features/tracking/hooks/useActiveFaehrte', () => ({ useDogActiveFaehrte: () => mockActive }));
 jest.mock('@/features/tracking/services/dogTrackRecoveryService', () => ({ getDogRecoveryTracks: (...a: unknown[]) => mockGetTracks(...a) }));
 jest.mock('@/features/tracking/services/trackService', () => ({ getTrackSessionById: (...a: unknown[]) => mockRemote(...a) }));
@@ -78,4 +80,13 @@ it('a late color save cannot refresh the previous account/dog context', async ()
   await act(async () => { finish({ error: null }); await promise; });
   expect(mockUpdate).toHaveBeenCalledWith('d', { track_overlay_color_key: '#ABCDEF' });
   expect(mockRefresh).not.toHaveBeenCalled(); expect(Alert.alert).not.toHaveBeenCalled();
+});
+
+it('verlinkt die Fährten-Einstellungen des Hundes mit Kurzübersicht', async () => {
+  await act(async () => { view = TestRenderer.create(<DogTrackingPanel userId="owner-1" dogId="dog-1" dogName="Aron" />); });
+  const link = view.root.find((n: any) => n.props?.testID === 'dog-track-settings-link' && typeof n.props.onPress === 'function');
+  const shown = view.root.findAll((n: any) => typeof n.children?.[0] === 'string').map((n: any) => n.children[0]);
+  expect(shown).toContain('track.settings.indication.down · 10 m');
+  act(() => { link.props.onPress(); });
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-track-settings/[id]', params: { id: 'dog-1', name: 'Aron' } });
 });
