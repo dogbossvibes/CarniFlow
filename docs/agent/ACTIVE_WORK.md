@@ -1,5 +1,23 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #269 und #274 (iOS 60 und Android 53/54) – 2026-11-24
+
+**Erledigt:** Production-Migration `release_newbie_quota` und OTA #269 «NEWBIE-Rückgabe» (PR #260, #266).
+OTA #274 «Abkürzung» (PR #268, T-222). Production: iOS `702667f2`, Android `e0ee6f3d`. PR #265 und #270
+(Doku) gemergt.
+
+**Offen:**
+- **Gerätetest #269 und #274** auf iOS und Android; erst danach Karten auf «Veröffentlicht». Für #274 achten auf:
+  Platz der vierten Taste auf kleinen Geräten, Wert «bei X m», Dialog «Noch nicht am Startpunkt» blieb im
+  Simulator einmal offen, obwohl die Absuche schon lief (Zusammenhang mit T-222 ungeklärt).
+- **Android-Nachzug** der iOS-Änderungen (Rückgängig, Fährten-Darstellung, Schnellmenü/Tab-Tipp/Mint): nicht
+  vorbereitet.
+- **Quick Wins Phase 1** (geführte erste Fährte, PDF/GPX-Export, Store-Auftritt, Bewertungen): eigene
+  Aufgaben-Sitzung, je ein PR.
+- **Französisch/Italienisch** der Winkelansage klingt doppelt.
+- **Simulator-Beobachtungen (ohne Auftrag):** Suchdauer beginnt nach App-Neustart wieder bei 00:00;
+  Startseite zeigt während laufender Absuche «1× liegt».
+
 ## Stand nach OTA #264 (iOS 60 und Android 53/54) – 2026-11-23
 
 **Erledigt:** OTA #264 «Winkelbegriffe» (T-219, Lint-Fix, T-220) auf iOS 60 und Android 53/54, von der

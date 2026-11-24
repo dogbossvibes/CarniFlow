@@ -1,5 +1,33 @@
 # ANYVO Master Status
 
+## Stand nach OTA #269 und #274 (iOS 60 und Android 53/54) – 2026-11-24
+
+Frisch aus EAS gelesen am 24.11.2026. Einzelheiten auf den Release-Karten #269 und #274 (beide «Live –
+Nachkontrolle offen», Testweg «Vorher», Gerätetest offen).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `702667f2ae224a2487f39b53ebcc5f4844244b21`,
+  Update Group `daa8cf1f-c1d5-47dd-b334-9a2f0a942d3c`, Branch `release/ios60-abkuerzung-20261124`.
+  Vorher: `de61d257` (#269), davor `893c4fd9` (#264).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit `e0ee6f3d47a3d9f16ce3a0d478a28dea1383bcc7`,
+  Update Group `0331d385-8852-4f5e-b93e-60dedd280a3d`, Branch `release/android53-abkuerzung-20261124`.
+  Vorher: `423a364a` (#269), davor `17f30ed1` (#264).
+- Die nächste OTA muss `702667f2` (iOS) bzw. `e0ee6f3d` (Android) enthalten.
+
+**Inhalt (beide Plattformen)**
+- **#269 NEWBIE-Rückgabe:** PR #260 (abgebrochene, nie abgesuchte Fährte gibt das Monatskontingent zurück)
+  und PR #266 (Lint-Fix `TrackResumeCta`, uhrzeitunabhängige Identitätstests). Vorher Production-Migration
+  `20261123200000_newbie_track_claim_release.sql` angewendet (rein additiv, Funktion `release_newbie_quota`,
+  SECURITY DEFINER, Rechte nur postgres/authenticated/service_role).
+- **#274 Abkürzung:** PR #268 (T-222, Taste «Abgekürzt» während der Absuche, «Abkürzung gemeldet · bei X m»
+  unter Details, Kennzeichnung «innerhalb der Messgenauigkeit»). Simulator mit abgespielter GPS-Route geprüft;
+  auf Entscheid der Nutzerin ohne vorherigen Gerätetest veröffentlicht.
+- Release-Linien bleiben Cherry-Picks auf dem aktiven Production-Stand.
+
+**Auf main, nicht ausgeliefert:** Android weiterhin ohne PR #237, #244, #247, #250, #254, #256, #238, #239,
+#241. Native Änderungen PR #196 und #200 nur per Build. Bereits verbrauchte NEWBIE-Buchungen (Kundenfall)
+nicht rückwirkend zurückgegeben.
+
 ## Stand nach OTA #264 (iOS 60 und Android 53/54) – 2026-11-23
 
 Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf Release-Karte #264 (Veröffentlicht, Gerätetest der Nutzerin bestanden).
