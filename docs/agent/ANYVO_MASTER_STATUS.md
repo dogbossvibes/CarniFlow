@@ -1,5 +1,26 @@
 # ANYVO Master Status
 
+## Stand nach OTA #264 (iOS 60 und Android 53/54) – 2026-11-23
+
+Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf Release-Karte #264 (Veröffentlicht, Gerätetest der Nutzerin bestanden).
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `893c4fd93c307c14d4ee4a45aae8e41d4b76a184`,
+  Update Group `70846bfc-262b-4820-bc3c-0918fbb38861`, Branch `release/ios60-winkelbegriffe-20261123`.
+  Vorher: `6280f74e` (#258).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit `17f30ed1305b4bb63ce5f335615f49c09f5d1fd6`,
+  Update Group `c4726aa8-7364-4097-bd27-28f96e3669d4`, Branch `release/android53-winkelbegriffe-20261123`.
+  Vorher: `12a9baf7` (#255).
+- Die nächste OTA muss `893c4fd9` (iOS) bzw. `17f30ed1` (Android) enthalten.
+
+**Inhalt #264 (beide Plattformen):** T-219 (PR #261, Richtung in der Ansage für OW/GW/BW/Abriss, keine
+Spitz-Auswahl bei OW/GW/BW), PR #263 (Lint-Fix SpecialAnglePicker), T-220 (PR #262, alte spitze OW/GW/BW mit
+«spitz» und Richtung). Release-Linien bleiben Cherry-Picks auf dem aktiven Production-Stand.
+
+**Auf main, nicht ausgeliefert:** NEWBIE-Rückgabe (PR #260; Migration `release_newbie_quota` nur auf Staging,
+Production-Migration und OTA brauchen Freigabe, Testweg «Vorher»). Android weiterhin ohne PR #237, #244, #247,
+#250, #254, #256, #238, #239, #241. Native Änderungen PR #196 und #200 nur per Build.
+
 ## Stand nach OTA #255 und #258 (iOS 60) – 2026-11-23
 
 Frisch aus EAS gelesen am 23.11.2026. Einzelheiten auf den Release-Karten #255 und #258.
