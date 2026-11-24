@@ -26,6 +26,18 @@ export interface SearchRunBreak {
   manual?: boolean;
 }
 
+/**
+ * T-222: per Taste «Abgekürzt» gemeldete Abkürzung des Hundes. Das Handy ist beim
+ * Hundeführer und kann eine Abkürzung im GPS-Rauschen nicht sicher erkennen; nur der
+ * Mensch sieht sie. Reine Meldung: fliesst nicht in Punktzahl oder Abweichung ein.
+ */
+export interface SearchRunShortcut {
+  /** Sekunden seit Start der Absuche. */
+  tSec: number;
+  /** Fortschritt entlang der gelegten Fährte (m) beim Antippen. */
+  progressM: number;
+}
+
 export interface SearchSegmentAnnounced {
   announcedApproach: boolean;
   announcedStart: boolean;
@@ -59,6 +71,8 @@ export interface SearchRunState {
   segmentAnnouncements: Record<string, SearchSegmentAnnounced>;
   /** PERSIST: bestätigte Abrisse (breaksRef) — Ergebnisdaten, nicht rekonstruierbar. */
   breaks: SearchRunBreak[];
+  /** PERSIST (T-222): per Taste gemeldete Abkürzungen. Fehlt in älteren Puffern → keine. */
+  shortcuts?: SearchRunShortcut[];
   /** PERSIST: diskreter Off-Track-State (nicht die Streaks) → keine falsche Übergangsansage nach Resume. */
   offTrackState: OffTrackState;
 }
@@ -113,6 +127,14 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
         }];
       })
     : [];
+  const shortcuts: SearchRunShortcut[] = Array.isArray(r.shortcuts)
+    ? (r.shortcuts as unknown[]).flatMap(x => {
+        if (!x || typeof x !== 'object') return [];
+        const o = x as Record<string, unknown>;
+        if (typeof o.tSec !== 'number' || !Number.isFinite(o.tSec) || typeof o.progressM !== 'number' || !Number.isFinite(o.progressM)) return [];
+        return [{ tSec: Math.max(0, o.tSec), progressM: Math.max(0, o.progressM) }];
+      })
+    : [];
   return {
     maxCursorM: Math.max(0, num(r.maxCursorM, 0)),
     devSumM: Math.max(0, num(r.devSumM, 0)),
@@ -131,6 +153,7 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
     endFired: r.endFired === true,
     segmentAnnouncements: seg,
     breaks,
+    ...(shortcuts.length ? { shortcuts } : {}),
     offTrackState: OFF_STATES.includes(r.offTrackState as OffTrackState) ? (r.offTrackState as OffTrackState) : 'on_track',
   };
 }

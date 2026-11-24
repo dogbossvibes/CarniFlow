@@ -9,7 +9,7 @@ import { sanitizeRestoredSegments, type TrackSegment } from '@/features/tracking
 import { DEFAULT_HANDLER_DISTANCE_M, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import {
   freshSearchRunState, sanitizeSearchRunState,
-  type SearchRunState, type SearchRunBreak, type SearchSegmentAnnounced,
+  type SearchRunState, type SearchRunBreak, type SearchRunShortcut, type SearchSegmentAnnounced,
 } from '@/features/tracking/store/searchRunState';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 
@@ -152,6 +152,7 @@ interface TrackingState {
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
   noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; unobservedProgressM?: number; unobservedObjectIds?: string[]; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
   noteSearchManualBreaks: (breaks: SearchRunBreak[]) => void;  // T-213: Taste «Fährtenverlust», sofort persistiert
+  noteSearchShortcut: (shortcut: SearchRunShortcut) => void;   // T-222: Taste «Abgekürzt», sofort persistiert
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
   noteSearchAutoDwell: (objectKey: string) => void;
   dismissSearchAutoDwell: (objectKey: string) => void;
@@ -374,6 +375,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   },
   noteSearchManualBreaks: (breaks) => {
     set(s => ({ searchRunState: { ...s.searchRunState, breaks } }));
+    persistNow(get);
+  },
+  noteSearchShortcut: (shortcut) => {
+    set(s => ({ searchRunState: { ...s.searchRunState, shortcuts: [...(s.searchRunState.shortcuts ?? []), shortcut] } }));
     persistNow(get);
   },
   noteSearchObjectFound: (key) => {

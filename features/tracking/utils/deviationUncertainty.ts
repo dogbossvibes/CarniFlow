@@ -36,3 +36,16 @@ export function deviationUncertaintyM(referenceAccuracyM: number | null | undefi
   const combined = Math.hypot(usable(referenceAccuracyM) ? referenceAccuracyM : 0, searchAccuracyM);
   return Math.round(DEVIATION_UNCERTAINTY_FACTOR * combined * 10) / 10;
 }
+
+/**
+ * T-222: Liegt eine einzelne Abweichung innerhalb der angezeigten Messunsicherheit?
+ * Dieselbe Schwelle wie in der Anzeige (`±` auf ganze Meter, mindestens 1 m), damit
+ * «±2 m» und «innerhalb der Messgenauigkeit» einander nie widersprechen. Ohne
+ * Unsicherheit (ältere Analysen) immer false: dann wird nichts behauptet.
+ * Reine Anzeigehilfe — ändert keine Abweichung und keine Punktzahl.
+ */
+export function isWithinDeviationUncertainty(valueM: number | null | undefined, uncertaintyM: number | null | undefined): boolean {
+  if (valueM == null || !Number.isFinite(valueM) || valueM < 0) return false;
+  if (!usable(uncertaintyM)) return false;
+  return valueM <= Math.max(1, Math.round(uncertaintyM));
+}

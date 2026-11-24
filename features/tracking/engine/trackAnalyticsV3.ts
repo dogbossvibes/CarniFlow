@@ -205,6 +205,12 @@ export interface TrackAnalyticsV3 extends Omit<TrackAnalyticsV2, 'analyticsVersi
    * älteren Analysen und wenn die Absuche keine GPS-Genauigkeit liefert.
    */
   deviationUncertaintyM?: number;
+  /**
+   * T-222: vom Hundeführer per Taste gemeldete Abkürzungen, aufsteigend nach Zeit.
+   * Reine Meldung des Menschen (das Handy sieht den Hund nicht); ohne Wirkung auf
+   * Score, Abweichung oder Konfidenz. Fehlt, wenn nichts gemeldet wurde.
+   */
+  reportedShortcuts?: { tSec: number; alongTrackM: number }[];
 }
 
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
@@ -704,6 +710,10 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
   const band: ConfidenceBand = confidenceBand(confidence);
   const { score, breakdown } = computeScore(deviationEvents, corners, pace, assessableDistance, sampleConfidence);
   const uncertaintyM = deviationUncertaintyM(referenceQuality?.medianAccuracyM, medianAccuracyM(input.samples.map(sample => sample.accuracyM)));
+  const reportedShortcuts = (input.shortcuts ?? [])
+    .filter(x => Number.isFinite(x.tSec) && Number.isFinite(x.progressM))
+    .map(x => ({ tSec: round1(Math.max(0, x.tSec)), alongTrackM: round1(Math.max(0, Math.min(input.trackLengthM, x.progressM))) }))
+    .sort((a, b) => a.tSec - b.tSec);
   return {
     ...base,
     analyticsVersion: ANALYTICS_VERSION_V3,
@@ -721,6 +731,7 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
     scoreBreakdown: breakdown,
     ...(referenceQuality ? { referenceQuality } : {}),
     ...(uncertaintyM != null ? { deviationUncertaintyM: uncertaintyM } : {}),
+    ...(reportedShortcuts.length ? { reportedShortcuts } : {}),
     trackScore: input.samples.length >= TRACK_ANALYSIS_THRESHOLDS.minSamplesForAssessment ? score : 0,
     // V3 zeigt keine irreführende „niedrigste Abweichung“ und wertet einen
     // automatischen Kontaktstatus nie als bestätigtes Verweisen.

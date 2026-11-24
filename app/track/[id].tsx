@@ -63,6 +63,7 @@ import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
 import { formatApproxDeviationM, formatDeviationUncertaintyM } from '@/features/tracking/utils/formatDeviation';
+import { isWithinDeviationUncertainty } from '@/features/tracking/utils/deviationUncertainty';
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
@@ -726,7 +727,18 @@ export default function TrackAuswertungScreen() {
                     {analyticsV3?.deviationEvents.map(event => (
                       <View key={event.id} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>
-                        <Text style={s.analyseDetailValue}>{event.durationSec.toFixed(1)} s · max. {formatApproxDeviationM(event.maxLineDeviationM)} · Confidence {Math.round(event.confidence * 100)} %</Text>
+                        <Text style={s.analyseDetailValue}>
+                          {event.durationSec.toFixed(1)} s · max. {formatApproxDeviationM(event.maxLineDeviationM)}
+                          {isWithinDeviationUncertainty(event.maxLineDeviationM, analyticsV3.deviationUncertaintyM) ? ` · ${t('track.analysisWithinAccuracy')}` : ''}
+                          {' '}· Confidence {Math.round(event.confidence * 100)} %
+                        </Text>
+                      </View>
+                    ))}
+                    {/* T-222: vom Hundeführer per Taste gemeldete Abkürzungen (Meldung, keine Messung). */}
+                    {analyticsV3?.reportedShortcuts?.map((x, i) => (
+                      <View key={`shortcut-${i}`} style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>{t('track.analysisShortcutReported')}</Text>
+                        <Text style={s.analyseDetailValue}>{t('track.analysisShortcutAt', { m: Math.round(x.alongTrackM) })}</Text>
                       </View>
                     ))}
                     {/* Re-Acquisition-Zeit (Punkt 1/9 der Nachbesserung) — nur wenn
@@ -753,6 +765,7 @@ export default function TrackAuswertungScreen() {
                         <Text style={s.analyseDetailLabel}>Winkel {i + 1} ({c.side === 'links' ? 'links' : c.side === 'rechts' ? 'rechts' : 'Fachwinkel'})</Text>
                         <Text style={s.analyseDetailValue}>
                           {c.maxLateralDeviationM != null ? `max. ${formatApproxDeviationM(c.maxLateralDeviationM)}` : 'nicht erreicht'}
+                          {isWithinDeviationUncertainty(c.maxLateralDeviationM, analyticsV3?.deviationUncertaintyM) ? ` · ${t('track.analysisWithinAccuracy')}` : ''}
                           {c.overshootM != null && c.overshootM > 0 ? ` · Überschuss ${formatApproxDeviationM(c.overshootM)}` : ''}
                           {'interpretation' in c ? ` · ${t(CORNER_INTERPRETATION_KEYS[c.interpretation])}` : ''}
                           {'stabilizationTimeSec' in c ? c.stabilizationTimeSec != null

@@ -1164,6 +1164,7 @@ export default function TrackRunScreen() {
       handlerDistanceHintM: searchHandlerDistanceM,
       // Referenz-Qualität der gelegten Fährte (Accuracy + scharfe Knicke ohne Winkel-Marker).
       referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, breakBefore: p.breakBefore, accuracy: snapData.laidAccuracies[i] ?? null })),
+      shortcuts: res.shortcuts,   // T-222: nur gemeldet, ohne Wirkung auf Score/Abweichung
     }) : undefined;
 
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
@@ -1676,6 +1677,20 @@ export default function TrackRunScreen() {
           >
             <Ionicons name={s.manualLossActive ? 'checkmark-circle' : 'help-buoy'} size={20} color={s.manualLossActive ? FT.warn : FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text" numberOfLines={1} adjustsFontSizeToFit>{t(s.manualLossActive ? 'track.lossEnd' : 'track.lossStart')}</Text>
+          </Pressable>
+          {/* T-222: Abkürzung des Hundes melden — im GPS nicht sicher erkennbar, nur der Mensch sieht sie. */}
+          <Pressable
+            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            style={arming ? { opacity: 0.45 } : undefined}
+            onPress={() => { hapticTap(); s.markShortcut(); }} disabled={arming}
+            accessibilityRole="button"
+            accessibilityLabel={t('track.shortcutA11y')}
+            accessibilityValue={s.shortcutCount > 0 ? { text: t('track.shortcutCount', { count: s.shortcutCount }) } : undefined}
+          >
+            <Ionicons name="git-merge-outline" size={20} color={FT.text} />
+            <Text className="text-[10.5px] font-extrabold text-ft-text" numberOfLines={1} adjustsFontSizeToFit>
+              {s.shortcutCount > 0 ? `${t('track.shortcut')} · ${s.shortcutCount}` : t('track.shortcut')}
+            </Text>
           </Pressable>
           <HoldToStopButton
             onStop={handleFinish}
