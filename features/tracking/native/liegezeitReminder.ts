@@ -8,7 +8,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
-const keyFor = (dogId: string) => `anyvo.layReminder.v1::${dogId}`;
+const KEY_PREFIX = 'anyvo.layReminder.v1::';
+const keyFor = (dogId: string) => `${KEY_PREFIX}${dogId}`;
 interface Stored { id: string; sessionId: string | null; fireAt: number }
 
 export interface LayReminderInput {
@@ -49,12 +50,54 @@ export async function scheduleLayReminder(input: LayReminderInput): Promise<void
   } catch { /* best-effort */ }
 }
 
-/** Entfernt die geplante Erinnerung dieses Hundes. Wirft nie. */
-export async function cancelLayReminder(dogId: string | null | undefined): Promise<void> {
+/**
+ * Entfernt die geplante Erinnerung dieses Hundes. Mit `sessionId` nur, wenn sie zu genau
+ * dieser Fährte gehört (eine Erinnerung ohne bekannte Fährte wird ebenfalls entfernt). Wirft nie.
+ */
+export async function cancelLayReminder(dogId: string | null | undefined, sessionId?: string | null): Promise<void> {
   if (!dogId) return;
   try {
     const stored = await readStored(dogId);
+    if (stored && sessionId && stored.sessionId && stored.sessionId !== sessionId) return;
     if (stored) await Notifications.cancelScheduledNotificationAsync(stored.id).catch(() => {});
     await AsyncStorage.removeItem(keyFor(dogId));
   } catch { /* best-effort */ }
+}
+
+/** Entfernt die Erinnerung einer bestimmten Fährte, egal für welchen Hund (z. B. beim Löschen). Wirft nie. */
+export async function cancelLayRemindersForSession(sessionId: string | null | undefined): Promise<void> {
+  if (!sessionId) return;
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter(k => k.startsWith(KEY_PREFIX));
+    for (const key of keys) {
+      const dogId = key.slice(KEY_PREFIX.length);
+      if ((await readStored(dogId))?.sessionId === sessionId) await cancelLayReminder(dogId, sessionId);
+    }
+  } catch { /* best-effort */ }
+}
+
+/**
+ * Abgleich mit der Registry offener Fährten (App-Start, Rückkehr in den Vordergrund):
+ * Eine Erinnerung bleibt nur, solange dieselbe Fährte des Hundes noch liegt. Deckt
+ * alle Wege ab, auf denen eine liegende Fährte endet (Abbruch, Verwerfen, Löschen,
+ * «ohne App abgeschlossen», Absuche gestartet). Wirft nie.
+ */
+export async function reconcileLayReminders(
+  byDog: Record<string, { status?: string | null; sessionId?: string | null } | undefined>,
+): Promise<string[]> {
+  const removed: string[] = [];
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter(k => k.startsWith(KEY_PREFIX));
+    for (const key of keys) {
+      const dogId = key.slice(KEY_PREFIX.length);
+      const stored = await readStored(dogId);
+      const entry = byDog[dogId];
+      const stillLying = !!stored && entry?.status === 'resting'
+        && (!stored.sessionId || !entry.sessionId || stored.sessionId === entry.sessionId);
+      if (stillLying) continue;
+      await cancelLayReminder(dogId);
+      removed.push(dogId);
+    }
+  } catch { /* best-effort */ }
+  return removed;
 }

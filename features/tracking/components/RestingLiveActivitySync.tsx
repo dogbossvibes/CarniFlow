@@ -5,6 +5,7 @@ import { useDogs } from '@/hooks/useDogs';
 import { useT } from '@/i18n';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { reconcileRestingActivities } from '@/features/tracking/native/restingActivityReconcile';
+import { reconcileLayReminders } from '@/features/tracking/native/liegezeitReminder';
 
 /**
  * Hält die Liegezeit-Live-Activities (iOS) mit der Active-Track-Registry in Einklang —
@@ -31,6 +32,15 @@ export function RestingLiveActivitySync() {
     const sub = AppState.addEventListener('change', s => { if (s === 'active') run(); });
     return () => sub.remove();
   }, [hydrated, dogsReady, dogs, t]);
+
+  // Liegezeit-Erinnerungen: nur solange dieselbe Fährte noch liegt (alle Plattformen, bei jeder Registry-Änderung).
+  const byDog = useActiveFaehrten(s => s.byDog);
+  useEffect(() => {
+    if (!hydrated) return;
+    void reconcileLayReminders(byDog);
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') void reconcileLayReminders(useActiveFaehrten.getState().byDog); });
+    return () => sub.remove();
+  }, [hydrated, byDog]);
 
   return null;
 }

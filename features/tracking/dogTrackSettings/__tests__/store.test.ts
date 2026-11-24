@@ -47,7 +47,7 @@ describe('Fährten-Einstellungen je Hund — Speichern', () => {
   it('offline: Gerätekopie gilt, nichts geht verloren', async () => {
     const { store, mem } = setup('offline');
     expect(await store.save('u1', 'd1', { haptics: false })).toEqual({ settings: { haptics: false }, synced: false });
-    expect(cache(mem)).toEqual({ raw: { version: 1, haptics: false }, pending: true });
+    expect(cache(mem)).toEqual({ raw: { version: 1, haptics: false }, pending: true, pendingKeys: ['haptics'] });
     expect(await store.load('u1', 'd1')).toEqual({ settings: { haptics: false }, synced: false });
   });
 
@@ -62,5 +62,47 @@ describe('Fährten-Einstellungen je Hund — Speichern', () => {
     const { store } = setup(null);
     expect(await store.load(null, 'd1')).toEqual({ settings: {}, synced: false });
     expect(await store.loadCached('u1', undefined)).toEqual({});
+  });
+
+  it('Nachtragen legt nur die lokal geänderten Felder auf den Kontostand (neuere Kontowerte bleiben)', async () => {
+    const { store, setRow, getRow } = setup('offline');
+    await store.save('u1', 'd1', { indication: 'down' });   // offline geändert
+    // Inzwischen auf einem anderen Gerät im Konto geändert:
+    setRow({ id: 'd1', owner_id: 'u1', track_settings: { version: 1, indication: 'sit', voice: false, layReminderMin: 60 } });
+    const loaded = await store.load('u1', 'd1');
+    expect(loaded.synced).toBe(true);
+    expect((getRow() as DogRow).track_settings).toEqual({ version: 1, indication: 'down', voice: false, layReminderMin: 60 });
+  });
+
+  it('offline entfernte Felder werden beim Nachtragen auch im Konto entfernt, andere bleiben', async () => {
+    const { store, mem, setRow, getRow } = setup('offline');
+    mem.set(dogTrackSettingsCacheKey('u1', 'd1'), JSON.stringify({ raw: { version: 1, indication: 'down', haptics: false }, pending: false }));
+    await store.save('u1', 'd1', { indication: undefined });
+    expect(cache(mem).pendingKeys).toEqual(['indication']);
+    setRow({ id: 'd1', owner_id: 'u1', track_settings: { version: 1, indication: 'stand', haptics: true } });
+    await store.load('u1', 'd1');
+    expect((getRow() as DogRow).track_settings).toEqual({ version: 1, haptics: true });
+  });
+
+  it('mehrere Offline-Änderungen sammeln ihre Felder', async () => {
+    const { store, mem } = setup('offline');
+    await store.save('u1', 'd1', { indication: 'down' });
+    await store.save('u1', 'd1', { voice: false });
+    expect(cache(mem).pendingKeys).toEqual(['indication', 'voice']);
+  });
+
+  it('Altformat-Gerätekopie ohne Feldliste: ganze Kopie wird nachgetragen, nichts geht verloren', async () => {
+    const { store, mem, getRow } = setup({ id: 'd1', owner_id: 'u1', track_settings: { version: 1, voice: false, other: 'keep' } });
+    mem.set(dogTrackSettingsCacheKey('u1', 'd1'), JSON.stringify({ raw: { version: 1, indication: 'retrieve' }, pending: true }));
+    await store.load('u1', 'd1');
+    expect((getRow() as DogRow).track_settings).toEqual({ version: 1, voice: false, other: 'keep', indication: 'retrieve' });
+    expect(cache(mem).pending).toBe(false);
+  });
+
+  it('Altformat bleibt beim weiteren Offline-Speichern «ganze Kopie offen»', async () => {
+    const { store, mem } = setup('offline');
+    mem.set(dogTrackSettingsCacheKey('u1', 'd1'), JSON.stringify({ raw: { version: 1, indication: 'retrieve' }, pending: true }));
+    await store.save('u1', 'd1', { voice: false });
+    expect(cache(mem)).toEqual({ raw: { version: 1, indication: 'retrieve', voice: false }, pending: true });
   });
 });

@@ -46,6 +46,7 @@ import { ExamTemplateBanner, ExamTemplateChooser, WindRelationPill } from '@/fea
 import { compassLabel, walkBearingDeg, windRelation, WIND_RELATION_MIN_SPEED_KMH } from '@/features/tracking/utils/windRelation';
 import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
 import { useDogTrackSettings } from '@/features/tracking/hooks/useDogTrackSettings';
+import { cancelLayReminder } from '@/features/tracking/native/liegezeitReminder';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
 import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
@@ -378,6 +379,7 @@ export default function LegenScreen() {
                   useActiveFaehrten.getState().remove(dId);
                   void clearPending(dId);
                   void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');   // dauerhaft: nie wieder „Fährte fortsetzen"
+                  void cancelLayReminder(dId, entry.sessionId);   // Liegezeit-Erinnerung der verworfenen Fährte
                   // NEWBIE: nie abgesuchte Fährte gibt das Kontingent zurück (Server prüft zusätzlich).
                   if (entry.sessionId && entry.status !== 'searching') void releaseNewbieQuota('track', entry.sessionId);
                   if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');

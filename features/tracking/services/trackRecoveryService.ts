@@ -18,6 +18,7 @@ import {
   clearLocalTrackCancelled, getLocalTrainingSessionById, markLocalTrackCancelled, setLocalTrackLifecycle,
 } from '@/features/training/repositories/localTrainingRepository';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
+import { cancelLayReminder } from '@/features/tracking/native/liegezeitReminder';
 import {
   deleteSearchPointsBySession, getLayTrackPointsBySession, getSearchPointsBySession, getTrackMarkersBySession, createLocalTrackPointsBatch, createLocalTrackMarker,
 } from '@/features/tracking/repositories/localTrackRepository';
@@ -224,6 +225,7 @@ export async function completeTrackWithoutApp(sessionId: string | null | undefin
       st.reset();   // leert nur diesen (bereits geräumten) Hunde-Slot
       void endLiegezeitNotification({ dogId, sessionId }).catch(() => {});
     }
+    void cancelLayReminder(dogId, sessionId);   // Liegezeit-Erinnerung DIESER Fährte (best-effort)
     return { ok: true };
   } catch (e) {
     console.warn('[trackRecovery] complete without app', e);

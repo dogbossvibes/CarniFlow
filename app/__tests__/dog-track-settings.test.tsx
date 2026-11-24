@@ -62,5 +62,5 @@ it('ohne Spalte (Migration offen): nur auf dem Gerät, mit Hinweis, kein Schreib
   expect(mockUpdate).not.toHaveBeenCalled();
   expect(texts(r!)).toContain('track.settings.deviceOnly');
   const cached = JSON.parse((await AsyncStorage.getItem('anyvo.dogTrackSettings.v1::owner-1::dog-1'))!);
-  expect(cached).toEqual({ raw: { version: 1, layReminderMin: 60 }, pending: true });
+  expect(cached).toEqual({ raw: { version: 1, layReminderMin: 60 }, pending: true, pendingKeys: ['layReminderMin'] });
 });

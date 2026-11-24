@@ -6,7 +6,7 @@ jest.mock('expo-notifications', () => ({
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { cancelLayReminder, layReminderFireAt, scheduleLayReminder } from '../liegezeitReminder';
+import { cancelLayReminder, cancelLayRemindersForSession, layReminderFireAt, reconcileLayReminders, scheduleLayReminder } from '../liegezeitReminder';
 
 const sched = Notifications.scheduleNotificationAsync as jest.Mock;
 const cancel = Notifications.cancelScheduledNotificationAsync as jest.Mock;
@@ -51,5 +51,37 @@ describe('Liegezeit-Erinnerung', () => {
   it('Fehler der Benachrichtigung werfen nie', async () => {
     sched.mockRejectedValueOnce(new Error('boom'));
     await expect(scheduleLayReminder(input(Date.now()))).resolves.toBeUndefined();
+  });
+
+  it('Abbruch mit Fährten-ID entfernt nie die Erinnerung einer anderen Fährte', async () => {
+    await scheduleLayReminder(input(Date.now()));
+    await cancelLayReminder('d1', 'other-session');
+    expect(cancel).not.toHaveBeenCalled();
+    await cancelLayReminder('d1', 's1');
+    expect(cancel).toHaveBeenCalledWith('reminder-1');
+  });
+
+  it('Löschen einer Fährte entfernt ihre Erinnerung, ohne den Hund zu kennen', async () => {
+    await scheduleLayReminder(input(Date.now()));
+    await cancelLayRemindersForSession('other');
+    expect(cancel).not.toHaveBeenCalled();
+    await cancelLayRemindersForSession('s1');
+    expect(cancel).toHaveBeenCalledWith('reminder-1');
+  });
+
+  it('Abgleich: bleibt, solange dieselbe Fährte liegt; sonst entfernt', async () => {
+    await scheduleLayReminder(input(Date.now()));
+    expect(await reconcileLayReminders({ d1: { status: 'resting', sessionId: 's1' } })).toEqual([]);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(await reconcileLayReminders({ d1: { status: 'searching', sessionId: 's1' } })).toEqual(['d1']);
+    expect(cancel).toHaveBeenCalledWith('reminder-1');
+  });
+
+  it.each([
+    ['Fährte nicht mehr offen (abgebrochen, verworfen, gelöscht)', {}],
+    ['andere Fährte liegt jetzt', { d1: { status: 'resting', sessionId: 's2' } }],
+  ])('Abgleich entfernt die Erinnerung: %s', async (_name, byDog) => {
+    await scheduleLayReminder(input(Date.now()));
+    expect(await reconcileLayReminders(byDog as never)).toEqual(['d1']);
   });
 });
