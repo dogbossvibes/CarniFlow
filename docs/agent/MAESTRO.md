@@ -10,8 +10,13 @@ es bisher von Hand im iOS-Simulator und Android-Emulator geprüft wurde.
 - **Keine Zugangsdaten im Repo.** Die Abläufe melden niemanden an. Die Nutzerin
   meldet sich einmalig von Hand mit dem Staging-Testkonto an; die Anmeldung bleibt
   erhalten, weil die Abläufe den App-Speicher nie löschen (`clearState: false`).
-- **Keine Fährtenaufnahme.** Simulator und Emulator liefern keine laufenden
-  GPS-Fixes; Legen, Liegezeit und Absuche werden nicht automatisch geprüft.
+- **Keine automatische Fährtenaufnahme.** Die Abläufe prüfen Legen, Liegezeit
+  und Absuche nicht. Von Hand geht es im iOS-Simulator: `xcrun simctl location
+  <Gerät> start <Punkt> <Punkt> …` spielt eine Route ab und liefert laufende
+  GPS-Fixes (2026-11-24 beim Test von T-222 belegt: Absuche mit Auswertung,
+  Messunsicherheit und gemeldeter Abkürzung). Ohne abgespielte Route bleibt
+  eine Fährte 0 m lang und hat keine Auswertung. Android-Emulator dafür nicht
+  geprüft. Eine abgespielte Route ist sauberes GPS und ersetzt keinen Feldtest.
 - **Keine Kosten** (Vorgabe der Nutzerin 2026-11-18): nur lokal auf dem Mac im
   iOS-Simulator und Android-Emulator. Kein Maestro Cloud (`maestro cloud …`, von
   der CLI beworben), keine EAS-Builds oder EAS Workflows, keine GitHub-Actions-
