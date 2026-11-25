@@ -1227,7 +1227,7 @@ export default function LegenScreen() {
               </ScrollView>
             </View>
           )}
-          {phase === 'recording' && layGuide.active && !gsPicker && !winkelSheet && !pocketLock && !rainMode && (
+          {phase === 'recording' && layGuide.active && !activeSegment && !gsPicker && !winkelSheet && !pocketLock && !rainMode && (
             <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: mapMetricsHeight + 12 }}>
               <FirstTrackGuideCard guide={layGuide} steps={FIRST_LAY_GUIDE} counterKey="help.firstLayCounter" />
             </View>
