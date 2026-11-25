@@ -26,6 +26,8 @@ import { useT } from '@/i18n';
 import { useToast } from '@/components/ui/Toast';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
 import type { Dog } from '@/types';
+import { useExamBook } from '@/features/exam-book/useExamBook';
+import { examProgress } from '@/features/exam-book/model';
 
 // Dünner Wrapper: lädt Hund + Trainings-Feed, baut das Dog-Hub-VM und rendert den
 // DogHubScreen. Route/Params/Deep-Links bleiben unverändert (`/dog/[id]`).
@@ -55,6 +57,12 @@ export default function DogHubRoute() {
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
   const [backpackItems, setBackpackItems] = useState<DogBackpackItem[]>([]);
   const [appointments, setAppointments] = useState<DogAppointment[]>([]);
+  // Prüfungsbuch: lokal (offline) gelesen; Kachel nur für eigene Hunde.
+  const examBook = useExamBook(userId, typeof id === 'string' ? id : '');
+  const examSummary = useMemo(() => {
+    const best = examProgress(examBook.exams).find(p => p.highestPassed);
+    return best?.highestPassed ? t('exam.passedLevel', { level: best.highestPassed.levelLabel }) : null;
+  }, [examBook.exams, t]);
 
   useEffect(() => {
     if (!id) return;
@@ -270,6 +278,11 @@ export default function DogHubRoute() {
         onSeedDemo: seedCmds,
         onDelete: deleteCmd,
       }}
+      exams={dog?.owner_id === userId ? {
+        count: examBook.exams.length,
+        summary: examSummary,
+        onOpen: () => router.push({ pathname: '/dog-exams/[id]', params: { id, name: dog?.name ?? '' } } as never),
+      } : undefined}
       backpack={{
         dogName: dog?.name ?? '',
         total: backpackCounts.total,

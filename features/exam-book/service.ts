@@ -87,3 +87,61 @@ export async function removeExamLink(linkId: string): Promise<ServiceResult<true
   if (error) return fail(error);
   return { data: true, error: null };
 }
+
+// ── Kandidaten zum Verknüpfen ───────────────────────────────
+export interface ExamLinkCandidate { kind: ExamLinkKind; id: string; date: string | null; title: string | null }
+
+const LINK_WINDOW_DAYS = 120;
+
+/** Tag `days` vor dem Prüfungsdatum (JJJJ-MM-TT). */
+export function linkWindowStart(examDate: string, days = LINK_WINDOW_DAYS): string {
+  const d = new Date(`${examDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Eigene Fährten, Trainings und Dokumente dieses Hundes aus den 120 Tagen vor der
+ * Prüfung (bis einschliesslich Prüfungstag). Nur lesen, nur eigene Zeilen.
+ */
+export async function listLinkCandidates(ownerId: string, dogId: string, examDate: string): Promise<ServiceResult<ExamLinkCandidate[]>> {
+  const from = linkWindowStart(examDate);
+  try {
+    const [tracks, units, docs] = await Promise.all([
+      supabase.from('training_sessions').select('id, session_date, title')
+        .eq('owner_id', ownerId).eq('dog_id', dogId).eq('type', 'track')
+        .gte('session_date', from).lte('session_date', examDate).order('session_date', { ascending: false }).limit(60),
+      supabase.from('training_units').select('id, session_date')
+        .eq('owner_id', ownerId).eq('dog_id', dogId)
+        .gte('session_date', from).lte('session_date', examDate).order('session_date', { ascending: false }).limit(60),
+      supabase.from('dog_documents').select('id, created_at, title')
+        .eq('owner_id', ownerId).eq('dog_id', dogId).order('created_at', { ascending: false }).limit(40),
+    ]);
+    if (tracks.error || units.error) return fail(tracks.error ?? units.error);
+    const pick = (rows: unknown, kind: ExamLinkKind, dateKey: string): ExamLinkCandidate[] =>
+      (Array.isArray(rows) ? rows : []).map((r: Record<string, unknown>) => ({
+        kind, id: String(r.id),
+        date: typeof r[dateKey] === 'string' ? (r[dateKey] as string).slice(0, 10) : null,
+        title: typeof r.title === 'string' && r.title.trim() ? r.title.trim().slice(0, 80) : null,
+      }));
+    return {
+      data: [
+        ...pick(tracks.data, 'training_session', 'session_date'),
+        ...pick(units.data, 'training_unit', 'session_date'),
+        // Dokumente: Tabelle kann bei älteren Ständen anders aussehen → Fehler ignorieren.
+        ...(docs.error ? [] : pick(docs.data, 'document', 'created_at')),
+      ],
+      error: null,
+    };
+  } catch (e) { return fail(e); }
+}
+
+/** Anzeigenamen der Besitzerinnen geteilter Prüfungsbücher (gleiche RPC wie bei Verbindungen). */
+export async function listOwnerNames(ownerIds: readonly string[]): Promise<Map<string, string>> {
+  if (ownerIds.length === 0) return new Map();
+  try {
+    const { data } = await supabase.rpc('get_profile_display_names', { p_ids: [...ownerIds] }) as
+      { data: { id: string; full_name: string | null; username: string | null }[] | null };
+    return new Map((data ?? []).map(p => [p.id, p.full_name ?? p.username ?? '']));
+  } catch { return new Map(); }
+}

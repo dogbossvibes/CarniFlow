@@ -15,6 +15,7 @@ jest.mock('@/components/dogs/DogCompactCard', () => ({ DogCompactCard: 'DogCard'
 // T-184 Etappe 2: Letztes Training wird hier nicht geladen (eigene Tests).
 jest.mock('@/hooks/useDogTrainingSummary', () => ({ useDogTrainingSummary: () => ({ data: undefined }) }));
 jest.mock('@/components/dogs/SharedDogsInbox', () => ({ SharedDogsInbox: 'SharedDogsInbox' }));
+jest.mock('@/features/exam-book/ui/SharedExamBooksCard', () => ({ SharedExamBooksCard: 'SharedExamBooksCard' }));
 jest.mock('@/components/dogs/types', () => ({ dogToIdentity: (dog: unknown) => dog }));
 jest.mock('@/components/ui/AnimatedPressable', () => ({ AnimatedPressable: 'AnimatedPressable' }));
 jest.mock('@/components/ui/DogIcon', () => ({ DogIcon: 'DogIcon' }));
