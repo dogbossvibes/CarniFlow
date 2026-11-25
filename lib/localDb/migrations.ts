@@ -197,4 +197,22 @@ export const MIGRATIONS: LocalMigration[] = [
     create index if not exists idx_unit_track_link_state
       on local_training_unit_tracks (owner_id, state);`,
   },
+  {
+    version: 14,
+    name: 'exam_book_results',
+    // Prüfungsbuch (Spec 01-pruefungsbuch.md). Eigene Tabelle statt sync_queue
+    // (ältere Clients verwerfen unbekannte Queue-Typen, siehe Version 13).
+    // payload_json enthält den ganzen Eintrag; die Spalten dienen nur der Suche.
+    // base_updated_at = Serverstand, auf dem die lokale Änderung beruht
+    // (Schutz gegen Überschreiben einer Änderung von einem anderen Gerät).
+    sql: `create table if not exists local_exam_results (
+      id text primary key, owner_id text not null, dog_id text not null, exam_date text not null,
+      payload_json text not null,
+      state text not null check (state in ('pending','synced','conflict')),
+      base_updated_at text, deleted_at text,
+      created_at text not null, updated_at text not null, last_error text
+    );
+    create index if not exists idx_exam_owner_dog on local_exam_results (owner_id, dog_id, exam_date);
+    create index if not exists idx_exam_owner_state on local_exam_results (owner_id, state);`,
+  },
 ];
