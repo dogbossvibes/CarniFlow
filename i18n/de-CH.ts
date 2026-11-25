@@ -3099,6 +3099,21 @@ export const deCH = {
   "exam.sharedUnavailable": "Dieses Prüfungsbuch ist nicht mehr geteilt.",
   "exam.attachmentsPrivate": "Anhänge sind nur für die Besitzerin oder den Besitzer sichtbar.",
   "exam.loadFailed": "Konnte nicht geladen werden.",
+  "exam.pdfExport": "Als PDF teilen",
+  "exam.pdfLocked": "Den PDF-Export gibt es mit Premium.",
+  "exam.pdfUnavailable": "Teilen ist auf diesem Gerät nicht möglich.",
+  "exam.pdfFailed": "Das PDF konnte nicht erstellt werden.",
+  "exam.pdfColDate": "Datum",
+  "exam.pdfColExam": "Prüfung",
+  "exam.pdfColPlace": "Verein / Ort",
+  "exam.pdfColPoints": "Punkte",
+  "exam.pdfColResult": "Ergebnis",
+  "exam.pdfNotPassed": "nicht bestanden",
+  "exam.pdfProgress": "Stand",
+  "exam.pdfEmpty": "Noch keine Prüfungen erfasst.",
+  "exam.pdfFooter": "Erstellt mit ANYVO",
+  "exam.pdfPage": "Seite {n} von {total}",
+  "exam.pdfGenerated": "Stand {date}",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere
