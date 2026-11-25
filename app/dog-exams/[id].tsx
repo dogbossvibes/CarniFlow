@@ -38,7 +38,8 @@ export default function DogExamsRoute() {
 function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string; dogName: string }) {
   const router = useRouter();
   const { t } = useT();
-  const { isPro } = useCapabilities();
+  // Solange das Abo noch lädt: weder Schloss noch Weg zu Premium (Knopf wartet).
+  const { isPro, loading: capabilitiesLoading } = useCapabilities();
   const { exams, conflicts, pending, loading, reload, available } = useExamBook(ownerId, dogId);
   const [shareOpen, setShareOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +59,7 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
   // PDF-Export (Premium). Entsteht nur auf dem Gerät; nichts wird hochgeladen.
   const [exporting, setExporting] = useState(false);
   const exportPdf = async () => {
+    if (capabilitiesLoading) return;
     if (!isPro) { router.push('/premium' as never); return; }
     if (exporting) return;
     setExporting(true);
@@ -124,11 +126,12 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
             )}
             {exams.length > 0 ? (
               <AnyvoButton
-                variant="secondary" icon={isPro ? 'document-text-outline' : 'lock-closed-outline'}
-                label={t('exam.pdfExport')} loading={exporting} onPress={() => void exportPdf()}
+                variant="secondary" icon={isPro || capabilitiesLoading ? 'document-text-outline' : 'lock-closed-outline'}
+                label={t('exam.pdfExport')} loading={exporting || capabilitiesLoading} disabled={capabilitiesLoading}
+                onPress={() => void exportPdf()}
               />
             ) : null}
-            {exams.length > 0 && !isPro ? <Text style={s.muted}>{t('exam.pdfLocked')}</Text> : null}
+            {exams.length > 0 && !isPro && !capabilitiesLoading ? <Text style={s.muted}>{t('exam.pdfLocked')}</Text> : null}
           </>}
       </ScrollView>
       <ExamShareSheet visible={shareOpen} onClose={() => setShareOpen(false)} ownerId={ownerId} dogId={dogId} dogName={dogName} />

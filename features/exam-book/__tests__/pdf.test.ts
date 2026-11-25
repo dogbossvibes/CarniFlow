@@ -1,5 +1,9 @@
 import { buildExam, type ExamInput, type ExamResult } from '../model';
-import { buildExamPdfModel, renderExamPdf, renderExamPdfBase64, type ExamPdfLabels } from '../pdf';
+import { buildExamPdfModel, renderExamPdf, renderExamPdfBase64, truncateNoteLines, wrapNote, type ExamPdfLabels } from '../pdf';
+import { safePdfFileName } from '../pdfShare';
+
+jest.mock('expo-file-system/legacy', () => ({}));
+jest.mock('expo-sharing', () => ({}));
 
 const labels: ExamPdfLabels = {
   title: 'Prüfungsbuch', colDate: 'Datum', colExam: 'Prüfung', colPlace: 'Verein / Ort', colPoints: 'Punkte', colResult: 'Ergebnis',
@@ -62,5 +66,46 @@ describe('PDF-Datei', () => {
     const pdf = renderExamPdf(model([]));
     expect(pdf.pageCount).toBe(1);
     expect(pdf.build()).toContain('%PDF');
+  });
+});
+
+describe('Notiz mit Absätzen', () => {
+  it('behält Zeilenumbrüche als eigene Zeilen, Leerzeile als Absatz', () => {
+    expect(wrapNote('Wind stark\nBoden nass\n\n\nZweiter Absatz', 8, 400)).toEqual(['Wind stark', 'Boden nass', '', 'Zweiter Absatz']);
+    expect(wrapNote('a\r\nb\rc', 8, 400)).toEqual(['a', 'b', 'c']);
+    expect(wrapNote('\n\nnur Text\n\n', 8, 400)).toEqual(['nur Text']);
+  });
+  it('bricht jeden Absatz einzeln um', () => {
+    const lines = wrapNote(`${'wort '.repeat(40)}\nkurz`, 8, 120);
+    expect(lines.length).toBeGreaterThan(2);
+    expect(lines[lines.length - 1]).toBe('kurz');
+  });
+  it('Emojis fallen weg, Absatz bleibt', () => {
+    expect(wrapNote('Super 🐕\nWeiter', 8, 400)).toEqual(['Super', 'Weiter']);
+  });
+  it('Kürzen behält Absätze und endet mit «…», ohne leere Zeile davor', () => {
+    expect(truncateNoteLines(['a', 'b', '', 'c', 'd'], 4)).toEqual(['a', 'b', '…']);
+    expect(truncateNoteLines(['a', 'b', 'c'], 3)).toEqual(['a', 'b', 'c']);
+    expect(truncateNoteLines(['a', '', 'b', 'c'], 4)).toEqual(['a', '', 'b', 'c']);
+  });
+  it('PDF enthält die Absätze als getrennte Textzeilen', () => {
+    const raw = renderExamPdf(model([exam('e1', { notes: 'Erste Zeile\nZweite Zeile' })])).build();
+    const hex = (t: string) => `<${Array.from(t).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('').toUpperCase()}>`;
+    const hasHex = (t: string) => raw.toUpperCase().includes(hex(t).toUpperCase());
+    expect(hasHex('Erste Zeile')).toBe(true);
+    expect(hasHex('Zweite Zeile')).toBe(true);
+    expect(hasHex('Erste Zeile Zweite Zeile')).toBe(false);
+  });
+});
+
+describe('Dateiname', () => {
+  it.each([
+    ['ANYVO-Pruefungsbuch-Jäger', 'ANYVO-Pruefungsbuch-Jaeger'],
+    ['Öli Über Groß', 'Oeli-Ueber-Gross'],
+    ['Chérie à l\'île', 'Cherie-a-l-ile'],
+    ['Jäger'.normalize('NFD'), 'Jaeger'],
+    ['🐕', 'ANYVO-Pruefungsbuch'],
+  ])('%s → %s', (input, out) => {
+    expect(safePdfFileName(input)).toBe(out);
   });
 });

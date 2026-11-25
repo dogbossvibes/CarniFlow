@@ -6,6 +6,7 @@ import { buildExam, type ExamInput } from '@/features/exam-book/model';
 // geteilte Ansicht nur lesend.
 let mockParams: Record<string, string> = { id: 'dog-1', name: 'Luna' };
 let mockPro = false;
+let mockCapsLoading = false;
 const mockPush = jest.fn();
 const mockBook = { exams: [] as any[], conflicts: new Set<string>(), pending: new Set<string>(), loading: false, reload: jest.fn(), readLocal: jest.fn(), available: true };
 const mockShared = jest.fn();
@@ -25,7 +26,7 @@ jest.mock('react-native-svg', () => {
   return { __esModule: true, default: C, Svg: C, G: C, Line: C, Polyline: C, Circle: C };
 });
 jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'owner' } }) }));
-jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ isPro: mockPro }) }));
+jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ isPro: mockPro, loading: mockCapsLoading }) }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string, p?: Record<string, unknown>) => p ? `${key}:${JSON.stringify(p)}` : key }) }));
 jest.mock('@/i18n/format', () => ({ formatDate: (d: Date) => d.toISOString().slice(0, 10) }));
 jest.mock('@/features/exam-book/useExamBook', () => ({ useExamBook: () => mockBook }));
@@ -51,7 +52,7 @@ const texts = (r: ReactTestRenderer) => r.root.findAllByType(Text).map(t => Stri
 const render = async () => { let r!: ReactTestRenderer; await act(async () => { r = TestRenderer.create(<DogExamsRoute />); }); return r; };
 
 beforeEach(() => {
-  mockParams = { id: 'dog-1', name: 'Luna' }; mockPro = false; mockPush.mockReset();
+  mockParams = { id: 'dog-1', name: 'Luna' }; mockPro = false; mockCapsLoading = false; mockPush.mockReset();
   Object.assign(mockBook, { exams, conflicts: new Set(), pending: new Set(['e2']) });
   mockShared.mockReset();
   mockSharePdf.mockReset();
@@ -127,4 +128,17 @@ it('PDF mit Premium: teilt das Prüfungsbuch mit beiden Einträgen', async () =>
   expect(model.rows).toHaveLength(2);
   expect(model.dogName).toBe('Luna');
   expect(fileName).toBe('ANYVO-Pruefungsbuch-Luna');
+});
+
+it('PDF solange das Abo lädt: kein Schloss, kein Weg zu Premium, kein PDF', async () => {
+  mockCapsLoading = true;
+  const r = await render();
+  expect(texts(r)).not.toContain('exam.pdfLocked');
+  const icons = r.root.findAll(n => n.props.label === 'exam.pdfExport' && typeof n.props.icon === 'string');
+  expect(icons.length).toBeGreaterThan(0);
+  expect(icons.every(n => n.props.icon !== 'lock-closed-outline' && n.props.disabled === true)).toBe(true);
+  // Auch ein direkter Aufruf (falls die Taste doch ausgelöst würde) führt nirgends hin.
+  await act(async () => { await icons[0].props.onPress(); });
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockSharePdf).not.toHaveBeenCalled();
 });
