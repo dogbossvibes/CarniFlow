@@ -34,6 +34,7 @@ import { documentDraftKey, loadDocumentDraft, saveDocumentDraft, clearDocumentDr
 import { SelectedExerciseCard } from '@/components/training/SelectedExerciseCard';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
+import { onTrainingSaved } from '@/lib/reviewPrompt';
 import { useProfile } from '@/hooks/useProfile';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
@@ -621,7 +622,10 @@ function DocumentForm() {
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     if (editing) router.replace({ pathname: '/unit/detail', params: { id: id! } });
-    else setSaved(true);
+    else {
+      setSaved(true);
+      void onTrainingSaved(session.user.id);
+    }
     } catch {
       if (!alive.current) return;
       haptic.error();

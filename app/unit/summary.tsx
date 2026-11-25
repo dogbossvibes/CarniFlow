@@ -19,6 +19,7 @@ import { useActiveTraining, resetUnit, updateSummaryDraft, saveActiveTrainingDra
 import { readTrainingSaveIntent, retryTrainingSave } from '@/features/training/documentation/saveIntent';
 import type { DocumentSave } from '@/services/trainingDocumentService';
 import { useSession } from '@/hooks/useSession';
+import { onTrainingSaved } from '@/lib/reviewPrompt';
 import { useProfile } from '@/hooks/useProfile';
 import { successHaptic, tapHaptic, haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
@@ -127,6 +128,7 @@ function SummaryForm() {
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     router.replace('/(tabs)/home');
+    void onTrainingSaved(session.user.id);
     } catch {
       if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally {

@@ -4,6 +4,7 @@ import { ANGLE_LABEL, ANGLE_SHORT } from '@/features/tracking/utils/angleClassif
 import { cornerGlowRange, nextSearchEvents, nextEventArcM, type SearchEvent } from '@/features/tracking/utils/searchMapView';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
+import { onTrainingSaved } from '@/lib/reviewPrompt';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
 import type { TransferRunIdentity } from '@/features/tracking-transfer/runScope';
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
@@ -1242,6 +1243,8 @@ export default function TrackRunScreen() {
     }
     setFinishing(false);
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
+    // Bewertungsabfrage erst, wenn die Auswertung zu sehen ist (verzögert, wirft nie).
+    if (sessId) void onTrainingSaved(transferAuth?.user.id);
   };
 
   const guardedBack = useCallback(() => {

@@ -21,6 +21,7 @@ import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { noteFirstLaunch } from '@/lib/reviewPrompt';
 import { ActiveFaehrtenSelfHeal } from '@/features/tracking/components/ActiveFaehrtenSelfHeal';
 import { AppIntentRouteHandler } from '@/features/appIntents/AppIntentRouteHandler';
 import { RestingLiveActivitySync } from '@/features/tracking/components/RestingLiveActivitySync';
@@ -39,6 +40,9 @@ void initMonitoring();
 // Die Selbstheilung aus Pending-Puffern läuft NICHT hier, sondern erst mit bekannter
 // Session + Hunden (ActiveFaehrtenSelfHeal im SessionProvider).
 void useActiveFaehrten.getState().hydrate();
+
+// Ersten App-Start merken (Bewertungsabfrage frühestens 7 Tage danach). Rein lokal.
+void noteFirstLaunch();
 
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).

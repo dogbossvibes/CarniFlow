@@ -10,6 +10,7 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
+import { onTrainingSaved } from '@/lib/reviewPrompt';
 import * as Crypto from 'expo-crypto';
 import { createDocumentedUnit } from '@/services/trainingUnitService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
@@ -110,6 +111,7 @@ function TimerForm() {
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     router.replace('/(tabs)/home');
+    void onTrainingSaved(ownerId);
     } catch {
       if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally { saveLock.current = false; }
