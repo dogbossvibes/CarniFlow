@@ -30,6 +30,7 @@ import { getMyInvitations } from "@/services/umfrageService";
 import type { TrainerUmfrage } from "@/types/umfrage";
 import { supabase, SUPABASE_BACKEND_ENV } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
+import { openStoreReviewPage } from "@/lib/storeReview";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
 import { useT, NATIVE_NAME } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
@@ -758,6 +759,16 @@ export default function ProfilScreen() {
               Linking.openURL(`mailto:shadesofym@gmail.com?subject=${encodeURIComponent('ANYVO Feedback')}`)
                 .catch(() => Alert.alert(t('profile.noMailApp'), t('profile.mailFallback')))
             }
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="star-outline"
+            label={t('profile.rateApp')}
+            onPress={() => {
+              void openStoreReviewPage().then((opened) => {
+                if (!opened) Alert.alert(t('profile.rateAppError'));
+              });
+            }}
           />
           <View style={s.trenner} />
           <EinstellungZeile

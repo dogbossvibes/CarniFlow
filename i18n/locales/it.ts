@@ -909,6 +909,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "profile.messages": "Messaggi",
   "profile.helpCenter": "Centro assistenza",
   "profile.sendFeedback": "Invia feedback",
+  "profile.rateApp": "Valuta l'app",
+  "profile.rateAppError": "Impossibile aprire lo store.",
   "profile.terms": "Condizioni",
   "profile.privacy": "Privacy",
   "timer.running": "ALLENAMENTO IN CORSO",

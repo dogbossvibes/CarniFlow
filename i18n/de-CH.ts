@@ -911,6 +911,8 @@ export const deCH = {
   'profile.messages':        'Nachrichten',
   'profile.helpCenter':      'Hilfecenter',
   'profile.sendFeedback':    'Feedback senden',
+  'profile.rateApp':    'App bewerten',
+  'profile.rateAppError': 'Store konnte nicht geöffnet werden.',
   'profile.terms':           'Nutzungsbedingungen (AGB)',
   'profile.privacy':         'Datenschutz',
 

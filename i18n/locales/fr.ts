@@ -685,6 +685,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "profile.messages":        "Messages",
   "profile.helpCenter":      "Centre d'aide",
   "profile.sendFeedback":    "Envoyer un commentaire",
+  "profile.rateApp":    "Évaluer l'app",
+  "profile.rateAppError": "Impossible d'ouvrir le store.",
   "profile.terms":           "Conditions d'utilisation (CGU)",
   "profile.privacy":         "Confidentialité",
 
