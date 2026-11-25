@@ -3144,4 +3144,6 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "voiceField.toggleOff": "Désactiver la commande vocale",
   "voiceField.started": "Commande vocale activée",
   "voiceField.stopped": "Commande vocale désactivée",
+  "voiceField.undoNotInSearch": "Annuler n'est pas possible pendant la recherche.",
+  "voiceField.notNow": "Pas possible maintenant.",
 };
