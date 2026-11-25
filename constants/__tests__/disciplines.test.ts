@@ -68,7 +68,7 @@ describe('Obedience-Übung „Kegelgruppe umrunden"', () => {
   it('bleibt Teil der vollständigen DISCIPLINES-Liste (keine Sparte verloren)', () => {
     const keys = DISCIPLINES.map(d => d.key);
     expect(keys).toEqual([
-      'faehrte', 'unterordnung', 'schutzdienst', 'obedience', 'agility', 'rally', 'mondioring', 'eigene',
+      'faehrte', 'unterordnung', 'schutzdienst', 'obedience', 'agility', 'rally', 'mondioring', 'mantrailing', 'eigene',
     ]);
   });
 });
