@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,24 +25,32 @@ export default function DogTrackSettingsScreen() {
   const scope = `${userId ?? ''}:${id ?? ''}`;
   const settings = local?.key === scope ? local.settings : loadedSettings;
   const synced = local?.key === scope ? local.synced : null;
+  // Jede Auswahl gilt sofort; Speichervorgänge laufen nacheinander (keine Sperre, kein verlorener Tipp).
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestRef = useRef<{ key: string; settings: DogTrackSettings } | null>(null);
+  const openRef = useRef(0);
 
-  const save = async (patch: DogTrackSettingsPatch) => {
-    if (!userId || !id || saving) return;
-    setSaving(true);
-    setLocal({ key: scope, settings: { ...settings, ...patch }, synced: null });   // sofort sichtbar
-    try {
-      if (patch.handlerDistanceM != null) await dogLeadSetting.save(id, patch.handlerDistanceM);
-      const result = await dogTrackSettingsStore.save(userId, id, patch);
-      setLocal({ key: scope, settings: result.settings, synced: result.synced });
-    } finally { setSaving(false); }
-  };
+  const save = useCallback((patch: DogTrackSettingsPatch) => {
+    if (!userId || !id) return;
+    const base = latestRef.current?.key === scope ? latestRef.current.settings : settings;
+    const optimistic = { ...base, ...patch };
+    latestRef.current = { key: scope, settings: optimistic };
+    setLocal({ key: scope, settings: optimistic, synced: null });   // sofort sichtbar
+    openRef.current += 1; setSaving(true);
+    queueRef.current = queueRef.current.then(async () => {
+      try {
+        if (patch.handlerDistanceM != null) await dogLeadSetting.save(id, patch.handlerDistanceM);
+        const result = await dogTrackSettingsStore.save(userId, id, patch);
+        // Nur der letzte offene Speichervorgang übernimmt das Ergebnis; neuere Tipps bleiben sichtbar.
+        if (openRef.current === 1 && latestRef.current?.key === scope) {
+          latestRef.current = { key: scope, settings: result.settings };
+          setLocal({ key: scope, settings: result.settings, synced: result.synced });
+        } else setLocal(prev => prev && prev.key === scope ? { ...prev, synced: result.synced } : prev);
+      } catch { /* Gerätekopie ist bereits geschrieben oder bleibt beim nächsten Tipp erhalten */ }
+      finally { openRef.current -= 1; if (openRef.current === 0) setSaving(false); }
+    });
+  }, [userId, id, scope, settings]);
 
-  const chip = (label: string, selected: boolean, onPress: () => void, testID?: string) => (
-    <TouchableOpacity key={label} testID={testID} onPress={onPress} disabled={saving} accessibilityRole="radio"
-      accessibilityState={{ checked: selected, disabled: saving }} style={[s.chip, selected && s.chipOn]}>
-      <Text style={[s.chipText, selected && s.chipTextOn]}>{label}</Text>
-    </TouchableOpacity>
-  );
   const exam = settings.examTemplate ?? null;
 
   return (
@@ -64,45 +72,54 @@ export default function DogTrackSettingsScreen() {
           <Text style={s.label}>{t('track.settings.indication.title')}</Text>
           <Text style={s.hint}>{t('track.settings.indication.hint')}</Text>
           <View style={s.row} accessibilityRole="radiogroup">
-            {TRACK_INDICATIONS.map(v => chip(t(INDICATION_LABEL_KEYS[v]), settings.indication === v, () => void save({ indication: v }), `indication-${v}`))}
-            {chip(t('track.settings.none'), !settings.indication, () => void save({ indication: undefined }), 'indication-none')}
+            {TRACK_INDICATIONS.map(v => <Chip key={`indication-${v}`} label={t(INDICATION_LABEL_KEYS[v])} selected={settings.indication === v} onPress={() => save({ indication: v })} testID={`indication-${v}`} />)}
+            <Chip label={t('track.settings.none')} selected={!settings.indication} onPress={() => save({ indication: undefined })} testID="indication-none" />
           </View>
 
           <Text style={s.label}>{t('track.settings.distance.title')}</Text>
           <Text style={s.hint}>{t('track.settings.distance.hint')}</Text>
           <View style={s.row} accessibilityRole="radiogroup">
-            {HANDLER_DISTANCES_M.map(d => chip(`${d} m`, settings.handlerDistanceM === d, () => void save({ handlerDistanceM: d }), `distance-${d}`))}
+            {HANDLER_DISTANCES_M.map(d => <Chip key={`distance-${d}`} label={`${d} m`} selected={settings.handlerDistanceM === d} onPress={() => save({ handlerDistanceM: d })} testID={`distance-${d}`} />)}
           </View>
 
           <Text style={s.label}>{t('track.settings.exam.title')}</Text>
           <Text style={s.hint}>{t('track.settings.exam.hint')}</Text>
           <View style={s.row} accessibilityRole="radiogroup">
-            {chip(t('track.settings.exam.training'), exam === null, () => void save({ examTemplate: null }), 'exam-training')}
-            {EXAM_TEMPLATES.map(tpl => chip(tpl.label, exam === tpl.id, () => void save({ examTemplate: tpl.id }), `exam-${tpl.id}`))}
+            <Chip label={t('track.settings.exam.training')} selected={exam === null} onPress={() => save({ examTemplate: null })} testID="exam-training" />
+            {EXAM_TEMPLATES.map(tpl => <Chip key={`exam-${tpl.id}`} label={tpl.label} selected={exam === tpl.id} onPress={() => save({ examTemplate: tpl.id })} testID={`exam-${tpl.id}`} />)}
           </View>
 
           <Text style={s.label}>{t('track.settings.reminder.title')}</Text>
           <Text style={s.hint}>{t('track.settings.reminder.hint')}</Text>
           <View style={s.row} accessibilityRole="radiogroup">
-            {chip(t('track.settings.off'), settings.layReminderMin == null, () => void save({ layReminderMin: null }), 'reminder-off')}
-            {LAY_REMINDER_MINUTES.map(m => chip(t('track.settings.minutes', { minutes: m }), settings.layReminderMin === m, () => void save({ layReminderMin: m }), `reminder-${m}`))}
+            <Chip label={t('track.settings.off')} selected={settings.layReminderMin == null} onPress={() => save({ layReminderMin: null })} testID="reminder-off" />
+            {LAY_REMINDER_MINUTES.map(m => <Chip key={`reminder-${m}`} label={t('track.settings.minutes', { minutes: m })} selected={settings.layReminderMin === m} onPress={() => save({ layReminderMin: m })} testID={`reminder-${m}`} />)}
           </View>
 
           <Text style={s.label}>{t('track.settings.help.title')}</Text>
           <View style={s.switchRow}>
             <Text style={s.switchText}>{t('track.settings.help.haptics')}</Text>
-            <Switch testID="haptics-switch" value={hapticsEnabled(settings)} disabled={saving} onValueChange={v => void save({ haptics: v })}
+            <Switch testID="haptics-switch" value={hapticsEnabled(settings)} onValueChange={v => save({ haptics: v })}
               trackColor={{ true: C.trackPrimary }} accessibilityLabel={t('track.settings.help.haptics')} />
           </View>
           <View style={s.switchRow}>
             <Text style={s.switchText}>{t('track.settings.help.voice')}</Text>
-            <Switch testID="voice-switch" value={voiceEnabled(settings)} disabled={saving} onValueChange={v => void save({ voice: v })}
+            <Switch testID="voice-switch" value={voiceEnabled(settings)} onValueChange={v => save({ voice: v })}
               trackColor={{ true: C.trackPrimary }} accessibilityLabel={t('track.settings.help.voice')} />
           </View>
           <Text style={s.hint}>{t('track.settings.help.hint')}</Text>
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function Chip({ label, selected, onPress, testID }: { label: string; selected: boolean; onPress: () => void; testID?: string }) {
+  return (
+    <TouchableOpacity testID={testID} onPress={onPress} accessibilityRole="radio"
+      accessibilityState={{ checked: selected }} style={[s.chip, selected && s.chipOn]}>
+      <Text style={[s.chipText, selected && s.chipTextOn]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 

@@ -29,6 +29,7 @@ import DogTrackSettingsScreen from '@/app/dog-track-settings/[id]';
 type Node = any;
 const flush = async () => { for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve(); }); };
 const byId = (r: Node, id: string) => r.root.find((n: Node) => n.props?.testID === id && typeof n.props.onPress === 'function');
+const checked = (r: Node, id: string) => r.root.findAll((n: Node) => n.props?.testID === id && n.props.accessibilityState)[0].props.accessibilityState.checked;
 const texts = (r: Node) => r.root.findAll((n: Node) => typeof n.children?.[0] === 'string').map((n: Node) => n.children[0]);
 
 beforeEach(async () => {
@@ -63,4 +64,27 @@ it('ohne Spalte (Migration offen): nur auf dem Gerät, mit Hinweis, kein Schreib
   expect(texts(r!)).toContain('track.settings.deviceOnly');
   const cached = JSON.parse((await AsyncStorage.getItem('anyvo.dogTrackSettings.v1::owner-1::dog-1'))!);
   expect(cached).toEqual({ raw: { version: 1, layReminderMin: 60 }, pending: true, pendingKeys: ['layReminderMin'] });
+});
+
+it('schnelle Tipps hintereinander gehen nicht verloren (Speichern läuft nacheinander, ohne Sperre)', async () => {
+  let row: Record<string, unknown> = { id: 'dog-1', owner_id: 'owner-1', track_settings: null };
+  mockGetDog.mockImplementation(async () => ({ data: row, error: null }));
+  mockUpdate.mockImplementation(async (_id: string, u: Record<string, unknown>) => {
+    await new Promise(resolve => setTimeout(resolve, 20));   // langsames Netz
+    row = { ...row, ...u }; return { data: row, error: null };
+  });
+  let r: Node;
+  await act(async () => { r = TestRenderer.create(<DogTrackSettingsScreen />); });
+  await flush();
+  await act(async () => {
+    byId(r!, 'indication-down').props.onPress();
+    byId(r!, 'distance-10').props.onPress();
+    byId(r!, 'exam-ifh1').props.onPress();
+  });
+  // Sofort alle drei sichtbar gewählt
+  for (const id of ['indication-down', 'distance-10', 'exam-ifh1']) expect(checked(r!, id)).toBe(true);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
+  await flush();
+  expect(row.track_settings).toEqual({ version: 1, indication: 'down', handlerDistanceM: 10, examTemplate: 'ifh1' });
+  for (const id of ['indication-down', 'distance-10', 'exam-ifh1']) expect(checked(r!, id)).toBe(true);
 });
