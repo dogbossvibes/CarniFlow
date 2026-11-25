@@ -18,7 +18,7 @@ import { addCommand, getCommands, deleteCommand } from '@/features/dogs/dogComma
 
 describe('NEWBIE — core model', () => {
   it('quotas: dog=1, training=2/month, track=1/month', () => {
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1, mantrail: 1 });   // Mantrailing: eigenes Kontingent (Spec 02)
   });
   it('first monthly track allowed, next blocked until reset', () => {
     expect(quotaAllowsNew(false, 'track', 0)).toBe(true);

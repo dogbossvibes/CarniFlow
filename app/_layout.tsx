@@ -105,6 +105,9 @@ export default function RootLayout() {
         <Stack.Screen name="analyse/coach" />
         <Stack.Screen name="track/[id]" />
         <Stack.Screen name="track/legen"  options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        {/* Mantrailing (Spec 02): wie die Fährte ohne Wischgeste, damit eine laufende Aufnahme nicht versehentlich verlassen wird. */}
+        <Stack.Screen name="mantrail/legen" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="mantrail/run"   options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="sync" />
         {/* ANYVO CONNECT — Stack-Routen. Die Route-Dateien laden ihren Screen nur
             bei aktivem Feature-Flag (sonst Redirect); reine Registrierung ist

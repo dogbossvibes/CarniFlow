@@ -160,6 +160,21 @@ describe('10: healActiveFaehrtenFromPending (App-Neustart)', () => {
   });
 });
 
+describe('Mantrailing (Spec 02): Selbstheilung behält die Art', () => {
+  it('liegender Mantrail-Puffer → Registry mit kind=mantrail und eigenem Ziel; IGP-Puffer ohne kind', async () => {
+    await writePendingNow('dog-A', pending());
+    await writePendingNow('dog-B', pending({ dogId: 'dog-B', sessionId: 'sess-M' }));
+    mockSession.mockImplementation(async (id: string) => id === 'sess-M'
+      ? { ...sessionRow, local_id: 'sess-M', dog_id: 'dog-B', type: 'mantrail' } : sessionRow);
+    expect(await healActiveFaehrtenFromPending(['dog-A', 'dog-B'])).toBe(2);
+    const igp = useActiveFaehrten.getState().get('dog-A')!;
+    expect(igp).toMatchObject({ status: 'resting', sessionId: 'sess-A' });
+    expect('kind' in igp).toBe(false);
+    expect(useActiveFaehrten.getState().get('dog-B')).toMatchObject({ status: 'resting', sessionId: 'sess-M', kind: 'mantrail' });
+    noSideEffects();
+  });
+});
+
 describe('Account-Wechsel: Selbstheilung nur für Hunde des angemeldeten Nutzers', () => {
   it('Account A hinterlässt Pending dog-A; Account B (nur dog-B) → dog-A wird NICHT registriert, dog-B schon', async () => {
     await writePendingNow('dog-A', pending({ dogId: 'dog-A', sessionId: 'sess-A' }));

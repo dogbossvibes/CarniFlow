@@ -13,6 +13,9 @@ let mockCurrentLabels: Record<string, string> = {};
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
+// Mantrailing-Karte (Spec 02) hängt an den im Profil eingeschalteten Sparten.
+let mockSparten: string[] | null = null;
+jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: mockSparten ? { aktive_sparten: mockSparten } : null }) }));
 // T-184 Etappe 2: Abschnitt „Weitermachen“ hat eigene Tests.
 jest.mock('@/components/training/ContinueTrainingSection', () => ({ ContinueTrainingSection: () => null }));
 
@@ -158,5 +161,24 @@ describe('Training-Tab — überarbeitete Darstellung ohne neue Geschäftslogik'
     expect(stats).toBeDefined();
     act(() => { stats.props.onPress?.(); });
     expect(mockPush).toHaveBeenCalledWith('/unit/stats');
+  });
+});
+
+describe('Training-Tab — Mantrailing-Karte (Spec 02)', () => {
+  beforeEach(() => { mockPush.mockReset(); mockSparten = null; });
+
+  it('ohne eingeschaltete Sparte: keine Karte (Standard-Sparten)', () => {
+    const node = render(deCH as unknown as Record<string, string>);
+    expect(cardContaining(node, deCH['mantrail.entryTitle'])).toBeUndefined();
+    expect(pressableTexts(node)).toHaveLength(4);
+  });
+
+  it('mit Sparte «Mantrailing»: Karte öffnet «Trail legen»', () => {
+    mockSparten = ['Fährte', 'Mantrailing'];
+    const node = render(deCH as unknown as Record<string, string>);
+    const card = cardContaining(node, deCH['mantrail.entrySub']);
+    expect(card).toBeDefined();
+    act(() => { card?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/mantrail/legen');
   });
 });

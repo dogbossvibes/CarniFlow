@@ -143,6 +143,11 @@ Einstieg: Training → Sparte «Mantrailing» → «Trail legen» / «Hund start
    Recorder-Kontinuität (Hintergrund, Sperre, App-Neustart, Wiederherstellung)
    mit bestehenden Tests absichern; IGP-Simulator-Matrix (T-192) muss
    unverändert grün bleiben.
+   Aufgeteilt (Entscheid Nutzerin 2026-11-25):
+   - **PR B1**: Trail legen (bestehender Recorder, Sitzungstyp `mantrail`) oder ohne
+     Aufzeichnung, Hund arbeitet (bestehender Absuche-Recorder ohne Gegenstände),
+     Doppelblind-Verdeckung, Wiederherstellung, eigenes Kontingent (Migration).
+   - **PR B2**: Übergabe Trailer → Hundeführer.
 3. **PR C – Auswertung und Statistik**.
 
 ## Testweg «Vorher» und Erfolgskriterium
