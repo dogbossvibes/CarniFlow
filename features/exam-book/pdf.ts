@@ -66,6 +66,34 @@ export function buildExamPdfModel(input: {
   return { title: L.title, dogName: input.dogName, generated: input.generated, progress, rows, labels: L };
 }
 
+/**
+ * Notiz mit erhaltenen Absätzen: zuerst an Zeilenumbrüchen teilen (toWinAnsi
+ * würde sie zu Leerzeichen machen), dann jeden Absatz einzeln umbrechen.
+ * Eine Leerzeile zwischen Absätzen bleibt als leere Zeile erhalten;
+ * mehrere Leerzeilen hintereinander werden zu einer.
+ */
+export function wrapNote(note: string, size: number, width: number): string[] {
+  const lines: string[] = [];
+  for (const raw of note.split(/\r\n|\r|\n/)) {
+    const paragraph = toWinAnsi(raw);
+    if (!paragraph) {
+      if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
+      continue;
+    }
+    lines.push(...wrapText(paragraph, size, width));
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+/** Kürzt auf höchstens `max` Zeilen; Absätze bleiben erhalten, am Ende «…». */
+export function truncateNoteLines(lines: readonly string[], max: number): string[] {
+  if (lines.length <= max) return [...lines];
+  const kept = lines.slice(0, Math.max(0, max - 1));
+  while (kept.length > 0 && kept[kept.length - 1] === '') kept.pop();
+  return [...kept, '…'];
+}
+
 const M = 42;
 const INK: PdfColor = [0.06, 0.09, 0.10];
 const INK2: PdfColor = [0.33, 0.38, 0.41];
@@ -127,11 +155,11 @@ export function renderExamPdf(model: ExamPdfModel): PdfWriter {
       ...(row.sections ? wrap(row.sections, 8, subW) : []),
       ...(row.details ? wrap(row.details, 8, subW) : []),
     ];
-    let noteLines = row.note ? wrap(row.note, 8, subW) : [];
+    let noteLines = row.note ? wrapNote(row.note, 8, subW) : [];
     const mainLines = Math.max(1, examLines.length, placeLines.length, resultLines.length);
     // Sehr lange Notiz auf die Seitenhöhe kürzen, statt endlos Seiten anzulegen.
     const maxNote = Math.floor((H - 2 * M - 140 - mainLines * LINE - subLines.length * SUB) / SUB);
-    if (noteLines.length > maxNote) noteLines = [...noteLines.slice(0, Math.max(0, maxNote - 1)), '…'];
+    if (noteLines.length > maxNote) noteLines = truncateNoteLines(noteLines, maxNote);
     const height = mainLines * LINE + (subLines.length + noteLines.length) * SUB + 8;
     if (y - height < M + 24) newPage(false);
 
