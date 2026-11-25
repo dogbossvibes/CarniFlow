@@ -45,6 +45,8 @@ import { metersToSteps } from '@/features/tracking/utils/steps';
 import { ExamTemplateBanner, ExamTemplateChooser, WindRelationPill } from '@/features/tracking/components/ExamTemplateGuide';
 import { compassLabel, walkBearingDeg, windRelation, WIND_RELATION_MIN_SPEED_KMH } from '@/features/tracking/utils/windRelation';
 import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
+import { useDogTrackSettings } from '@/features/tracking/hooks/useDogTrackSettings';
+import { cancelLayReminder } from '@/features/tracking/native/liegezeitReminder';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
 import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
@@ -377,6 +379,7 @@ export default function LegenScreen() {
                   useActiveFaehrten.getState().remove(dId);
                   void clearPending(dId);
                   void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');   // dauerhaft: nie wieder „Fährte fortsetzen"
+                  void cancelLayReminder(dId, entry.sessionId);   // Liegezeit-Erinnerung der verworfenen Fährte
                   // NEWBIE: nie abgesuchte Fährte gibt das Kontingent zurück (Server prüft zusätzlich).
                   if (entry.sessionId && entry.status !== 'searching') void releaseNewbieQuota('track', entry.sessionId);
                   if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
@@ -431,6 +434,14 @@ export default function LegenScreen() {
   // eine noch geladene Fährte eines anderen Hundes fälschlich ausgeblendet.
   // Default AN, kontextuell (kein globales Setting). Lädt nie pro GPS-Fix.
   const { color: layColor } = useDogTrackColor(activeDog?.id ?? params.dogId ?? storeDogId);
+  // Fährten-Einstellungen des Hundes: Prüfungsvorlage vorwählen, solange vor dem Legen nichts selbst gewählt wurde.
+  const { settings: dogTrackSettings, loaded: dogTrackSettingsLoaded } = useDogTrackSettings(activeDog?.id ?? params.dogId ?? storeDogId);
+  const examChosenRef = useRef(false);
+  const chooseExamTemplate = useCallback((next: ExamTemplateId | null) => { examChosenRef.current = true; setExamTemplateId(next); }, []);
+  useEffect(() => {
+    if (!dogTrackSettingsLoaded || examChosenRef.current || phase !== 'warmup') return;
+    setExamTemplateId(dogTrackSettings.examTemplate ?? null);
+  }, [dogTrackSettingsLoaded, dogTrackSettings.examTemplate, phase]);
   const referenceOverlays = useActiveTrackOverlays({
     userId:           session?.user?.id ?? null,
     currentUserDogs:  dogs,
@@ -1097,7 +1108,7 @@ export default function LegenScreen() {
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
 
-                  <ExamTemplateChooser selected={examTemplate} onSelect={setExamTemplateId} t={t} />
+                  <ExamTemplateChooser selected={examTemplate} onSelect={chooseExamTemplate} t={t} />
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>

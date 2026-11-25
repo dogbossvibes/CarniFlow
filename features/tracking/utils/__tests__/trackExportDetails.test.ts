@@ -93,4 +93,25 @@ describe('Export: Liegezeit, Abweichung, Winkel, Gegenstände', () => {
     expect(text).toMatch(/3 · 2× Geschlossener Winkel, 1× Offener Winkel/);
     jest.restoreAllMocks();
   }, 30_000);
+
+  it('übernimmt die Anzeige am Gegenstand aus der Absuche; Altdaten und fremde Absuchen ohne', () => {
+    const withIndication = () => { const s = source(); (s.track_data.run as Record<string, unknown>).indication = { version: 1, value: 'retrieve', source: 'dog_profile' }; return s; };
+    expect(buildTrackUserExport(withIndication(), now).indication).toBe('retrieve');
+    expect(buildTrackUserExport(source(), now)).not.toHaveProperty('indication');
+    const foreign = withIndication(); foreign.runs[0].id = 'other-run';
+    expect(buildTrackUserExport(foreign, now)).not.toHaveProperty('indication');
+  });
+
+  it('PDF zeigt die Anzeige am Gegenstand', async () => {
+    const drawn = jest.spyOn(PDFPage.prototype, 'drawText');
+    const keys = ['title','reference','search','duration','objects','score','confidence','conditions','notes','map','source','unknown','date','glyphNotice'] as const;
+    const labels = Object.fromEntries(keys.map(k => [k, deCH[`track.report.${k}`]])) as unknown as ReportLabels;
+    labels.noGeometry = deCH['track.export.unavailable'];
+    labels.indication = deCH['track.settings.indication.title'];
+    labels.indicationLabels = { down: deCH['track.settings.indication.down'], sit: deCH['track.settings.indication.sit'], stand: deCH['track.settings.indication.stand'], retrieve: deCH['track.settings.indication.retrieve'] };
+    const input = source(); (input.track_data.run as Record<string, unknown>).indication = { version: 1, value: 'down', source: 'dog_profile' };
+    await buildTrackReportPdf(buildTrackUserExport(input, now), fs.readFileSync('assets/fonts/NotoSans-Regular.ttf'), labels, fs.readFileSync('assets/images/anyvologo.png'));
+    expect(drawn.mock.calls.map(c => c[0]).join('\n')).toContain('Anzeige am Gegenstand: Liegen');
+    jest.restoreAllMocks();
+  }, 30_000);
 });

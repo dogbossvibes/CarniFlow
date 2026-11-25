@@ -14,6 +14,8 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { loadPending } from '@/features/tracking/store/trackPersist';
 import { restingElapsedSeconds, isRestingRecovery } from '@/features/tracking/store/restingTime';
 import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
+import { cancelLayReminder, scheduleLayReminder } from '@/features/tracking/native/liegezeitReminder';
+import { loadDogTrackSettingsForCurrentUser } from '@/features/tracking/dogTrackSettings/currentUser';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import { resolveRestingCancelTarget } from '@/features/tracking/store/trackRecovery';
@@ -236,12 +238,29 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startMs, sessionStatus, activityDogName, id]);
 
+  // Liegezeit-Erinnerung aus den Fährten-Einstellungen des Hundes (best-effort, eine pro Hund).
+  // Einstellungen werden erst hier nachgeladen (der Screen bleibt frei von der Supabase-Initialisierung).
+  useEffect(() => {
+    if (startMs == null || sessionStatus !== 'resting') return;
+    let alive = true;
+    void loadDogTrackSettingsForCurrentUser(dogId).then(settings => {
+      if (!alive || useTrackingStore.getState().sessionStatus !== 'resting') return;
+      const reminderMin = settings.layReminderMin ?? null;
+      if (!reminderMin) { void cancelLayReminder(dogId); return; }
+      const body = t('track.layReminderBody', { minutes: reminderMin });
+      void scheduleLayReminder({ dogId, sessionId: id ?? null, startedAt: startMs, minutes: reminderMin,
+        title: t('track.layReminderTitle'), body: activityDogName ? `${activityDogName}: ${body}` : body });
+    });
+    return () => { alive = false; };
+  }, [startMs, sessionStatus, dogId, id, activityDogName, t]);
+
   const elapsedS = restingElapsedSeconds(startMs, now);
 
   const startSearch = async () => {
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
     void endLiegezeitNotification(activityIdentity());   // Liegezeit-Anzeige DIESER Fährte entfernen (Übergang → Absuche)
+    void cancelLayReminder(dogId);
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
     // Bewusst KEIN Statuswechsel auf 'searching' hier: die Suchzeit startet erst am
@@ -298,6 +317,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
       } catch { /* best-effort: Buchung bleibt wie bisher */ }
     }
     void endLiegezeitNotification({ dogId: target.dogId ?? dogId, sessionId: target.sessionId });   // nur DIESE Activity (cancelled)
+    void cancelLayReminder(target.dogId ?? dogId);
     setAllowLeave(true);
     repeat();   // hebt die SDK-58-Sperre auf und wiederholt die blockierte Navigation
   }

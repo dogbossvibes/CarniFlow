@@ -78,6 +78,9 @@ export type Dog = {
   // null = Automatisch). Optional, weil die Spalte erst mit der Migration
   // 20261005120000_dogs_track_overlay_color_key existiert.
   track_overlay_color_key?: TrackOverlayColorValue | null;
+  // Fährten-Einstellungen je Hund (JSON, siehe features/tracking/dogTrackSettings).
+  // Optional, weil die Spalte erst mit der Migration 20261124200000_dogs_track_settings existiert.
+  track_settings?: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -88,7 +91,7 @@ export type NewDog = Pick<Dog,
   | 'registry_country_code' | 'registry_type' | 'registry_name' | 'registry_number'
   | 'discipline'
   | 'vet' | 'food'
-> & { vaccination?: Dog['vaccination']; track_overlay_color_key?: Dog['track_overlay_color_key'] };
+> & { vaccination?: Dog['vaccination']; track_overlay_color_key?: Dog['track_overlay_color_key']; track_settings?: Dog['track_settings'] };
 
 export type TrainingCategory = 'IGP' | 'IBGH' | 'Mondioring' | 'Alltagstraining';
 export type TrainingType     = 'privat' | 'trainer';

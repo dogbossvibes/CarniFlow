@@ -80,7 +80,7 @@ const SESSION_KEYS = ['id', 'owner_id', 'dog_id', 'dog', 'owner_name', 'type', '
   'articles_found', 'articles_total', 'average_deviation_meters', 'gps_quality_average', 'rating', 'score',
   'temperature', 'weather_condition', 'wetter', 'wind_speed', 'humidity', 'notes', 'objectReview'] as const;
 const RUN_KEYS = ['id', 'run_id', 'started_at', 'ended_at', 'duration_seconds', 'distance_meters', 'articles_found',
-  'total_objects', 'average_deviation_meters', 'breaks', 'score', 'continuity'] as const;
+  'total_objects', 'average_deviation_meters', 'breaks', 'score', 'continuity', 'indication'] as const;
 
 function searchRun(value: unknown): Rec {
   const run = record(value);

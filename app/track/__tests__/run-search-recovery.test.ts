@@ -53,7 +53,7 @@ describe('run.tsx — Search-Recovery-State', () => {
     expect(run).toContain('noteSearchEndFired()');
     expect(run).toContain('setSearchSegmentAnnouncements(result.state)');
     expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn && !blindSearch, stepLengthM, guidanceObjects, voiceRecovery,');
-    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);');
+    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible && hapticsEnabled(dogTrackSettings), hapticRecovery);');
   });
 
   it('laidObjects tragen die Marker-ID (stabile Fund-Identität)', () => {

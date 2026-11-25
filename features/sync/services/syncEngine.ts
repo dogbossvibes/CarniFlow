@@ -3,6 +3,7 @@ import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/
 import { syncObjectReviews, objectReviewQueueCounts } from '@/features/tracking/services/objectReview/service';
 import { fetchIsOnline } from '@/features/sync/services/netinfo';
 import { syncTrackLinks } from '@/features/training/trackLinks/sync';
+import { syncExamBook } from '@/features/exam-book/sync';
 import { supabase } from '@/lib/supabase';
 import { useSyncStore } from '@/features/sync/store/syncStore';
 import {
@@ -207,6 +208,8 @@ export async function syncNow(): Promise<void> {
     // Verknüpfungen Training ↔ Fährte (#114): eigener Speicher, erst nach den
     // Fährten selbst, damit frisch hochgeladene Fährten sofort verknüpfbar sind.
     await syncTrackLinks(session.user.id, { sessionVerified: true }).catch(() => {});
+    // Prüfungsbuch: eigener Speicher (local_exam_results), wirft nicht.
+    await syncExamBook(session.user.id, { sessionVerified: true }).catch(() => {});
     st.setLastSyncAt(Date.now());
   } catch (e: any) {
     st.setLastError(e?.message ?? 'Sync-Fehler');

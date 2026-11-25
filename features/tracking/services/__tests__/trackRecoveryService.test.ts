@@ -35,6 +35,8 @@ jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
   markTrainingAsDeleted: (...a: unknown[]) => mockDeleteSession(...a),
 }));
 jest.mock('@/features/tracking/native/liegezeitNotification', () => ({ endLiegezeitNotification: () => mockEndNotification() }));
+const mockCancelReminder = jest.fn(async (..._a: unknown[]) => undefined);
+jest.mock('@/features/tracking/native/liegezeitReminder', () => ({ cancelLayReminder: (...a: unknown[]) => mockCancelReminder(...a) }));
 jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   createLocalTrackPointsBatch: (...a: unknown[]) => mockWriteLay(...a),
   createLocalTrackMarker: (...a: unknown[]) => mockWriteMarker(...a),
@@ -280,6 +282,19 @@ describe('„Ohne App abgeschlossen"', () => {
     await completeTrackWithoutApp('sess-A', 'dog-A');
     expect(useTrackingStore.getState().currentSessionId).toBeNull();
     expect(mockEndNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('entfernt die Liegezeit-Erinnerung genau dieser Fährte, auch ohne passenden Aufnahme-Store', async () => {
+    mockCancelReminder.mockClear();
+    expect(await completeTrackWithoutApp('sess-A', 'dog-A')).toEqual({ ok: true });
+    expect(mockCancelReminder).toHaveBeenCalledWith('dog-A', 'sess-A');
+  });
+
+  it('Marker nicht schreibbar → Erinnerung bleibt (Fährte gilt weiter als offen)', async () => {
+    mockCancelReminder.mockClear();
+    mockSetLifecycle.mockResolvedValue(false);
+    await completeTrackWithoutApp('sess-A', 'dog-A');
+    expect(mockCancelReminder).not.toHaveBeenCalled();
   });
 
   it('ohne Session/Hund → kein Write', async () => {

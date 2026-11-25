@@ -1,4 +1,5 @@
 import { scoredObjectSummary } from './scoredObjectProjection';
+import { readRunIndication, type TrackIndication } from '@/features/tracking/dogTrackSettings/model';
 import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { parseObjectReview, reviewCounts, reviewObjectLabel, type ObjectReview } from '../services/objectReview/model';
 import { restoreLayContinuity } from './trackContinuity';
@@ -24,6 +25,8 @@ export interface TrackUserExport {
   continuity?: ExportContinuity;
   /** Recorded per-object outcomes; omitted when a confirmed review exists or the mapping is unsafe. */
   objectOutcomes?: ExportObjectOutcome[];
+  /** Anzeige am Gegenstand aus dem Hundeprofil (Stand der Absuche); fehlt bei Altdaten. */
+  indication?: TrackIndication;
   /** Confirmed review projection; original measurements and analysis are unchanged. */
   objectReview?: { version: 1; revision: number; totalScore: number | null; auditTruncated: boolean;
     objects: { label: string; recordedStatus: string; effectiveStatus: string }[];
@@ -129,6 +132,7 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
     conditions: { temperatureC: number(d.temperature), humidityPercent: number(d.humidity), windSpeed: nonnegative(d.wind_speed), weather: text(d.weather_condition ?? d.wetter) },
     ...(continuity ? { continuity } : {}),
     ...(objectOutcomes ? { objectOutcomes } : {}),
+    ...(runMatches && readRunIndication(run) ? { indication: readRunIndication(run)! } : {}),
     ...(objectReview ? { objectReview: { version: 1 as const, revision: objectReview.revision,
       totalScore: objectReview.totalScore, auditTruncated: objectReview.auditTruncated,
       objects: objectReview.objects.map(o => ({ label: reviewObjectLabel(objectReview!, o.objectId), recordedStatus: o.recordedStatus, effectiveStatus: o.effectiveStatus })),

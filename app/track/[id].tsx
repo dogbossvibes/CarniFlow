@@ -10,6 +10,7 @@ import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { useSession } from '@/hooks/useSession';
 import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
 import { TrackObjectCorrections } from '@/features/tracking/components/TrackObjectCorrections';
+import { INDICATION_LABEL_KEYS, readRunIndication } from '@/features/tracking/dogTrackSettings/model';
 import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
@@ -393,6 +394,8 @@ export default function TrackAuswertungScreen() {
     }
   };
 
+  // Anzeige am Gegenstand aus dem Hundeprofil (Stand der Absuche); Altdaten ohne Vermerk zeigen nichts.
+  const runIndicationValue = readRunIndication(data?.track_data?.run);
   if (loading) return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;
   if (!data)   return <View style={s.center}><Text style={s.muted}>Fährte nicht gefunden.</Text></View>;
 
@@ -830,6 +833,7 @@ export default function TrackAuswertungScreen() {
             <>
               <SectionLabel>{t('track.analysisObjects')}</SectionLabel>
               <View style={[s.card, { padding: 16, marginBottom: 16, gap: 10 }]}>
+                {runIndicationValue && <Text testID="track-run-indication" style={s.objectLogTitle}>{t('track.indicationResult', { indication: t(INDICATION_LABEL_KEYS[runIndicationValue]) })}</Text>}
                 {map.markers.filter(isScoredObject).map((marker, index) => {
                   const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
                   const label = isTrainingJoker(marker.material) ? `${material} · ${t('track.jokers')}` : `G${marker.objectIndex ?? index + 1}`;

@@ -22,6 +22,7 @@ export interface OwnRun {
   continuity?: Record<string, unknown>; object_snapshot?: Record<string, unknown>;
   analytics?: Record<string, unknown>; object_detections?: unknown[];
   replay_points?: RunPoint[];
+  indication?: { version: 1; value: 'down' | 'sit' | 'stand' | 'retrieve'; source: 'dog_profile' };
 }
 /** Reference is the existing strict TrackTransferReference, unchanged. */
 export interface OwnCopy<Reference> {
