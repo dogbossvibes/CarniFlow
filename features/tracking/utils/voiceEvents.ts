@@ -34,6 +34,8 @@ export const VOICE_QUEUE = Object.freeze({
 interface PendingVoice { request: VoiceRequest; trigger: number }
 let pending: PendingVoice[] = [];
 let speakingSinceMs = 0;
+/** Ende der letzten eigenen Ansage (für die Sprachsteuerung: eigene Ansage ist kein Befehl). */
+let lastSpeechEndedMs = 0;
 
 const relativeSec = (ms: number) => Math.max(0, Math.round(((ms - originMs) / 1000) * 100) / 100);
 const anonymousKey = (value: string) => {
@@ -68,7 +70,7 @@ export function noteSuppressedVoice(request: VoiceRequest, reason: string): void
 
 function finishSpeaking(currentGeneration: number) {
   if (generation !== currentGeneration) return;
-  activePriority = 0; speakingSinceMs = 0;
+  activePriority = 0; speakingSinceMs = 0; lastSpeechEndedMs = Date.now();
   speakNextPending();
 }
 
@@ -148,6 +150,14 @@ export function requestVoice(request: VoiceRequest): boolean {
 }
 
 export function cancelVoiceEvents() {
-  activePriority = 0; generation++; pending = []; speakingSinceMs = 0;
+  activePriority = 0; generation++; pending = []; speakingSinceMs = 0; lastSpeechEndedMs = Date.now();
   try { Speech.stop(); } catch { /* optional native service */ }
+}
+
+/**
+ * Nur lesend: spricht ANYVO gerade bzw. wann endete die letzte Ansage?
+ * Ändert nichts an Warteschlange, Inhalt oder Reihenfolge der Ansagen.
+ */
+export function appSpeechActivity(): { speaking: boolean; endedAtMs: number } {
+  return { speaking: activePriority > 0, endedAtMs: lastSpeechEndedMs };
 }
