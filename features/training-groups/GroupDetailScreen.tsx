@@ -212,6 +212,18 @@ export default function GroupDetailScreen() {
             </AnyvoCard>
           )}
 
+          {/* #144: Verleitung anfragen direkt im Gruppentraining (älterer Bereich, gleiche Gruppen). */}
+          {group?.status === 'active' && (
+            <AnyvoCard>
+              <Text style={cs.section}>{t('groups.distractions')}</Text>
+              <Text style={cs.hint}>{t('groups.distractionsHint')}</Text>
+              <View style={cs.actions}>
+                <AnyvoButton style={cs.flex} label={t('groups.requestDistraction')} icon="shuffle-outline" variant="secondary"
+                  onPress={() => router.push({ pathname: '/track/group-tasks', params: { groupId } } as never)} />
+              </View>
+            </AnyvoCard>
+          )}
+
           {manage && (
             <AnyvoCard>
               <Text style={cs.section}>{t('groups.requests')}</Text>
