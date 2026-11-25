@@ -3131,4 +3131,6 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "voiceField.toggleOff": "Sprachstüürig uusschalte",
   "voiceField.started": "Sprachstüürig aa",
   "voiceField.stopped": "Sprachstüürig uus",
+  "voiceField.undoNotInSearch": "Rückgängig gaht bi de Absuechi nöd.",
+  "voiceField.notNow": "Jetzt nöd möglich.",
 };

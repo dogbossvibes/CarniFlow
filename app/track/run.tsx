@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { HelpButton } from '@/components/help/HelpButton';
 import { FirstTrackGuideCard, useFirstTrackGuide } from '@/components/help/FirstTrackGuide';
 import { FIRST_SEARCH_GUIDE } from '@/features/help/helpRegistry';
@@ -29,6 +29,10 @@ import { useTrackVoiceGuidance, say, speechLanguage, type GuidanceAngle } from '
 import { requestVoice, resetVoiceEvents, voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
 import { useTrackVoiceAudioSession } from '@/features/tracking/utils/trackVoiceAudioSession';
 import i18n from '@/i18n/config';
+import { useFieldVoiceControl } from '@/features/voice/hooks/useFieldVoiceControl';
+import { useVoiceControlPreference } from '@/features/voice/hooks/useVoiceControlPreference';
+import { searchVoiceStep } from '@/features/voice/services/searchVoiceBridge';
+import type { FieldVoiceEffect } from '@/features/voice/services/fieldVoiceController';
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
@@ -263,7 +267,8 @@ export default function TrackRunScreen() {
   // Startwert aus dem Hundeprofil (ohne Einstellung: an), bis die Sprachansage hier selbst umgeschaltet wird.
   const [voiceOverride, setVoiceOverride] = useState<boolean | null>(null);
   const voiceOn = voiceOverride ?? voiceEnabled(dogTrackSettings);
-  useTrackVoiceAudioSession(voiceOn);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
+  // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm (Aufruf weiter unten,
+  // weil auch die Sprachsteuerung ihre Bestätigungen hörbar braucht).
   const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
   // T-206: «Gegenstand erkannt» je Fund genau einmal pro Absuche — auch nach einem App-Neustart.
   // resumeSearch seedet die schon gefundenen Gegenstände; die Merkliste der Sprachausgabe selbst
@@ -1244,6 +1249,55 @@ export default function TrackRunScreen() {
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
   };
 
+  // ── Sprachsteuerung bei der Absuche (Spec 03, PR C) ────────────────────────
+  // Jeder Befehl ruft GENAU die Funktion der Taste auf («Gegenstand» → s.markObject,
+  // «Auswerten» → handleFinish) – gleiche Auswertung, gleiche Daten. Erkannter Text
+  // wird nicht gespeichert. Kein Zurücknehmen eines Fundes; Anzeigeart nur Bestätigung.
+  const finishRef = useRef<() => void>(() => undefined);
+  useEffect(() => { finishRef.current = () => { void handleFinish(); }; });
+  const voiceGateRef = useRef({ recording: false, arming: false, finishing: false, canMark: false });
+  useEffect(() => {
+    voiceGateRef.current = { recording: s.recording, arming, finishing, canMark: s.foundObjects < s.totalObjects };
+  });
+  const voiceSeqRef = useRef(0);
+  const speakVoiceControl = useCallback((key: string) => {
+    requestVoice({ eventType: 'status', text: t(key as TranslationKey), language: speechLanguage(i18n.language as never),
+      priority: 4, onceKey: `search-voice-control:${Date.now()}:${++voiceSeqRef.current}`, phase: 'search' });
+  }, [t]);
+  const markObject = s.markObject;
+  const onVoiceEffect = useCallback((effect: FieldVoiceEffect) => {
+    const gate = voiceGateRef.current;
+    if (!gate.recording || gate.finishing) return;
+    const step = searchVoiceStep(effect);
+    if (step.run === 'found') {
+      // Gleiche Sperre wie die Taste: nicht während der Anfahrt, nicht wenn alle gefunden.
+      if (gate.arming || !gate.canMark) { speakVoiceControl('voiceField.notNow'); return; }
+      hapticSuccess();
+      markObject();
+    } else if (step.run === 'finish') {
+      if (gate.arming) { speakVoiceControl('voiceField.notNow'); return; }
+      finishRef.current();
+      return;
+    }
+    if (step.speakKey) speakVoiceControl(step.speakKey);
+  }, [markObject, speakVoiceControl]);
+  const voiceControl = useFieldVoiceControl('search', onVoiceEffect);
+  const voicePref = useVoiceControlPreference('search');
+  const voiceListening = voiceControl.status === 'listening' || voiceControl.status === 'starting';
+  useTrackVoiceAudioSession(voiceOn || voiceListening);
+  const { enable: enableVoice, disable: disableVoice } = voiceControl;
+  // Gemerkt «an»: während der Absuche wieder einschalten; danach aus.
+  useEffect(() => {
+    if (!s.recording || finishing) { disableVoice(); return; }
+    if (voicePref.wanted && voiceControl.status === 'off') void enableVoice();
+  }, [s.recording, finishing, voicePref.wanted, voiceControl.status, enableVoice, disableVoice]);
+  const toggleVoiceControl = useCallback(() => {
+    hapticTap();
+    if (voiceListening) { disableVoice(); voicePref.save(false); speakVoiceControl('voiceField.stopped'); return; }
+    voicePref.save(true);
+    void enableVoice();
+  }, [voiceListening, disableVoice, enableVoice, voicePref, speakVoiceControl]);
+
   const guardedBack = useCallback(() => {
     if (pocketLock) return;
     handleCancel();
@@ -1424,6 +1478,24 @@ export default function TrackRunScreen() {
             >
               <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={17} color={pocketLock ? FT.accText : FT.text} />
             </Pressable>
+          )}
+          {!arming && s.recording && !pocketLock && voiceControl.available && (
+            <Pressable
+              testID="voice-control-toggle"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: voiceListening }}
+              accessibilityLabel={t(voiceListening ? 'voiceField.toggleOff' : 'voiceField.toggleOn')}
+              onPress={toggleVoiceControl}
+              className={`absolute top-[64px] right-[58px] z-30 w-9 h-9 rounded-[11px] items-center justify-center border ${voiceListening ? 'bg-ft-acc border-ft-acc' : 'bg-black/90 border-ft-line-strong'}`}
+              style={{ elevation: 30 }}
+            >
+              <Ionicons name={voiceListening ? 'mic' : 'mic-outline'} size={17} color={voiceListening ? FT.accText : FT.text} />
+            </Pressable>
+          )}
+          {s.recording && voiceListening && (
+            <View testID="voice-control-status" accessibilityLiveRegion="polite" className="absolute top-[106px] right-[14px] z-30 px-2.5 py-1 rounded-full bg-black/90 border border-ft-line-strong">
+              <Text className="text-ft-text text-[12px]">{`${t('voiceField.listening')}${voiceControl.offline === true ? ' · offline' : ''}`}</Text>
+            </View>
           )}
           {view === 'map' || blindSearch ? (
             <TrackingMap

@@ -50,7 +50,7 @@ describe('legen.tsx — Sprachsteuerung', () => {
 describe('Datenschutzerklärung nennt die Sprachsteuerung', () => {
   const privacy = readFileSync('app/privacy.tsx', 'utf8');
   it('Offline auf dem Gerät, sonst Apple/Google; ANYVO speichert keinen Text', () => {
-    expect(privacy).toContain('Sprachsteuerung beim Fährtenlegen');
+    expect(privacy).toContain('Sprachsteuerung beim Fährtenlegen und bei der Absuche');
     expect(privacy).toContain('an Apple (iOS) bzw. Google (Android) übermittelt');
     expect(privacy).toContain('weder Audio noch erkannten Text');
   });

@@ -3123,4 +3123,6 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.toggleOff": "Disattiva comando vocale",
   "voiceField.started": "Comando vocale attivo",
   "voiceField.stopped": "Comando vocale disattivato",
+  "voiceField.undoNotInSearch": "Annullare non è possibile durante la ricerca.",
+  "voiceField.notNow": "Non possibile adesso.",
 };

@@ -3123,4 +3123,6 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.toggleOff": "Turn off voice control",
   "voiceField.started": "Voice control on",
   "voiceField.stopped": "Voice control off",
+  "voiceField.undoNotInSearch": "Undo isn't possible while searching.",
+  "voiceField.notNow": "Not possible right now.",
 };
