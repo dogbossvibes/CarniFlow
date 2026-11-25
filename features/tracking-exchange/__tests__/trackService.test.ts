@@ -115,8 +115,9 @@ describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
   it('Liste verlangt eigene Fährten ausdrücklich und liefert sie', async () => {
     const c = client(() => ok({ sessionId: SESSION, tracks: [raw(), own({ trackId: '50000000-0000-4000-8000-000000000002', ...lying })] }));
     const result = await createGroupTrackService(c.client, LAYER).list(SESSION);
-    expect(c.calls).toEqual([{ endpoint: 'training_group_tracks_v1', action: 'list', request: { sessionId: SESSION, includeOwn: true } }]);
+    expect(c.calls).toEqual([{ endpoint: 'training_group_tracks_v1', action: 'list', request: { sessionId: SESSION, includeOwn: true, includeMantrail: true } }]);
     expect(result.ownTracks).toBe(true);
+    expect(result.mantrailTracks).toBe(true);
     expect(result.tracks.map(isOwnGroupTrack)).toEqual([false, true]);
   });
 
@@ -126,13 +127,41 @@ describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
     const service = createGroupTrackService(c.client, LAYER);
     const first = await service.list(SESSION);
     expect(first).toMatchObject({ ownTracks: false, tracks: [expect.objectContaining({ layerUserId: LAYER, handlerUserId: HANDLER })] });
-    expect(c.calls.map(x => x.request)).toEqual([{ sessionId: SESSION, includeOwn: true }, { sessionId: SESSION }]);
+    expect(c.calls.map(x => x.request)).toEqual([{ sessionId: SESSION, includeOwn: true, includeMantrail: true }, { sessionId: SESSION, includeOwn: true }, { sessionId: SESSION }]);
     expect((await service.list(SESSION)).ownTracks).toBe(false);
-    expect(c.calls).toHaveLength(3);
+    expect(c.calls).toHaveLength(4);
     // Nach der Wartezeit erneut versuchen: der Server kann inzwischen aktualisiert sein.
     now.mockReturnValue(1_000_000 + OWN_TRACKS_RETRY_MS);
     await service.list(SESSION);
-    expect(c.calls.slice(3).map(x => 'includeOwn' in x.request)).toEqual([true, false]);
+    expect(c.calls.slice(4).map(x => 'includeOwn' in x.request)).toEqual([true, true, false]);
+  });
+
+  it('Mantrailing (Spec 02): Server ohne Trail-Migration → einmal ohne includeMantrail, eigene Fährten bleiben', async () => {
+    const c = client((_a, r) => { if ('includeMantrail' in r) throw new GroupApiError('GROUP_INVALID_REQUEST'); return ok({ sessionId: SESSION, tracks: [raw()] }); });
+    const service = createGroupTrackService(c.client, LAYER);
+    expect(await service.list(SESSION)).toMatchObject({ ownTracks: true, mantrailTracks: false });
+    expect(c.calls.map(x => x.request)).toEqual([{ sessionId: SESSION, includeOwn: true, includeMantrail: true }, { sessionId: SESSION, includeOwn: true }]);
+    await service.list(SESSION);
+    expect(c.calls).toHaveLength(3);   // kein Dauer-Doppelaufruf
+  });
+
+  it('Mantrailing: kind wird gelesen; fehlt es (alter Server), ist es eine Fährte', async () => {
+    const c = client(() => ok({ sessionId: SESSION, tracks: [raw(), raw({ trackId: '50000000-0000-4000-8000-000000000003', kind: 'mantrail' }), raw({ trackId: '50000000-0000-4000-8000-000000000004', kind: 'other' })] }));
+    const { tracks } = await createGroupTrackService(c.client, LAYER).list(SESSION);
+    expect(tracks.map(t => t.kind)).toEqual(['track', 'mantrail', 'track']);
+  });
+
+  it('Mantrailing: zuteilen mit kind; ohne kind bleibt die Anfrage wie bisher', async () => {
+    const c = client((_a, r) => ok({ track: raw({ trackId: r.trackId, ...(r.kind ? { kind: r.kind } : {}) }) }));
+    const service = createGroupTrackService(c.client, LAYER);
+    await service.assign(SESSION, PART, true);
+    expect(Object.keys(c.calls[0].request).sort()).toEqual(['blind', 'handlerParticipationId', 'sessionId', 'trackId']);
+    const trail = await service.assign(SESSION, PART, true, 'mantrail');
+    expect(c.calls[1].request).toMatchObject({ kind: 'mantrail', blind: true });
+    expect(trail.kind).toBe('mantrail');
+    // Server ohne Migration antwortet ohne kind → nicht still als Fährte weiterlegen.
+    const old = client((_a, r) => ok({ track: raw({ trackId: r.trackId }) }));
+    await expect(createGroupTrackService(old.client, LAYER).assign(SESSION, PART, false, 'mantrail')).rejects.toThrow('GROUP_INVALID_RESPONSE');
   });
 
   it('andere Fehler der Liste werden nicht als «alter Server» gedeutet', async () => {

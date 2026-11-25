@@ -20,7 +20,10 @@ export interface GroupTrack {
   dogId: string; blind: boolean; status: GroupTrackStatus; createdAtMs: number;
   laidAtMs: number | null; searchStartedAtMs: number | null; searchedAtMs: number | null;
   area: GroupTrackArea | null; distanceM: number | null;
+  /** Mantrailing (Spec 02). Ältere Server liefern kein Feld → 'track'. */
+  kind: GroupTrackKind;
 }
+export type GroupTrackKind = 'track' | 'mantrail';
 
 const STATUSES: readonly GroupTrackStatus[] = ['laying', 'lying', 'searching', 'searched', 'revoked'];
 const nullableNumber = (value: unknown) => value === null || value === undefined ? null : number(value);
@@ -47,6 +50,7 @@ export function parseGroupTrack(value: unknown): GroupTrack {
     handlerParticipationId: id(r.handlerParticipationId), dogId: id(r.dogId), blind: r.blind, status: r.status as GroupTrackStatus,
     createdAtMs: number(r.createdAtMs), laidAtMs: nullableNumber(r.laidAtMs), searchStartedAtMs: nullableNumber(r.searchStartedAtMs),
     searchedAtMs: nullableNumber(r.searchedAtMs), area, distanceM: nullableNumber(r.distanceM),
+    kind: r.kind === 'mantrail' ? 'mantrail' : 'track',
   };
   // Eigene Fährte (Issue #150): Leger:in = Hundeführer:in ist erlaubt, aber nie «blind».
   if ((track.layerUserId === track.handlerUserId && track.blind)
@@ -79,6 +83,8 @@ export function createGroupTrackService(client: Client, userId: string) {
   const assignIds = new Map<string, string>();
   // Server ohne die Migration für eigene Fährten lehnt «includeOwn» ab: dann ohne fragen.
   let ownUnsupportedUntil = 0;
+  // Server ohne die Mantrailing-Migration lehnt «includeMantrail» ab: dann ohne Trails fragen.
+  let mantrailUnsupportedUntil = 0;
   const call = (action: string, request: Record<string, unknown>) => client.call(userId, 'training_group_tracks_v1', action, request);
   const single = async (action: string, request: Record<string, unknown>, trackId: string) => {
     const track = parseGroupTrack((await call(action, request)).track);
@@ -86,11 +92,19 @@ export function createGroupTrackService(client: Client, userId: string) {
     return track;
   };
   return {
-    /** ownTracks = false: der Server kennt eigene Fährten noch nicht (Migration fehlt). */
-    async list(sessionId: string): Promise<{ tracks: GroupTrack[]; serverNowMs: number; ownTracks: boolean }> {
+    /** ownTracks / mantrailTracks = false: der Server kennt eigene Fährten bzw. Trails noch nicht (Migration fehlt). */
+    async list(sessionId: string): Promise<{ tracks: GroupTrack[]; serverNowMs: number; ownTracks: boolean; mantrailTracks: boolean }> {
       let data: Record<string, unknown> | null = null;
       let ownTracks = Date.now() >= ownUnsupportedUntil;
-      if (ownTracks) {
+      let mantrailTracks = ownTracks && Date.now() >= mantrailUnsupportedUntil;
+      if (mantrailTracks) {
+        try { data = await call('list', { sessionId, includeOwn: true, includeMantrail: true }); }
+        catch (error) {
+          if (!(error instanceof GroupApiError) || error.code !== 'GROUP_INVALID_REQUEST') throw error;
+          mantrailTracks = false; mantrailUnsupportedUntil = Date.now() + OWN_TRACKS_RETRY_MS;
+        }
+      }
+      if (!data && ownTracks) {
         try { data = await call('list', { sessionId, includeOwn: true }); }
         catch (error) {
           if (!(error instanceof GroupApiError) || error.code !== 'GROUP_INVALID_REQUEST') throw error;
@@ -100,16 +114,17 @@ export function createGroupTrackService(client: Client, userId: string) {
       data ??= await call('list', { sessionId });
       const tracks = values(data.tracks, parseGroupTrack, 200);
       if (data.sessionId !== sessionId || tracks.some(t => t.sessionId !== sessionId)) throw new GroupApiError('GROUP_INVALID_RESPONSE');
-      return { tracks, serverNowMs: data.serverNowMs as number, ownTracks };
+      return { tracks, serverNowMs: data.serverNowMs as number, ownTracks, mantrailTracks };
     },
     /** Gleiche Eingabe nach unklarer Antwort = gleiche trackId (keine doppelte Fährte). */
-    async assign(sessionId: string, handlerParticipationId: string, blind: boolean): Promise<GroupTrack> {
-      const key = `${sessionId}\n${handlerParticipationId}\n${blind}`;
+    async assign(sessionId: string, handlerParticipationId: string, blind: boolean, kind: GroupTrackKind = 'track'): Promise<GroupTrack> {
+      const key = `${sessionId}\n${handlerParticipationId}\n${blind}\n${kind}`;
       let trackId = assignIds.get(key);
       if (!trackId) { trackId = Crypto.randomUUID(); assignIds.set(key, trackId); }
       try {
-        const track = await single('assign', { sessionId, trackId, handlerParticipationId, blind }, trackId);
-        if (track.layerUserId !== userId || track.handlerParticipationId !== handlerParticipationId) throw new GroupApiError('GROUP_INVALID_RESPONSE');
+        // Ohne kind bleibt die Anfrage byte-gleich wie bisher (IGP-Fährte).
+        const track = await single('assign', { sessionId, trackId, handlerParticipationId, blind, ...(kind === 'mantrail' ? { kind } : {}) }, trackId);
+        if (track.layerUserId !== userId || track.handlerParticipationId !== handlerParticipationId || track.kind !== kind) throw new GroupApiError('GROUP_INVALID_RESPONSE');
         assignIds.delete(key);
         return track;
       } catch (error) {

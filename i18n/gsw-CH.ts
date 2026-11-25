@@ -3215,4 +3215,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "mantrail.savedText": "Dä Trail isch ufem Gerät gsicheret und wird ufeglade, sobald Netz da isch.",
   "mantrail.notFound": "Dä Trail isch nöd (meh) offe.",
   "premium.newbieMantrailLimit": "Du hesch din gratis Trail für dä Monet scho bruucht. Mit Active trainiersch unbegrenzt.",
+  // Mantrailing im Gruppentraining (Spec 02, PR B2)
+  "groups.mantrailTitle": "Mantrailing-Trail",
+  "groups.mantrailHint": "Statt ere IGP-Fährte en Trail lege. D Hundefüehrer:in schafft en im Mantrailing-Modus; «Blind» heisst det Doppelblind.",
+  "groups.kindMantrail": "Mantrailing",
 };

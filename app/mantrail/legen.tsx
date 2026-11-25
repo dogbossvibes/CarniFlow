@@ -44,7 +44,11 @@ export default function MantrailLayScreen() {
   useKeepAwake();
   const { t } = useT();
   const router = useRouter();
-  const params = useLocalSearchParams<{ dogId?: string; id?: string }>();
+  const params = useLocalSearchParams<{ dogId?: string; id?: string; groupTrackId?: string; groupId?: string; groupSessionId?: string; groupOwn?: string }>();
+  // Gruppentraining (Spec 02, PR B2): nach «Trail beenden» geht der Trail über die bestehende
+  // Gruppen-Übergabe an die Hundeführer:in (gleicher Weg wie bei der Fährte).
+  const groupHandover = typeof params.groupTrackId === 'string' && typeof params.groupId === 'string' && typeof params.groupSessionId === 'string'
+    ? { trackId: params.groupTrackId, groupId: params.groupId, sessionId: params.groupSessionId, own: params.groupOwn === '1' } : null;
   const { session } = useSession();
   const { dogs } = useDogs();
   const { isPro, loading: capsLoading } = useCapabilities();
@@ -190,12 +194,17 @@ export default function MantrailLayScreen() {
     if (!id || !dogId || phase !== 'recording') return;
     hapticSuccess();
     rec.finish();   // stoppt synchron, sichert lokal und reiht den Upload ein (wie bei der Fährte)
-    useActiveFaehrten.getState().upsert(dogId, {
-      status: 'resting', sessionId: id, kind: 'mantrail', layStartedAt: Date.now(), distanceMeters: Math.round(distanceMeters),
-    });
+    // Für eine andere Person gelegt: der Trail gehört nach der Übergabe nicht mehr dem eigenen Hund.
+    if (!(groupHandover && !groupHandover.own)) {
+      useActiveFaehrten.getState().upsert(dogId, {
+        status: 'resting', sessionId: id, kind: 'mantrail', layStartedAt: Date.now(), distanceMeters: Math.round(distanceMeters),
+      });
+    }
     void persistMantrailDetails(id, { ...data, trailSource: 'self' });
     setPhase('leaving');
-    setExitTo(`/mantrail/run?id=${id}&dogId=${dogId}`);
+    setExitTo(groupHandover
+      ? `/groups/handover?trackId=${groupHandover.trackId}&localId=${id}&groupId=${groupHandover.groupId}&sessionId=${groupHandover.sessionId}${groupHandover.own ? '&own=1' : ''}`
+      : `/mantrail/run?id=${id}&dogId=${dogId}`);
   };
 
   usePreventRemove(phase === 'recording', useCallback(() => {
@@ -278,7 +287,7 @@ export default function MantrailLayScreen() {
           onPress={onStartPress} testID="mantrail-start-recording">
           {wantStart ? <ActivityIndicator color={C.bg} /> : <Text style={s.primaryText}>{resumeId ? t('mantrail.resumeRecording') : t('mantrail.startRecording')}</Text>}
         </TouchableOpacity>
-        {!resumeId && (
+        {!resumeId && !groupHandover && (
           <TouchableOpacity accessibilityRole="button" style={s.secondary} disabled={!dog || capsLoading || busy} onPress={() => void startWithoutRecording()}
             testID="mantrail-start-without-recording">
             <Text style={s.secondaryText}>{t('mantrail.withoutRecording')}</Text>

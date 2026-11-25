@@ -3253,6 +3253,10 @@ export const deCH = {
   "mantrail.savedText": "Der Trail ist auf dem Gerät gesichert und wird hochgeladen, sobald Netz da ist.",
   "mantrail.notFound": "Dieser Trail ist nicht (mehr) offen.",
   "premium.newbieMantrailLimit": "Du hast deinen kostenlosen Trail für diesen Monat bereits genutzt. Mit Active trainierst du unbegrenzt.",
+  // Mantrailing im Gruppentraining (Spec 02, PR B2)
+  "groups.mantrailTitle": "Mantrailing-Trail",
+  "groups.mantrailHint": "Statt einer IGP-Fährte einen Trail legen. Die Hundeführer:in arbeitet ihn im Mantrailing-Modus; «Blind» bedeutet dort Doppelblind.",
+  "groups.kindMantrail": "Mantrailing",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

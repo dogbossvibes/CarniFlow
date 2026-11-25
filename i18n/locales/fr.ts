@@ -3228,4 +3228,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "mantrail.savedText": "La piste est enregistrée sur l’appareil et sera envoyée dès qu’il y a du réseau.",
   "mantrail.notFound": "Cette piste n’est pas (plus) ouverte.",
   "premium.newbieMantrailLimit": "Tu as déjà utilisé ta piste de mantrailing gratuite ce mois-ci. Avec Active, entraîne-toi sans limite.",
+  // Mantrailing im Gruppentraining (Spec 02, PR B2)
+  "groups.mantrailTitle": "Piste de mantrailing",
+  "groups.mantrailHint": "Poser une piste de mantrailing au lieu d’une piste IGP. Le conducteur la travaille en mode mantrailing ; « aveugle » y signifie double aveugle.",
+  "groups.kindMantrail": "Mantrailing",
 };

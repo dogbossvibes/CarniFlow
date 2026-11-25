@@ -60,6 +60,19 @@ describe('Import bei der Hundeführerin', () => {
     expect(projected).toEqual(reference);
   });
 
+  it('Mantrailing (Spec 02): Trail wird als eigener Mantrail angelegt, Blind = Doppelblind', () => {
+    const igp = rowsFromPlan(createGroupTrackImportPlan(input, reference));
+    const { session, points } = rowsFromPlan(createGroupTrackImportPlan({ ...input, kind: 'mantrail' }, reference));
+    expect(session).toMatchObject({ type: 'mantrail', category: 'Mantrailing', title: 'Mantrailing', status: 'completed' });
+    const payload = JSON.parse(session.payload_json as string);
+    expect(payload.mantrail).toMatchObject({ version: 1, trailSource: 'transfer', doubleBlind: true, result: null });
+    expect(payload.groupTrack).toEqual({ version: 1, trackId: input.trackId, blind: true });
+    expect(points).toEqual(igp.points);   // gleiche Trailer-Spur wie bei der Fährte
+    // Ohne kind bleibt der IGP-Import unverändert.
+    expect(igp.session).toMatchObject({ type: 'track', category: 'IGP', title: null });
+    expect(JSON.parse(igp.session.payload_json as string).mantrail).toBeUndefined();
+  });
+
   it('ungültige Pakete werden nicht angelegt', () => {
     expect(() => createGroupTrackImportPlan(input, { ...reference, points: [reference.points[0]] })).toThrow();
   });

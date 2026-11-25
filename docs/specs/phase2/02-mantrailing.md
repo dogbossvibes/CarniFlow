@@ -147,7 +147,10 @@ Einstieg: Training → Sparte «Mantrailing» → «Trail legen» / «Hund start
    - **PR B1**: Trail legen (bestehender Recorder, Sitzungstyp `mantrail`) oder ohne
      Aufzeichnung, Hund arbeitet (bestehender Absuche-Recorder ohne Gegenstände),
      Doppelblind-Verdeckung, Wiederherstellung, eigenes Kontingent (Migration).
-   - **PR B2**: Übergabe Trailer → Hundeführer.
+   - **PR B2**: Übergabe Trailer → Hundeführer über die Gruppen-Übergabe
+     (`training_group_tracks_v1`, Spalte `kind`). Die direkte Konto-Übergabe
+     (`track_transfer_v2`) steht weder im Repo noch auf Staging und bleibt vorerst
+     IGP-only (Entscheid Nutzerin 2026-11-25).
 3. **PR C – Auswertung und Statistik**.
 
 ## Testweg «Vorher» und Erfolgskriterium

@@ -24,7 +24,7 @@ import { useGroupLivePositions } from '@/features/tracking-exchange/live/useGrou
 import { isLiveShareReleaseReady } from '@/features/tracking-exchange/live/releaseGate';
 import { findLocalGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
 
-type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean };
+type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean; mantrailTracks: boolean };
 
 export function dogColor(dogId: string, colorKey: string | null): string {
   return colorKey && /^#[\da-f]{6}$/i.test(colorKey) ? colorKey : trackOverlayColor(resolveTrackOverlayColorKey(dogId, colorKey));
@@ -49,6 +49,8 @@ export default function GroupSessionScreen() {
   const [assigning, setAssigning] = useState(false);
   const [handlerParticipation, setHandlerParticipation] = useState<string | null>(null);
   const [blind, setBlind] = useState(false);
+  // Mantrailing (Spec 02): Trail statt IGP-Fährte legen (nur wenn der Server Trails kennt).
+  const [asMantrail, setAsMantrail] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const generation = useRef(0);
   const [courses, setCourses] = useState<Record<string, { lat: number; lng: number }[]>>({});
@@ -111,10 +113,10 @@ export default function GroupSessionScreen() {
       }
       // Ohne Netz gelegte Fährten nachreichen, bevor die Liste gelesen wird.
       if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId);
-      const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs, ownTracks: true };
+      const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs, ownTracks: true, mantrailTracks: false };
       const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;
-      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover, ownTracks: trackList.ownTracks !== false });
+      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover, ownTracks: trackList.ownTracks !== false, mantrailTracks: trackList.mantrailTracks === true });
       if (services.userId) { void prepareHandlerTracks(services.userId, trackList.tracks); void loadCourses(services.userId, trackList.tracks); }
       setError(null);
     } catch (e) {
@@ -159,8 +161,9 @@ export default function GroupSessionScreen() {
   const errorKey = groupErrorText(error);
   // Eigene Fährte (Issue #150): gewählt ist eine eigene Teilnahme. Server ohne die Migration: nicht anbieten.
   const ownSupported = data?.ownTracks !== false;
+  const mantrailSupported = data?.mantrailTracks === true;
   const ownChoice = mine.find(p => p.participationId === handlerParticipation) ?? null;
-  const closeAssign = () => { setAssigning(false); setHandlerParticipation(null); setBlind(false); };
+  const closeAssign = () => { setAssigning(false); setHandlerParticipation(null); setBlind(false); setAsMantrail(false); };
 
   const toggleDog = (dogId: string) => setSelectedDogs(prev => prev.includes(dogId) ? prev.filter(x => x !== dogId) : [...prev, dogId]);
   const joinDogs = () => {
@@ -200,11 +203,13 @@ export default function GroupSessionScreen() {
     setBusy('assign'); setError(null);
     void (async () => {
       try {
-        const trackId = (await tracks.assign(sessionId, handlerParticipation, own ? false : blind)).trackId;
+        const kind = asMantrail && mantrailSupported ? 'mantrail' as const : 'track' as const;
+        const trackId = (await tracks.assign(sessionId, handlerParticipation, own ? false : blind, kind)).trackId;
         closeAssign();
         // Gewohnter Recorder; nach dem Stoppen geht die Fährte an die Hundeführerin. Eigene Fährte:
         // sie bleibt die eigene, normale Fährte, nur ihre Fläche wird im Gruppentraining eingetragen.
-        router.push({ pathname: '/track/legen', params: { dogId: layerDog, groupTrackId: trackId, groupId, groupSessionId: sessionId, ...(own ? { groupOwn: '1' } : {}) } } as never);
+        // Mantrailing: eigener Bildschirm mit demselben Recorder.
+        router.push({ pathname: kind === 'mantrail' ? '/mantrail/legen' : '/track/legen', params: { dogId: layerDog, groupTrackId: trackId, groupId, groupSessionId: sessionId, ...(own ? { groupOwn: '1' } : {}) } } as never);
         await load(true);
       } catch (e) {
         const code = groupErrorCode(e);
@@ -237,6 +242,10 @@ export default function GroupSessionScreen() {
     return t('groups.trackOther', { layer: memberName(track.layerUserId), name: memberName(track.handlerUserId), dog });
   };
   const trackSub = (track: GroupTrack) => {
+    const sub = trackSubBase(track);
+    return track.kind === 'mantrail' ? `${t('groups.kindMantrail')} · ${sub}` : sub;
+  };
+  const trackSubBase = (track: GroupTrack) => {
     if (isOwnGroupTrack(track)) return track.layerUserId === userId ? t('groups.trackOwnTag') : `${t('groups.trackOwnTag')} · ${t('groups.trackAreaOnly')}`;
     const parts = [track.layerUserId === userId ? t('groups.trackByYou') : track.handlerUserId === userId ? t('groups.trackBy', { name: memberName(track.layerUserId) }) : t('groups.trackAreaOnly')];
     if (track.blind && (track.layerUserId === userId || track.handlerUserId === userId)) parts.push(t('groups.blind'));
@@ -394,6 +403,16 @@ export default function GroupSessionScreen() {
                     trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
                 </View>
               )}
+              {mantrailSupported ? (
+                <View style={[cs.row, { alignItems: 'flex-start' }]}>
+                  <View style={cs.rowText}>
+                    <Text style={cs.rowTitle}>{t('groups.mantrailTitle')}</Text>
+                    <Text style={cs.rowSub}>{t('groups.mantrailHint')}</Text>
+                  </View>
+                  <Switch testID="group-assign-mantrail" value={asMantrail} onValueChange={setAsMantrail} accessibilityLabel={t('groups.mantrailTitle')}
+                    trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
+                </View>
+              ) : null}
               <Text style={cs.hint}>{t('groups.lyingHint')}</Text>
               <Text style={[cs.hint, { marginTop: 4 }]}>{t('groups.areaHint')}</Text>
               <Text style={[cs.hint, { marginTop: 4 }]}>{t('groups.ownHint')}</Text>

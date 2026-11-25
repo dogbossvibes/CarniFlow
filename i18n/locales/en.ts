@@ -3207,4 +3207,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "mantrail.savedText": "The trail is saved on the device and will upload once there is a connection.",
   "mantrail.notFound": "This trail is not open (any more).",
   "premium.newbieMantrailLimit": "You’ve already used your free trail for this month. With Active you can train without limits.",
+  // Mantrailing im Gruppentraining (Spec 02, PR B2)
+  "groups.mantrailTitle": "Mantrailing trail",
+  "groups.mantrailHint": "Lay a mantrailing trail instead of an IGP track. The handler works it in mantrailing mode; “blind” means double blind there.",
+  "groups.kindMantrail": "Mantrailing",
 };

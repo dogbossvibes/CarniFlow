@@ -3207,4 +3207,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "mantrail.savedText": "La traccia è salvata sul dispositivo e verrà caricata appena c’è rete.",
   "mantrail.notFound": "Questa traccia non è (più) aperta.",
   "premium.newbieMantrailLimit": "Hai già usato la tua traccia di mantrailing gratuita per questo mese. Con Active ti alleni senza limiti.",
+  // Mantrailing im Gruppentraining (Spec 02, PR B2)
+  "groups.mantrailTitle": "Traccia di mantrailing",
+  "groups.mantrailHint": "Posare una traccia di mantrailing invece di una traccia IGP. Il conduttore la lavora in modalità mantrailing; «cieco» significa lì doppio cieco.",
+  "groups.kindMantrail": "Mantrailing",
 };
