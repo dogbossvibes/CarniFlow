@@ -18,6 +18,8 @@ import { fetchRemoteExam } from '@/features/exam-book/sync';
 import { listSharedExams } from '@/features/exam-book/service';
 import { ExamPointsChart } from '@/features/exam-book/ui/ExamPointsChart';
 import { ExamShareSheet } from '@/features/exam-book/ui/ExamShareSheet';
+import { buildExamPdfModel, type ExamPdfLabels } from '@/features/exam-book/pdf';
+import { shareExamBookPdf } from '@/features/exam-book/pdfShare';
 
 // Prüfungsbuch eines Hundes (Spec 01-pruefungsbuch.md).
 // Eigener Hund: lokal (offline) mit Bearbeiten. Geteilter Hund (?shared=1):
@@ -53,6 +55,39 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
 
   const onRefresh = async () => { setRefreshing(true); try { await reload(); } finally { setRefreshing(false); } };
 
+  // PDF-Export (Premium). Entsteht nur auf dem Gerät; nichts wird hochgeladen.
+  const [exporting, setExporting] = useState(false);
+  const exportPdf = async () => {
+    if (!isPro) { router.push('/premium' as never); return; }
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const labels: ExamPdfLabels = {
+        title: t('exam.bookTitle'),
+        colDate: t('exam.pdfColDate'), colExam: t('exam.pdfColExam'), colPlace: t('exam.pdfColPlace'),
+        colPoints: t('exam.pdfColPoints'), colResult: t('exam.pdfColResult'),
+        passed: t('exam.passed'), failed: t('exam.pdfNotPassed'),
+        judge: t('exam.judge'), placement: t('exam.placement'),
+        progressTitle: t('exam.pdfProgress'),
+        passedLevel: level => t('exam.passedLevel', { level }),
+        nextLevel: level => t('exam.nextLevel', { level }),
+        noPassYet: t('exam.noPassYet'), highestLevel: t('exam.highestLevel'),
+        empty: t('exam.pdfEmpty'), footerCreated: t('exam.pdfFooter'),
+        page: (n, total) => t('exam.pdfPage', { n, total }),
+      };
+      const model = buildExamPdfModel({
+        exams, dogName, labels, formatDate: dateLabel,
+        generated: t('exam.pdfGenerated', { date: formatDate(new Date()) }),
+      });
+      const res = await shareExamBookPdf(model, `ANYVO-Pruefungsbuch-${dogName}`);
+      if (res === 'unavailable') Alert.alert(t('exam.pdfUnavailable'));
+    } catch {
+      Alert.alert(t('exam.pdfFailed'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <Header title={t('exam.bookTitle')} subtitle={dogName} onBack={() => router.back()}>
@@ -87,6 +122,13 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
             ) : (
               <ExamList exams={exams} pending={pending} onOpen={e => openEdit(e.id)} />
             )}
+            {exams.length > 0 ? (
+              <AnyvoButton
+                variant="secondary" icon={isPro ? 'document-text-outline' : 'lock-closed-outline'}
+                label={t('exam.pdfExport')} loading={exporting} onPress={() => void exportPdf()}
+              />
+            ) : null}
+            {exams.length > 0 && !isPro ? <Text style={s.muted}>{t('exam.pdfLocked')}</Text> : null}
           </>}
       </ScrollView>
       <ExamShareSheet visible={shareOpen} onClose={() => setShareOpen(false)} ownerId={ownerId} dogId={dogId} dogName={dogName} />

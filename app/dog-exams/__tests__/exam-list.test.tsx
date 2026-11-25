@@ -33,6 +33,8 @@ jest.mock('@/features/exam-book/store', () => ({ acceptServerVersion: jest.fn(),
 jest.mock('@/features/exam-book/sync', () => ({ fetchRemoteExam: jest.fn() }));
 jest.mock('@/features/exam-book/service', () => ({ listSharedExams: (...a: unknown[]) => mockShared(...a) }));
 jest.mock('@/features/exam-book/ui/ExamShareSheet', () => ({ ExamShareSheet: () => null }));
+const mockSharePdf = jest.fn();
+jest.mock('@/features/exam-book/pdfShare', () => ({ shareExamBookPdf: (...a: unknown[]) => mockSharePdf(...a) }));
 
 import DogExamsRoute from '../[id]';
 
@@ -52,6 +54,7 @@ beforeEach(() => {
   mockParams = { id: 'dog-1', name: 'Luna' }; mockPro = false; mockPush.mockReset();
   Object.assign(mockBook, { exams, conflicts: new Set(), pending: new Set(['e2']) });
   mockShared.mockReset();
+  mockSharePdf.mockReset();
 });
 
 it('zeigt Fortschritt, Liste und «noch nicht synchronisiert»', async () => {
@@ -97,4 +100,31 @@ it('geteilte Ansicht ohne Freigabe: Hinweis statt Daten', async () => {
   const r = await render();
   await act(async () => { await Promise.resolve(); });
   expect(texts(r)).toContain('exam.sharedUnavailable');
+});
+
+const pressLabel = async (r: ReactTestRenderer, label: string) => {
+  const target = r.root.findAll(n => typeof n.props.onPress === 'function' && typeof n.type !== 'string'
+    && n.findAllByType(Text).some(t => t.props.children === label)).pop();
+  if (!target) throw new Error(`no button ${label}`);
+  await act(async () => { await target.props.onPress(); });
+};
+
+it('PDF ohne Premium: führt zu Premium, erzeugt nichts', async () => {
+  const r = await render();
+  expect(texts(r)).toContain('exam.pdfLocked');
+  await pressLabel(r, 'exam.pdfExport');
+  expect(mockPush).toHaveBeenCalledWith('/premium');
+  expect(mockSharePdf).not.toHaveBeenCalled();
+});
+
+it('PDF mit Premium: teilt das Prüfungsbuch mit beiden Einträgen', async () => {
+  mockPro = true;
+  mockSharePdf.mockResolvedValue('shared');
+  const r = await render();
+  await pressLabel(r, 'exam.pdfExport');
+  expect(mockSharePdf).toHaveBeenCalledTimes(1);
+  const [model, fileName] = mockSharePdf.mock.calls[0];
+  expect(model.rows).toHaveLength(2);
+  expect(model.dogName).toBe('Luna');
+  expect(fileName).toBe('ANYVO-Pruefungsbuch-Luna');
 });
