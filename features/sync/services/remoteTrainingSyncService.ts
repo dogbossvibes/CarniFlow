@@ -51,7 +51,9 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
         average_deviation_meters: summary.run.average_deviation_meters ?? null,
         articles_found:           summary.run.articles_found ?? null,
       } : {}),
-      ...((summary.manualAngleGeometry || summary.layContinuity || summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at || summary.groupTrack) ? { track_data: {
+      // Mantrailing (Spec 02): Angaben nur bei type = 'mantrail' übernehmen; IGP-Fährten unverändert.
+      ...((summary.manualAngleGeometry || summary.layContinuity || summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at || summary.groupTrack || (local.type === 'mantrail' && summary.mantrail)) ? { track_data: {
+        ...(local.type === 'mantrail' && summary.mantrail ? { mantrail: summary.mantrail } : {}),
         // Übernommene Gruppenfährte (fremd gelegt): Markierung mitnehmen, damit Teilen und Export die gelegte
         // Linie auch nach dem Laden vom Server weglassen (foreignLaidLine.ts). Rein additiv; ältere Zeilen bleiben lesbar.
         ...(summary.groupTrack ? { groupTrack: summary.groupTrack } : {}),

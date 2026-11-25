@@ -168,6 +168,26 @@ export const DISCIPLINES: Discipline[] = [
     ],
   },
   {
+    key:      'mantrailing',
+    label:    'Mantrailing',      // = Sparten-Label in constants/sparten.ts (Profil-Filter)
+    subtitle: 'Personensuche mit Geruchsträger',
+    emoji:    '🔍',
+    icon:     'search',
+    accent:   '#38BDF8',          // Himmelblau
+    hero:     false,
+    exercises: [
+      'Starttraining',
+      'Kurztrail',
+      'Langtrail',
+      'Negativtrail',
+      'Doppelblind',
+      'Stadttrail',
+      'Geruchsträger-Arbeit',
+      'Anzeige / Verweisen',
+      'Eigene Übung',
+    ],
+  },
+  {
     key:      'eigene',
     label:    'Eigene Kategorie',
     subtitle: 'Individuelles Training',
