@@ -1,3 +1,4 @@
+import { cancelLayRemindersForSession } from '@/features/tracking/native/liegezeitReminder';
 import { deleteGpsCaptures } from '@/features/tracking/storage/gpsCapture';
 import { gpsCaptureScope } from '@/features/tracking/storage/gpsCaptureScope';
 import { mutateOwnTransfer } from '@/features/tracking-transfer/runtime';
@@ -299,12 +300,14 @@ export async function deleteTrackSession(id: string): Promise<Result<null>> {
     check();
     if (transfer.handled) {
       if (!transfer.error && scope.userId) await deleteGpsCaptures(id);
+      if (!transfer.error) void cancelLayRemindersForSession(id);   // Liegezeit-Erinnerung der gelöschten Fährte
       return { data: null, error: transfer.error };
     }
     const { error } = await supabase.from('training_sessions').delete().eq('id', id);
     if (error) return fail('deleteTrackSession', error);
     check();
     if (scope.userId) await deleteGpsCaptures(id);
+    void cancelLayRemindersForSession(id);   // Liegezeit-Erinnerung der gelöschten Fährte (best-effort)
     return { data: null, error: null };
   } catch (e) { return fail('deleteTrackSession', e); }
 }

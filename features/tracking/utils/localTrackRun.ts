@@ -3,6 +3,7 @@
 // nur an finishTrackRun (remote) übergeben wird, plus die stabile client-Run-UUID.
 
 import { buildTrackObjectSnapshot } from './trackObjectReview';
+import type { RunIndication } from '@/features/tracking/dogTrackSettings/model';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import type { TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
@@ -25,6 +26,8 @@ export function buildRunResultPayload(args: {
   endedAtMs:             number;
   result:                RunResultSource;
   searchHandlerDistanceM?: number;
+  // Anzeige am Gegenstand aus dem Hundeprofil (Stand dieser Absuche). Additiv; fehlt = keine Angabe.
+  indication?: RunIndication;
   referenceHasGaps?: boolean;
   autoDwellObjectIds?: string[];
   objectSnapshotInput?: Omit<Parameters<typeof buildTrackObjectSnapshot>[0], 'foundObjects' | 'totalObjects'>;
@@ -70,6 +73,7 @@ export function buildRunResultPayload(args: {
     distance_meters:           r.distanceM,
     breaks:                    r.breaks.length,
     search_handler_distance_m: args.searchHandlerDistanceM ?? null,
+    ...(args.indication ? { indication: { ...args.indication } } : {}),
     ...(args.autoDwellObjectIds?.length ? { object_detections: args.autoDwellObjectIds.map(id => ({ id, source: 'auto_dwell' })) } : {}),
     ...(objectSnapshot ? { object_snapshot: objectSnapshot } : {}),
     run_points:                hasReplayTimestamps

@@ -1,6 +1,7 @@
 import { parseTrackTransferReference, type TrackTransferReference } from './reference';
 import { parseTransferReceipt, type TrackTransferReceipt } from './importPlan';
 import type { Evaluation, OwnCopy, OwnPatch, OwnRun, RunPoint } from './cloudContract';
+import { isTrackIndication, type TrackIndication } from '@/features/tracking/dogTrackSettings/model';
 export class TransferCopyError extends Error {
   constructor(readonly code: string = 'INVALID_RESPONSE') { super(code); this.name = 'TransferCopyError'; }
 }
@@ -53,7 +54,7 @@ export function parseEvaluation(v: unknown): Evaluation {
 }
 export function parseOwnRun(v: unknown, receipt: TrackTransferReceipt): OwnRun {
   const required = ['run_id','session_id','started_at','ended_at','duration_seconds','score','average_deviation_meters','articles_found','total_objects','distance_meters','breaks','search_handler_distance_m','run_points'];
-  const optional = ['continuity','object_detections','object_snapshot','analytics','replay_points'];
+  const optional = ['continuity','object_detections','object_snapshot','analytics','replay_points','indication'];
   const o = keys(v, required, optional);
   if (o.run_id !== receipt.ownRunId || o.session_id !== receipt.ownSessionId) return bad();
   const points = (value: unknown): RunPoint[] => {
@@ -77,6 +78,11 @@ export function parseOwnRun(v: unknown, receipt: TrackTransferReceipt): OwnRun {
   for (const k of ['continuity','object_snapshot','analytics'] as const) if (Object.hasOwn(o, k)) result[k] = record(o[k]);
   if (Object.hasOwn(o, 'object_detections')) { if (!Array.isArray(o.object_detections)) bad(); result.object_detections = o.object_detections as unknown[]; }
   if (Object.hasOwn(o, 'replay_points')) result.replay_points = points(o.replay_points);
+  if (Object.hasOwn(o, 'indication')) {
+    const ind = keys(o.indication, ['version','value','source']);
+    if (ind.version !== 1 || !isTrackIndication(ind.value) || ind.source !== 'dog_profile') bad();
+    result.indication = { version: 1, value: ind.value as TrackIndication, source: 'dog_profile' };
+  }
   return jsonClone(result, 4000000);
 }
 export function parseOwnCopy(value: unknown, receiptValue: unknown): OwnCopy<TrackTransferReference> {

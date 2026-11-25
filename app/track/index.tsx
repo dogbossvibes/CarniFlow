@@ -1,3 +1,4 @@
+import { cancelLayRemindersForSession } from '@/features/tracking/native/liegezeitReminder';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { GroupEntry } from '@/features/training-groups/GroupEntry';
@@ -130,6 +131,7 @@ export default function TrackOverviewScreen() {
             }
             if (version !== loadVersion.current) return;
             await markTrainingAsDeleted(id);
+            void cancelLayRemindersForSession(id);   // auch rein lokale Fährten
             if (version !== loadVersion.current) return;
             setRows(rs => rs.filter(r => r.id !== id));
             showToast('Fährte gelöscht');

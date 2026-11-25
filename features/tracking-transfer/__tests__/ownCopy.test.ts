@@ -15,3 +15,12 @@ it.each([undefined, null, {}, { ...fixture.accept.ownCopy, pointIds: [] }, { ...
   { ...fixture.accept.ownCopy, revision: 1.5 }, { ...fixture.restore.ownCopy, run: { ...fixture.restore.ownCopy.run, run_id: receipt.ownSessionId } }])('rejects malformed/current-copy response before hydration: %s', value => {
   expect(() => parseOwnCopy(value, receipt)).toThrow('INVALID_RESPONSE');
 });
+
+it('accepts the dog-profile indication on an own run and rejects unknown indications', () => {
+  const payload = buildRunResultPayload({ runId: receipt.ownRunId, sessionId: receipt.ownSessionId, startedAtMs: 1000, endedAtMs: 11000,
+    result: { durationS: 10, score: 80, deviationAvgM: 2, foundObjects: 1, totalObjects: 2, distanceM: 20, breaks: [], points: [{ latitude: 47, longitude: 8 }] },
+    indication: { version: 1, value: 'sit', source: 'dog_profile' } });
+  expect(parseOwnRun(payload, receipt)).toEqual(payload);
+  expect(() => parseOwnRun({ ...payload, indication: { version: 1, value: 'bark', source: 'dog_profile' } }, receipt)).toThrow('INVALID_RESPONSE');
+  expect(() => parseOwnRun({ ...payload, indication: { version: 1, value: 'sit', source: 'dog_profile', extra: 1 } }, receipt)).toThrow('INVALID_RESPONSE');
+});

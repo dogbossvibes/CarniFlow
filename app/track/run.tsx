@@ -45,6 +45,9 @@ import type { QaApproachFixDiagnostics, QaEndConfirmationDiagnostics, QaEndEligi
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { dogLeadSetting, nextHandlerDistance } from '@/features/tracking/store/dogLeadSetting';
+import { useDogTrackSettings } from '@/features/tracking/hooks/useDogTrackSettings';
+import { dogTrackSettingsStore, hapticsEnabled, runIndication, voiceEnabled } from '@/features/tracking/dogTrackSettings';
+import { cancelLayReminder } from '@/features/tracking/native/liegezeitReminder';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
@@ -230,6 +233,10 @@ export default function TrackRunScreen() {
     void dogLeadSetting.save(dogId, d);
   }, [dogId]);
   const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
+  // Fährten-Einstellungen des Hundes (Hundeprofil): Startwerte für Abstand, Sprachansagen und Vibration
+  // sowie die Anzeige am Gegenstand fürs Ergebnis. Fehlen sie, gilt das bisherige Verhalten.
+  const { settings: dogTrackSettings } = useDogTrackSettings(dogId);
+  useEffect(() => { void cancelLayReminder(dogId); }, [dogId]);   // Absuche erreicht: Liegezeit-Erinnerung entfällt
 
   const laidAngleArcM = useMemo(() => snapData.laidMarkers.filter(m => m.type === 'winkel')
     .flatMap(m => { const at = snapData.eventArcs[m.id]?.arcM; return at == null ? [] : [at]; }), [snapData]);
@@ -253,7 +260,9 @@ export default function TrackRunScreen() {
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
-  const [voiceOn, setVoiceOn] = useState(true);
+  // Startwert aus dem Hundeprofil (ohne Einstellung: an), bis die Sprachansage hier selbst umgeschaltet wird.
+  const [voiceOverride, setVoiceOverride] = useState<boolean | null>(null);
+  const voiceOn = voiceOverride ?? voiceEnabled(dogTrackSettings);
   useTrackVoiceAudioSession(voiceOn);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
   const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
   // T-206: «Gegenstand erkannt» je Fund genau einmal pro Absuche — auch nach einem App-Neustart.
@@ -418,6 +427,15 @@ export default function TrackRunScreen() {
         // Eine unterbrochene Absuche (Zweig oben) behält ihren eigenen Wert.
         void dogLeadSetting.load(dogId).then(remembered => {
           if (alive && remembered != null && !handlerDistanceChosenRef.current) setSearchHandlerDistanceM(remembered);
+          // Ohne gemerkten Abstand auf diesem Gerät: Abstand aus dem Hundeprofil — nur, solange nichts gewählt
+          // und die Absuche noch nicht gestartet ist (das Laden aus dem Konto kann dauern).
+          if (alive && remembered == null) {
+            void dogTrackSettingsStore.load(transferAuth?.user.id, dogId).then(({ settings }) => {
+              if (alive && settings.handlerDistanceM && !handlerDistanceChosenRef.current && useTrackingStore.getState().sessionStatus !== 'searching') {
+                setSearchHandlerDistanceM(settings.handlerDistanceM);
+              }
+            }).catch(() => {});
+          }
         });
       }
       setPhase('ready');
@@ -830,7 +848,7 @@ export default function TrackRunScreen() {
 
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
-  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible, hapticRecovery);
+  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, guidanceVisible && hapticsEnabled(dogTrackSettings), hapticRecovery);
 
   // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
   // akzeptierter Handler-Fixes und des gespeicherten Endpunkts (letzter Punkt
@@ -1186,6 +1204,9 @@ export default function TrackRunScreen() {
             breaks: res.breaks, points: res.points,
           },
           searchHandlerDistanceM,
+          // Anzeige am Gegenstand aus dem Hundeprofil. Nicht bei übernommenen Fährten: deren Kopie
+          // lesen ältere App-Versionen mit fester Feldliste (ownCopy.ts) und würden sie sonst ablehnen.
+          indication: transferIdentity.transferReceipt ? undefined : runIndication(dogTrackSettings),
           referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
           autoDwellObjectIds: res.autoDwellObjectIds,
           objectSnapshotInput: { objects: snapData.laidObjects, statuses: res.objectStatuses,
@@ -1360,7 +1381,7 @@ export default function TrackRunScreen() {
             </Pressable>
           )}
           {/* Sprachausgabe an/aus */}
-          <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
+          <Pressable onPress={() => setVoiceOverride(!voiceOn)} hitSlop={8}
             className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(0,255,204,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
             <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={17} color={voiceOn ? FT.acc : FT.muted} />
           </Pressable>
