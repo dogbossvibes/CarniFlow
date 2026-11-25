@@ -114,7 +114,7 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
                 </AnyvoCard>
               );
             })}
-            <ExamOverview exams={exams} isPro={isPro} onUpgrade={() => router.push('/premium' as never)} />
+            <ExamOverview exams={exams} isPro={isPro} capabilitiesLoading={capabilitiesLoading} onUpgrade={() => router.push('/premium' as never)} />
             {exams.length === 0 ? (
               <AnyvoCard>
                 <Text style={s.title}>{t('exam.emptyTitle')}</Text>
@@ -167,7 +167,8 @@ function SharedExams({ dogId, dogName }: { dogId: string; dogName: string }) {
 }
 
 // ── Bausteine ───────────────────────────────────────────────
-function ExamOverview({ exams, isPro, onUpgrade }: { exams: ExamResult[]; isPro: boolean; onUpgrade: () => void }) {
+// capabilitiesLoading: solange das Abo lädt, weder Verlauf noch Premium-Hinweis zeigen.
+function ExamOverview({ exams, isPro, capabilitiesLoading = false, onUpgrade }: { exams: ExamResult[]; isPro: boolean; capabilitiesLoading?: boolean; onUpgrade: () => void }) {
   const { t } = useT();
   const progress = useMemo(() => examProgress(exams), [exams]);
   const charts = useMemo(() => EXAM_TYPES.map(def => ({ def, series: sectionSeries(exams, def.key) }))
@@ -180,7 +181,7 @@ function ExamOverview({ exams, isPro, onUpgrade }: { exams: ExamResult[]; isPro:
         <Text style={s.text}>{p.next ? t('exam.nextLevel', { level: p.next.levelLabel }) : t('exam.highestLevel')}</Text>
       </AnyvoCard>
     ))}
-    {hasAnyPoints ? (
+    {hasAnyPoints && !capabilitiesLoading ? (
       isPro ? (
         charts.length > 0 ? charts.map(({ def, series }) => (
           <AnyvoCard key={def.key}>

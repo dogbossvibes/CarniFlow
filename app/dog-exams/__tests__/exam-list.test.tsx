@@ -134,6 +134,7 @@ it('PDF solange das Abo lädt: kein Schloss, kein Weg zu Premium, kein PDF', asy
   mockCapsLoading = true;
   const r = await render();
   expect(texts(r)).not.toContain('exam.pdfLocked');
+  expect(texts(r)).not.toContain('exam.chartLocked');   // auch kein Premium-Hinweis beim Verlauf
   const icons = r.root.findAll(n => n.props.label === 'exam.pdfExport' && typeof n.props.icon === 'string');
   expect(icons.length).toBeGreaterThan(0);
   expect(icons.every(n => n.props.icon !== 'lock-closed-outline' && n.props.disabled === true)).toBe(true);
