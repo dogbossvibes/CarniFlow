@@ -624,7 +624,7 @@ function DocumentForm() {
     if (editing) router.replace({ pathname: '/unit/detail', params: { id: id! } });
     else {
       setSaved(true);
-      void onTrainingSaved(session.user.id);
+      void onTrainingSaved(session.user.id, id ?? unitIdRef.current);
     }
     } catch {
       if (!alive.current) return;

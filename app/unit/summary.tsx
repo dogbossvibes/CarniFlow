@@ -128,7 +128,7 @@ function SummaryForm() {
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     router.replace('/(tabs)/home');
-    void onTrainingSaved(session.user.id);
+    void onTrainingSaved(session.user.id, active.unitId);
     } catch {
       if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally {

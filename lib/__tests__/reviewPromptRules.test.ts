@@ -6,7 +6,7 @@ import {
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 25, 12);
 
-const ready: ReviewPromptState = { successfulSaves: 3, lastPromptAt: null, lastPromptVersion: null };
+const ready: ReviewPromptState = { successfulSaves: 3, lastPromptAt: null, lastPromptVersion: null, countedIds: [] };
 const ctx = (over: Partial<ReviewContext> = {}): ReviewContext => ({
   now: NOW, firstLaunchAt: NOW - 8 * DAY, appVersion: '1.0.9', trackingActive: false, outcome: 'success', ...over,
 });
@@ -73,11 +73,11 @@ describe('sanitizeReviewState', () => {
   it('liefert Leerwerte bei fehlendem oder kaputtem Stand', () => {
     expect(sanitizeReviewState(null)).toEqual(EMPTY_REVIEW_STATE);
     expect(sanitizeReviewState('x')).toEqual(EMPTY_REVIEW_STATE);
-    expect(sanitizeReviewState({ successfulSaves: -2, lastPromptAt: 'gestern', lastPromptVersion: 5 }))
+    expect(sanitizeReviewState({ successfulSaves: -2, lastPromptAt: 'gestern', lastPromptVersion: 5, countedIds: [1, ''] }))
       .toEqual(EMPTY_REVIEW_STATE);
   });
   it('übernimmt gültige Werte', () => {
-    const s = { successfulSaves: 4, lastPromptAt: NOW, lastPromptVersion: '1.0.9' };
+    const s = { successfulSaves: 4, lastPromptAt: NOW, lastPromptVersion: '1.0.9', countedIds: ['a', 'b'] };
     expect(sanitizeReviewState(s)).toEqual(s);
   });
 });

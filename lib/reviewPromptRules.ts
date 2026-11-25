@@ -17,12 +17,15 @@ export interface ReviewPromptState {
   lastPromptAt: number | null;
   /** App-Version, in der zuletzt abgefragt wurde, oder null. */
   lastPromptVersion: string | null;
+  /** Zuletzt gezählte Fährten-/Einheits-IDs (dieselbe nur einmal zählen). */
+  countedIds: string[];
 }
 
 export const EMPTY_REVIEW_STATE: ReviewPromptState = {
   successfulSaves: 0,
   lastPromptAt: null,
   lastPromptVersion: null,
+  countedIds: [],
 };
 
 export type ReviewOutcome = 'success' | 'error' | 'cancelled';
@@ -68,12 +71,14 @@ const toText = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null
 
 /** Gespeicherten Stand robust lesen; beschädigte Werte fallen auf Leerwerte zurück. */
 export function sanitizeReviewState(raw: unknown): ReviewPromptState {
-  if (!raw || typeof raw !== 'object') return { ...EMPTY_REVIEW_STATE };
+  if (!raw || typeof raw !== 'object') return { ...EMPTY_REVIEW_STATE, countedIds: [] };
   const r = raw as Record<string, unknown>;
   return {
     successfulSaves: toCount(r.successfulSaves),
     lastPromptAt: toTime(r.lastPromptAt),
     lastPromptVersion: toText(r.lastPromptVersion),
+    countedIds: Array.isArray(r.countedIds)
+      ? r.countedIds.filter((x): x is string => typeof x === 'string' && x.length > 0) : [],
   };
 }
 

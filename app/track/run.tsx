@@ -1244,7 +1244,7 @@ export default function TrackRunScreen() {
     setFinishing(false);
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
     // Bewertungsabfrage erst, wenn die Auswertung zu sehen ist (verzögert, wirft nie).
-    if (sessId) void onTrainingSaved(transferAuth?.user.id);
+    if (sessId) void onTrainingSaved(transferAuth?.user.id, runId);
   };
 
   const guardedBack = useCallback(() => {

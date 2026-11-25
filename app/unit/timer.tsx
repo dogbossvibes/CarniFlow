@@ -111,7 +111,7 @@ function TimerForm() {
     queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     router.replace('/(tabs)/home');
-    void onTrainingSaved(ownerId);
+    void onTrainingSaved(ownerId, unitId);
     } catch {
       if (alive.current) { haptic.error(); Alert.alert(t('common.error'), t('training.saveError')); }
     } finally { saveLock.current = false; }
