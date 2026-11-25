@@ -3126,4 +3126,9 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "exam.pdfFooter": "Erstellt mit ANYVO",
   "exam.pdfPage": "Siite {n} vo {total}",
   "exam.pdfGenerated": "Stand {date}",
+  "voiceField.undoNotInLay": "Rückgängig gaht bim Lege nöd.",
+  "voiceField.toggleOn": "Sprachstüürig iischalte",
+  "voiceField.toggleOff": "Sprachstüürig uusschalte",
+  "voiceField.started": "Sprachstüürig aa",
+  "voiceField.stopped": "Sprachstüürig uus",
 };

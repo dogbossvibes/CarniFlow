@@ -75,6 +75,7 @@ export function parseFieldCommand(text: string | null | undefined, mode: FieldVo
 
 /** Erkennungshilfe für die Spracherkennung (iOS contextualStrings / Android-Bias). */
 export const FIELD_CONTEXT_STRINGS: Record<FieldVoiceMode, readonly string[]> = {
-  lay: ['Winkel links', 'Winkel rechts', 'Spitzwinkel links', 'Spitzwinkel rechts', 'Gegenstand', 'Verleitung', 'Ende', 'Ja', 'Nein', 'Rückgängig'],
+  // «Verleitung» beim Legen bewusst nicht (keine Taste, Entscheid 2026-11-25).
+  lay: ['Winkel links', 'Winkel rechts', 'Spitzwinkel links', 'Spitzwinkel rechts', 'Gegenstand', 'Ende', 'Ja', 'Nein'],
   search: ['Gegenstand gefunden', 'Liegt', 'Sitzt', 'Steht', 'Aufgenommen', 'Ende', 'Ja', 'Nein', 'Rückgängig'],
 };

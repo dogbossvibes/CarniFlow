@@ -74,6 +74,10 @@ import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButto
 import { useActiveTrackOverlays } from '@/features/tracking/hooks/useActiveTrackOverlays';
 import { TrackReferenceOverlayControl } from '@/features/tracking/components/TrackReferenceOverlayControl';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
+import { useFieldVoiceControl } from '@/features/voice/hooks/useFieldVoiceControl';
+import { useVoiceControlPreference } from '@/features/voice/hooks/useVoiceControlPreference';
+import { layVoiceStep } from '@/features/voice/services/layVoiceBridge';
+import type { FieldVoiceEffect } from '@/features/voice/services/fieldVoiceController';
 
 const NO_REFERENCE_OVERLAYS: TrackReferenceOverlay[] = [];
 
@@ -244,7 +248,8 @@ export default function LegenScreen() {
   // Toast + Sprachbestätigung. Alle drei Rückmeldungen benutzen denselben,
   // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
   const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
-  useTrackVoiceAudioSession(layVoice.enabled);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
+  // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm (Aufruf weiter unten,
+  // weil auch die Sprachsteuerung ihre Bestätigungen hörbar braucht).
   const layVoiceRef = useRef(false);
   // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   layVoiceRef.current = layVoice.enabled;
@@ -339,6 +344,50 @@ export default function LegenScreen() {
     });
     return () => { sub.remove(); void VolumeManager?.showNativeVolumeUI({ enabled: true }); };
   }, [phase, volumeKeyArticle, quickAddArticle]);
+
+  // ── Sprachsteuerung beim Legen (Spec 03, PR B) ─────────────────────────────
+  // Jeder Befehl ruft GENAU die Funktion der Taste auf (placeWinkel, quickAddArticle,
+  // finishTrack) – gleiche Marker, gleiche Daten, gleiche Rückmeldung. Erkannter Text
+  // wird nicht gespeichert. Kein Entfernen beim Legen (Recorder kann keinen Marker
+  // entfernen; Entscheid Nutzerin 2026-11-25). Nur im Vordergrund.
+  const finishTrackRef = useRef<() => void>(() => undefined);
+  const speakVoiceControl = useCallback((key: string) => {
+    requestVoice({ eventType: 'status', text: t(key as TranslationKey), language: getSpeechLocale(), priority: 4,
+      onceKey: `lay-voice-control:${Date.now()}:${++layVoiceSequence}`, phase: 'lay' });
+  }, [t]);
+  const onVoiceEffect = useCallback((effect: FieldVoiceEffect) => {
+    if (phaseRef.current !== 'recording') return;
+    const step = layVoiceStep(effect);
+    let accepted = true;
+    if (step.run === 'corner') accepted = placeWinkel(step.angleKind);
+    else if (step.run === 'article') { accepted = !!useTrackingStore.getState().startAnchor; quickAddArticle(); }
+    else if (step.run === 'finish') { finishTrackRef.current(); return; }
+    if (!accepted) return;   // Taste hätte nichts gesetzt (z. B. Startpunkt fehlt): gleicher Hinweis wie dort
+    if (step.run === 'none' && step.speakKey) showToast(t(step.speakKey as TranslationKey));
+    // Gesetzte Marker sagt announceEvent schon an, wenn die Sprachausgabe an ist.
+    const alreadySpoken = (step.run === 'corner' || step.run === 'article') && layVoiceRef.current;
+    if (step.speakKey && !alreadySpoken) speakVoiceControl(step.speakKey);
+  }, [placeWinkel, quickAddArticle, showToast, speakVoiceControl, t]);
+  const voiceControl = useFieldVoiceControl('lay', onVoiceEffect);
+  const voicePref = useVoiceControlPreference('lay');
+  const voiceListening = voiceControl.status === 'listening' || voiceControl.status === 'starting';
+  useTrackVoiceAudioSession(layVoice.enabled || voiceListening);
+  // Gemerkt «an»: beim Start der Aufnahme wieder einschalten; ausserhalb der Aufnahme aus.
+  const { enable: enableVoice, disable: disableVoice } = voiceControl;
+  useEffect(() => {
+    if (phase !== 'recording') { disableVoice(); return; }
+    if (voicePref.wanted && voiceControl.status === 'off') void enableVoice();
+  }, [phase, voicePref.wanted, voiceControl.status, enableVoice, disableVoice]);
+  const toggleVoiceControl = useCallback(() => {
+    hapticTap();
+    if (voiceListening) { disableVoice(); voicePref.save(false); showToast(t('voiceField.stopped')); return; }
+    voicePref.save(true);
+    void enableVoice();
+  }, [voiceListening, disableVoice, enableVoice, voicePref, showToast, t]);
+  useEffect(() => {
+    if (voiceControl.status === 'denied') showToast(t('voiceField.denied'));
+    else if (voiceControl.status === 'unavailable' && voicePref.wanted) showToast(t('voiceField.unavailable'));
+  }, [voiceControl.status, voicePref.wanted, showToast, t]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
   const conflictShownRef = useRef(false);
@@ -731,6 +780,9 @@ export default function LegenScreen() {
       }
     }
   };
+  // Sprach-«Ende» nach «Ja» nutzt genau diese Funktion (immer die aktuelle Fassung).
+  useEffect(() => { finishTrackRef.current = finishTrack; });
+
 
   const togglePause = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
@@ -878,6 +930,24 @@ export default function LegenScreen() {
             >
               <Ionicons name="water-outline" size={19} color={FT.text} />
             </Pressable>
+          )}
+          {phase === 'recording' && !pocketLock && voiceControl.available && (
+            <Pressable
+              testID="voice-control-toggle"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: voiceListening }}
+              accessibilityLabel={t(voiceListening ? 'voiceField.toggleOff' : 'voiceField.toggleOn')}
+              onPress={toggleVoiceControl}
+              className={`absolute top-[64px] right-[110px] z-30 w-10 h-10 rounded-[12px] border items-center justify-center ${voiceListening ? 'bg-ft-acc border-ft-acc' : 'bg-black/90 border-ft-line-strong'}`}
+              style={{ elevation: 30 }}
+            >
+              <Ionicons name={voiceListening ? 'mic' : 'mic-outline'} size={19} color={voiceListening ? FT.accText : FT.text} />
+            </Pressable>
+          )}
+          {phase === 'recording' && voiceListening && (
+            <View testID="voice-control-status" accessibilityLiveRegion="polite" className="absolute top-[112px] right-[14px] z-30 px-2.5 py-1 rounded-full bg-black/90 border border-ft-line-strong">
+              <Text className="text-ft-text text-[12px]">{`${t('voiceField.listening')}${voiceControl.offline === true ? ' · offline' : ''}`}</Text>
+            </View>
           )}
           {view === 'map' ? (
             <TrackingMap
