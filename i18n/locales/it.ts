@@ -3118,4 +3118,9 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "exam.pdfFooter": "Creato con ANYVO",
   "exam.pdfPage": "Pagina {n} di {total}",
   "exam.pdfGenerated": "Stato al {date}",
+  "voiceField.undoNotInLay": "Annullare non è possibile durante la posa.",
+  "voiceField.toggleOn": "Attiva comando vocale",
+  "voiceField.toggleOff": "Disattiva comando vocale",
+  "voiceField.started": "Comando vocale attivo",
+  "voiceField.stopped": "Comando vocale disattivato",
 };

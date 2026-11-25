@@ -3139,4 +3139,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "exam.pdfFooter": "Créé avec ANYVO",
   "exam.pdfPage": "Page {n} sur {total}",
   "exam.pdfGenerated": "État au {date}",
+  "voiceField.undoNotInLay": "Annuler n'est pas possible pendant la pose.",
+  "voiceField.toggleOn": "Activer la commande vocale",
+  "voiceField.toggleOff": "Désactiver la commande vocale",
+  "voiceField.started": "Commande vocale activée",
+  "voiceField.stopped": "Commande vocale désactivée",
 };

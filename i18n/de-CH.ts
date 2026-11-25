@@ -3164,6 +3164,11 @@ export const deCH = {
   "exam.pdfFooter": "Erstellt mit ANYVO",
   "exam.pdfPage": "Seite {n} von {total}",
   "exam.pdfGenerated": "Stand {date}",
+  "voiceField.undoNotInLay": "Rückgängig ist beim Legen nicht möglich.",
+  "voiceField.toggleOn": "Sprachsteuerung einschalten",
+  "voiceField.toggleOff": "Sprachsteuerung ausschalten",
+  "voiceField.started": "Sprachsteuerung an",
+  "voiceField.stopped": "Sprachsteuerung aus",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere
