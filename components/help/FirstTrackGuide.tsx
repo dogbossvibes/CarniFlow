@@ -4,7 +4,7 @@ import { useSession } from '@/hooks/useSession';
 import { useT } from '@/i18n';
 import { markHelpSeen, useHelpSeenState } from '@/stores/helpSeen';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Geführte erste Fährte: Schritt-Hinweise beim ersten Legen/Absuchen.
@@ -111,25 +111,27 @@ export function FirstTrackGuideCard({
       )}
       <View style={s.actions}>
         {!single && (
-          <Pressable
+          <TouchableOpacity
             testID="first-track-guide-skip"
             onPress={guide.skip}
-            style={({ pressed }) => [s.btn, s.secondary, pressed && s.pressed]}
+            activeOpacity={0.8}
+            style={[s.btn, s.secondary]}
             accessibilityRole="button"
             accessibilityLabel={t('help.firstGuideSkip')}
           >
             <Text style={s.secondaryText}>{t('help.firstGuideSkip')}</Text>
-          </Pressable>
+          </TouchableOpacity>
         )}
-        <Pressable
+        <TouchableOpacity
           testID="first-track-guide-next"
           onPress={guide.next}
-          style={({ pressed }) => [s.btn, s.primary, pressed && s.pressed]}
+          activeOpacity={0.8}
+          style={[s.btn, s.primary]}
           accessibilityRole="button"
           accessibilityLabel={single ? t('help.firstGuideGotIt') : isLast ? t('common.done') : t('common.next')}
         >
           <Text style={s.primaryText}>{single ? t('help.firstGuideGotIt') : isLast ? t('common.done') : t('common.next')}</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -153,7 +155,6 @@ const s = StyleSheet.create({
   btn: { flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   secondary: { borderWidth: 1, borderColor: FT.lineStrong },
   primary: { backgroundColor: FT.acc },
-  pressed: { opacity: 0.8 },
   secondaryText: { fontSize: 15, color: FT.text, fontWeight: '700' },
   primaryText: { fontSize: 15, color: FT.accText, fontWeight: '800' },
 });
