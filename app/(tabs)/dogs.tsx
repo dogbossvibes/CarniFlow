@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
 import { useCallback, useState } from "react";
 import { SharedDogsInbox } from "@/components/dogs/SharedDogsInbox";
+import { SharedExamBooksCard } from "@/features/exam-book/ui/SharedExamBooksCard";
 import {
     ActivityIndicator,
     TouchableOpacity,
@@ -77,7 +78,7 @@ export default function HundeScreen() {
       <View style={s.segments}>
         {(['owned', 'shared'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{ selected: section === value }} style={[s.segment, section === value && s.segmentActive]} onPress={() => setSection(value)}><Text style={[s.segmentText, section === value && s.segmentTextActive]}>{t(value === 'owned' ? 'sharing.myDogs' : 'sharing.withMe')}</Text></TouchableOpacity>)}
       </View>
-      {section === 'shared' ? <SharedDogsInbox /> : loading ? (
+      {section === 'shared' ? <><SharedExamBooksCard /><SharedDogsInbox /></> : loading ? (
         <View style={s.mitte}>
           <ActivityIndicator size="large" color={C.accent} />
         </View>

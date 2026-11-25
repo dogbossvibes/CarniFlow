@@ -42,6 +42,7 @@ export interface DogHeatProps {
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void; onDelete?: (c: DogCommand) => void }
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
+export interface DogExamsProps { count: number; summary: string | null; onOpen: () => void }
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; items?: DogBackpackItem[]; onOpen: () => void; onAdd?: () => void }
 // Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
 export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void; onOpenAppointment?: (appointment: DogAppointment) => void }
@@ -74,7 +75,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel }: { trackingPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, exams, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel }: { trackingPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; exams?: DogExamsProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
   const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
@@ -245,6 +246,25 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
               </TouchableOpacity>
               {expandedSection === 'goals' ? <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} /> : null}
             </View>
+
+            {exams ? (
+              <View style={s.miniHub}>
+                <TouchableOpacity
+                  style={s.miniHubHeader}
+                  onPress={exams.onOpen}
+                  activeOpacity={0.86}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('exam.title')}, ${exams.summary ?? (exams.count === 0 ? t('exam.summaryNone') : exams.count === 1 ? t('exam.summaryOne') : t('exam.summaryCount', { count: exams.count }))}`}
+                >
+                  <View style={s.miniHubIcon}><Ionicons name="ribbon-outline" size={18} color={C.trackPrimary} /></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.miniHubTitle}>{t('exam.title')}</Text>
+                    <Text style={s.miniHubSummary}>{exams.summary ?? (exams.count === 0 ? t('exam.summaryNone') : exams.count === 1 ? t('exam.summaryOne') : t('exam.summaryCount', { count: exams.count }))}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={C.trackTextMut} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {backpack ? (
               <View style={s.miniHub}>

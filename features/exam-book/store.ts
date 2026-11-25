@@ -226,3 +226,21 @@ export async function forgetDogExams(ownerId: string, dogId: string): Promise<vo
   const db = await getLocalDb();
   await db.runAsync(`delete from ${TABLE} where owner_id=? and dog_id=?`, ownerId, dogId);
 }
+
+/** IDs der Einträge eines Hundes, die auf eine Konfliktlösung warten. */
+export async function listConflictIds(ownerId: string, dogId: string): Promise<string[]> {
+  if (!SQLITE_AVAILABLE || !ownerId || !dogId) return [];
+  const db = await getLocalDb();
+  const rows = await db.getAllAsync<{ id: string }>(
+    `select id from ${TABLE} where owner_id=? and dog_id=? and state='conflict'`, ownerId, dogId);
+  return rows.map(r => r.id);
+}
+
+/** Wartet ein Eintrag noch auf den Upload? (Hinweis «Noch nicht synchronisiert») */
+export async function listPendingIds(ownerId: string, dogId: string): Promise<string[]> {
+  if (!SQLITE_AVAILABLE || !ownerId || !dogId) return [];
+  const db = await getLocalDb();
+  const rows = await db.getAllAsync<{ id: string }>(
+    `select id from ${TABLE} where owner_id=? and dog_id=? and state='pending'`, ownerId, dogId);
+  return rows.map(r => r.id);
+}
