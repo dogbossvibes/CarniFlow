@@ -40,7 +40,7 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
   const { t } = useT();
   // Solange das Abo noch lädt: weder Schloss noch Weg zu Premium (Knopf wartet).
   const { isPro, loading: capabilitiesLoading } = useCapabilities();
-  const { exams, conflicts, pending, loading, reload, available } = useExamBook(ownerId, dogId);
+  const { exams, conflicts, pending, waiting, loading, reload, available } = useExamBook(ownerId, dogId);
   const [shareOpen, setShareOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -122,7 +122,7 @@ function OwnExams({ ownerId, dogId, dogName }: { ownerId: string; dogId: string;
                 <AnyvoButton label={t('exam.add')} icon="add" onPress={() => openEdit()} />
               </AnyvoCard>
             ) : (
-              <ExamList exams={exams} pending={pending} onOpen={e => openEdit(e.id)} />
+              <ExamList exams={exams} pending={pending} waiting={waiting} onOpen={e => openEdit(e.id)} />
             )}
             {exams.length > 0 ? (
               <AnyvoButton
@@ -200,7 +200,7 @@ function ExamOverview({ exams, isPro, capabilitiesLoading = false, onUpgrade }: 
   </>;
 }
 
-function ExamList({ exams, pending, onOpen }: { exams: ExamResult[]; pending: Set<string>; onOpen?: (e: ExamResult) => void }) {
+function ExamList({ exams, pending, waiting, onOpen }: { exams: ExamResult[]; pending: Set<string>; waiting?: Set<string>; onOpen?: (e: ExamResult) => void }) {
   const { t } = useT();
   return (
     <View style={s.list}>
@@ -213,7 +213,7 @@ function ExamList({ exams, pending, onOpen }: { exams: ExamResult[]; pending: Se
             <View style={{ flex: 1 }}>
               <Text style={s.rowTitle}>{rowTitle(e)}</Text>
               <Text style={s.muted}>{[dateLabel(e.exam_date), e.club ?? e.location].filter(Boolean).join(' · ')}</Text>
-              {pending.has(e.id) ? <Text style={s.pending}>{t('exam.pendingSync')}</Text> : null}
+              {pending.has(e.id) ? <Text style={s.pending}>{t(waiting?.has(e.id) ? 'exam.waitingServer' : 'exam.pendingSync')}</Text> : null}
             </View>
             <View style={s.rowRight}>
               {points ? <Text style={s.points}>{points}</Text> : null}

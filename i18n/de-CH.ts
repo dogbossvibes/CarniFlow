@@ -3178,6 +3178,7 @@ export const deCH = {
   "voiceField.stopped": "Sprachsteuerung aus",
   "voiceField.undoNotInSearch": "Rückgängig ist bei der Absuche nicht möglich.",
   "voiceField.notNow": "Jetzt nicht möglich.",
+  "exam.waitingServer": "Wartet auf den Server – bleibt auf diesem Gerät gespeichert",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

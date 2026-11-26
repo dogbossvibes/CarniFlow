@@ -126,3 +126,18 @@ it('Verknüpfen ist erst nach dem Sync möglich (Hinweis statt Fehler)', async (
   await flush();
   expect(texts(r)).toContain('exam.linkOffline');
 });
+
+it('Kommastellen bei Abteilungspunkten: «85.» bleibt beim Tippen stehen, gespeichert wird 85.5', async () => {
+  let r!: ReactTestRenderer;
+  await act(async () => { r = TestRenderer.create(<ExamEditScreen />); });
+  await flush();
+  await act(async () => { input(r, 'Fährte exam.points').props.onChangeText('85.'); });
+  expect(input(r, 'Fährte exam.points').props.value).toBe('85.');
+  await act(async () => { input(r, 'Fährte exam.points').props.onChangeText('85.5'); });
+  expect(input(r, 'Fährte exam.points').props.value).toBe('85.5');
+  await act(async () => { input(r, 'Unterordnung exam.points').props.onChangeText('90,'); });
+  expect(input(r, 'Unterordnung exam.points').props.value).toBe('90,');
+  await press(r, 'exam.save');
+  const [saved] = await listExamsForDog('owner', 'dog-1');
+  expect(saved.sections.slice(0, 2).map(s => s.points)).toEqual([85.5, 90]);
+});

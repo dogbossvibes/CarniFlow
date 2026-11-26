@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { ExamResult } from './model';
 import {
-  confirmExamSynced, examFromRow, markExamConflict, mergeRemoteExams, noteExamError, openExamOperations,
+  confirmExamSynced, examFromRow, markExamConflict, mergeRemoteExams, noteExamError, openExamOperations, waitingError,
   type ExamRow,
 } from './store';
 
@@ -61,7 +61,7 @@ async function push(row: ExamRow): Promise<'synced' | 'conflict' | 'waiting' | '
   const { error } = await supabase.from(REMOTE).upsert(toRemote(exam), { onConflict: 'id' });
   if (!error) { await confirmExamSynced(row, exam.updated_at); return 'synced'; }
   if (tableMissing(error)) { await noteExamError(row, SERVER_NOT_READY); return 'not_ready'; }
-  if (notAllowedYet(error)) { await noteExamError(row, WAITING_FOR_SERVER); return 'waiting'; }
+  if (notAllowedYet(error)) { await noteExamError(row, waitingError(row.last_error, Date.now())); return 'waiting'; }
   await noteExamError(row, error.message ?? 'Sync-Fehler'); return 'failed';
 }
 

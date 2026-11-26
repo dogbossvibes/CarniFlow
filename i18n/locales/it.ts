@@ -3132,4 +3132,5 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.stopped": "Comando vocale disattivato",
   "voiceField.undoNotInSearch": "Annullare non è possibile durante la ricerca.",
   "voiceField.notNow": "Non possibile adesso.",
+  "exam.waitingServer": "In attesa del server – resta salvato su questo dispositivo",
 };
