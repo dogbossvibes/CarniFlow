@@ -25,6 +25,13 @@ export interface PositionStreamExtras {
    * expo-location-Fallback bleibt Vordergrund. Android ignoriert die Option.
    */
   allowBackground?: boolean;
+  /**
+   * Nur Android, nur positionSource: liefert die native Engine innerhalb dieser Zeit keinen
+   * brauchbaren Fix (gültige Koordinaten, Messzeit nicht in der Zukunft), wechselt die Quelle
+   * auf expo-location (Fused). Feldfehler 26.11.: Absuche blieb auf «GPS wird gesucht».
+   * Ohne Angabe unverändert (Legen nutzt die Option nicht).
+   */
+  androidNativeFixTimeoutMs?: number;
 }
 
 export async function startPositionStream(

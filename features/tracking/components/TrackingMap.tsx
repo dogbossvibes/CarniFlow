@@ -459,6 +459,19 @@ export function TrackingMap({
     });
   }, [fitToTrackToken, initialFitCoords, mapReady]);
 
+  // initialRegion gilt nur beim Mount. Stand dort noch keine Position und keine gelegte
+  // Linie zur Verfügung (Daten laden nach, Blindsuche nur mit startAnchor, GPS noch ohne Fix),
+  // blieb die Karte auf dem Zürich-Fallback (Feldfehler 26.11.). Einmalig auf den ersten
+  // echten Ort zentrieren; danach gewinnt Follow bzw. die Nutzerinteraktion.
+  const startedOnFallbackRef = useRef((currentPosition ?? layPoints[0] ?? null) == null);
+  useEffect(() => {
+    if (!startedOnFallbackRef.current || !mapReady || !mapRef.current || initialFitCoords.length >= 2) return;
+    const target = currentPosition ?? startAnchor ?? layPoints[0] ?? null;
+    if (!target || !Number.isFinite(target.lat) || !Number.isFinite(target.lng)) return;
+    startedOnFallbackRef.current = false;
+    mapRef.current.animateToRegion({ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.0016, longitudeDelta: 0.0016 }, 0);
+  }, [currentPosition, startAnchor, layPoints, mapReady, initialFitCoords.length]);
+
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
     if (p && mapRef.current) {
