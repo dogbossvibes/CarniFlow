@@ -3305,6 +3305,7 @@ export const deCH = {
   "plans.evalHint": "Es erscheinen nur Auswertungen, die die Hundeführer:in für die Gruppe geteilt hat.",
   "plans.finish": "Tag abschliessen",
   "plans.finishText": "Der Plan wird als abgeschlossen markiert. Das Gruppentraining und alle Fährten bleiben unverändert.",
+  "groups.notifyPlans": "Trainingstage (neu, geändert, du bist dran)",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

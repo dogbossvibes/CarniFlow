@@ -6,11 +6,14 @@ import { useT, type TranslationKey } from '@/i18n';
 import { contactStyles as cs } from '@/features/contacts/contactStyles';
 import type { createGroupNotifyService, GroupNotifySettings } from '@/features/tracking-exchange/groups/notifyService';
 
-const ROWS: { key: keyof GroupNotifySettings; label: TranslationKey }[] = [
+type BoolKey = Exclude<keyof GroupNotifySettings, 'plans'> | 'plans';
+const ROWS: { key: BoolKey; label: TranslationKey }[] = [
   { key: 'joinRequests', label: 'groups.notifyJoin' },
   { key: 'trackReady', label: 'groups.notifyReady' },
   { key: 'trackSearched', label: 'groups.notifySearched' },
   { key: 'trainingStarted', label: 'groups.notifyStarted' },
+  // Vereinsmodus (PR D): nur, wenn der Server den Schalter kennt.
+  { key: 'plans', label: 'groups.notifyPlans' },
 ];
 
 type Service = ReturnType<typeof createGroupNotifyService>;
@@ -31,7 +34,7 @@ export function GroupNotifyCard({ service }: { service: Service | null }) {
   const settings = service && loaded?.service === service ? loaded.settings : null;
   if (!service || !settings) return null;
   const setSettings = (next: GroupNotifySettings) => setLoaded({ service, settings: next });
-  const toggle = (key: keyof GroupNotifySettings, value: boolean) => {
+  const toggle = (key: BoolKey, value: boolean) => {
     const before = settings;
     setSettings({ ...settings, [key]: value });
     setBusy(true);
@@ -40,10 +43,10 @@ export function GroupNotifyCard({ service }: { service: Service | null }) {
   return (
     <AnyvoCard>
       <Text style={cs.section}>{t('groups.notifyTitle')}</Text>
-      {ROWS.map(row => (
+      {ROWS.filter(row => settings[row.key] !== null).map(row => (
         <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 10 }}>
           <Text style={[cs.body, { flex: 1 }]}>{t(row.label)}</Text>
-          <Switch value={settings[row.key]} disabled={busy} onValueChange={v => toggle(row.key, v)} accessibilityLabel={t(row.label)}
+          <Switch value={settings[row.key] === true} disabled={busy} onValueChange={v => toggle(row.key, v)} accessibilityLabel={t(row.label)}
             trackColor={{ true: C.trackPrimary, false: C.trackCardAlt }} />
         </View>
       ))}

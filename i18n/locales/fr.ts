@@ -3280,4 +3280,5 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "plans.evalHint": "Seuls les bilans partagés par le conducteur avec le groupe apparaissent.",
   "plans.finish": "Clôturer la journée",
   "plans.finishText": "Le plan sera marqué terminé. L’entraînement et les pistes restent inchangés.",
+  "groups.notifyPlans": "Journées (nouvelle, modifiée, à toi)",
 };
