@@ -128,7 +128,13 @@ select pg_temp.p('respond','{"planId":"70000000-0000-4000-8000-000000000001","en
 -- Carl sagt mit Rex zu und verlässt die Gruppe → Name und Hund verschwinden, Plan bleibt
 select pg_temp.as_user('c3333333-3333-4333-8333-333333333333');
 select pg_temp.p('respond','{"planId":"70000000-0000-4000-8000-000000000001","entryId":"80000000-0000-4000-8000-000000000002","response":"yes","dogId":"c0000000-0000-4000-8000-0000000000c1"}');
-select pg_temp.g('leave','{"groupId":"10000000-0000-4000-8000-000000000001"}');
+reset role;
+create temporary table qa_carl as select epoch from public.training_private_members
+ where group_id='10000000-0000-4000-8000-000000000001' and user_id='c3333333-3333-4333-8333-333333333333';
+grant select on qa_carl to authenticated;
+set local role authenticated;
+select pg_temp.as_user('c3333333-3333-4333-8333-333333333333');
+select pg_temp.g('leave', jsonb_build_object('groupId','10000000-0000-4000-8000-000000000001','membershipId',(select epoch from qa_carl)));
 select pg_temp.fails('ehemaliges Mitglied sieht nichts mehr','GROUP_UNAVAILABLE', $$select pg_temp.p('get','{"planId":"70000000-0000-4000-8000-000000000001"}')$$);
 select pg_temp.as_user('b2222222-2222-4222-8222-222222222222');
 select pg_temp.ok('ehemaliges Mitglied: kein Name, kein Hund; Zeile bleibt',
@@ -156,6 +162,10 @@ select pg_temp.ok('abgesagter Plan bleibt im Verlauf sichtbar',
 
 -- Konto der Hundeführerin gelöscht → eigene Zeile weg, Plan der anderen bleibt
 reset role;
+-- Wie delete-account: zuerst die Hunde, dann das Konto. Gelöschter Hund → dog_id und Epoche leer.
+delete from public.dogs where owner_id='b2222222-2222-4222-8222-222222222222';
+select pg_temp.ok('gelöschter Hund: Bezug und Epoche geleert, Zusage bleibt',
+ (select dog_id is null and dog_epoch is null and handler_response='yes' from public.training_private_plan_entries where id='80000000-0000-4000-8000-000000000001'));
 delete from auth.users where id='b2222222-2222-4222-8222-222222222222';
 select pg_temp.ok('Konto gelöscht: eigene Zeile entfernt, Plan bleibt',
  exists(select 1 from public.training_private_plans where id='70000000-0000-4000-8000-000000000001')
