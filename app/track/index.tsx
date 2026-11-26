@@ -2,6 +2,7 @@ import { cancelLayRemindersForSession } from '@/features/tracking/native/liegeze
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { GroupEntry } from '@/features/training-groups/GroupEntry';
+import { TrackWeatherHint } from '@/features/track-weather/components';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -240,6 +241,9 @@ export default function TrackOverviewScreen() {
             </>
           )}
         </View>
+
+        {/* ── Fährtenwetter: kurzer Hinweis, nur mit gültigen Daten ── */}
+        <TrackWeatherHint />
 
         {/* ── Schnellaktionen: Hauptaktion + Zweitaktionen ── */}
         <TouchableOpacity

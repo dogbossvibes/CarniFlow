@@ -15,7 +15,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
-import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, type HomeWidgetId } from "@/stores/homeScreenConfig";
+import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, setHomeScreenConfig, setWidgetVisible, type HomeWidgetId } from "@/stores/homeScreenConfig";
+import { TrackWeatherCard } from "@/features/track-weather/components";
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
 import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
@@ -145,6 +146,14 @@ export default function HomeScreen() {
           <View key={id} style={{ marginBottom: 24 }}>
             <HomeTimelineCard />
           </View>
+        );
+      case "track_weather":
+        return (
+          <TrackWeatherCard
+            key={id}
+            onOpen={() => router.push("/track")}
+            onHide={() => setHomeScreenConfig(setWidgetVisible(config, "track_weather", false))}
+          />
         );
       case "smart_analysis":
         return (
