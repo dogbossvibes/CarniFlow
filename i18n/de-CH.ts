@@ -574,6 +574,7 @@ export const deCH = {
   'track.evaluate':       'Stopp & Auswerten',
   'track.searchApproachHint': 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.',
   'track.searchApproachReached': 'Ansatz erreicht',
+  'track.searchApproachApproximate': 'Ungefähr · letzter bekannter Standort, GPS wird gesucht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
   "track.scale.mapLabel": "Kartenmassstab: {distance}",
   "track.scale.mapPending": "Massstab …",

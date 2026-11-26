@@ -1258,6 +1258,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "auth.signingIn": "Connexion en cours…",
   "track.searchApproachHint": "Va au départ de la piste. Choisis la distance au chien, puis touche Démarrer maintenant.",
   "track.searchApproachReached": "Départ atteint",
+  "track.searchApproachApproximate": "Approximatif · dernière position connue, recherche GPS",
   "track.searchHandlerDistanceLabel": "Distance au chien",
   "track.scale.mapLabel": "Échelle de la carte : {distance}",
   "track.scale.mapPending": "Échelle …",

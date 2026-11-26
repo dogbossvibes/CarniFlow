@@ -552,6 +552,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.evaluate':       'Stopp & Uswerte',
   'track.searchApproachHint': 'Gang zum Fährteasatz. Wähl de Abstand zum Hund und tipp uf Jetzt starte.',
   'track.searchApproachReached': 'Asatz erreicht',
+  'track.searchApproachApproximate': 'Ungfähr · letschte bekannte Standort, GPS wird gsuecht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
   "track.scale.mapLabel": "Chartemassstab: {distance}",
   "track.scale.mapPending": "Massstab …",
