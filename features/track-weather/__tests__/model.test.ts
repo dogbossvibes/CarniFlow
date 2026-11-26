@@ -1,5 +1,5 @@
 import {
-  HOUR_MS, findBestWindow, isDaylightHour, levelFromPoints, mergeHourHistory, pickReasons, rateHour,
+  HOUR_MS, OBSERVED_GROUND_HOURS, observedGroundFromCondition, findBestWindow, isDaylightHour, levelFromPoints, mergeHourHistory, pickReasons, rateHour,
   rateTrackingWeather, recentRain, sunTimes, type HourRating, type WeatherHour,
 } from '../model';
 
@@ -142,5 +142,43 @@ describe('mergeHourHistory', () => {
     const merged = mergeHourHistory(prev, [hour(now, { temperature: 9 }), hour(now + HOUR_MS)], now);
     expect(merged.map(h => h.timeMs)).toEqual([now - 3 * HOUR_MS, now, now + HOUR_MS]);
     expect(merged[1].temperature).toBe(9);
+  });
+});
+
+describe('Beschaffenheit vor Ort (Lege-Screen)', () => {
+  it('übersetzt die Lege-Screen-Werte', () => {
+    expect(observedGroundFromCondition('Nass')).toBe('wet');
+    expect(observedGroundFromCondition('Trocken')).toBe('dry');
+    expect(observedGroundFromCondition('Gefroren')).toBe('frozen');
+    expect(observedGroundFromCondition('Schnee')).toBe('snow');
+    expect(observedGroundFromCondition('Normal')).toBeNull();
+    expect(observedGroundFromCondition(null)).toBeNull();
+    expect(observedGroundFromCondition('unbekannt')).toBeNull();
+  });
+
+  it('ersetzt die Schätzung aus dem Regenverlauf', () => {
+    const wetHistory = { ...ctx, recentRainMm: 3 };
+    expect(keys(rateHour(hour(at(9)), { ...wetHistory, ground: 'dry' }))).toEqual(expect.arrayContaining(['dryGround']));
+    expect(keys(rateHour(hour(at(9)), { ...wetHistory, ground: 'dry' }))).not.toContain('wetGround');
+    expect(keys(rateHour(hour(at(9), { cloudCover: 10 }), { ...ctx, recentRainMm: 0, ground: 'wet' }))).toEqual(expect.arrayContaining(['wetGround']));
+    expect(keys(rateHour(hour(at(9), { cloudCover: 10 }), { ...ctx, recentRainMm: 0, ground: 'wet' }))).not.toContain('dryGround');
+  });
+
+  it('gefrorener Boden erschwert, Schnee bleibt neutral', () => {
+    const frozen = rateHour(hour(at(9)), { ...ctx, ground: 'frozen' });
+    expect(keys(frozen)).toContain('frozenGround');
+    expect(frozen.level).toBe('medium');
+    const snow = rateHour(hour(at(9)), { ...ctx, recentRainMm: 3, ground: 'snow' });
+    expect(snow.reasons.some(r => r.key === 'wetGround' || r.key === 'dryGround' || r.key === 'frozenGround')).toBe(false);
+  });
+
+  it('gilt nur für die nächsten Stunden, nicht für den ganzen Tag', () => {
+    const hours = Array.from({ length: 10 }, (_, i) => hour(at(9 + i)));
+    const res = rateTrackingWeather(hours, at(9), BERN, TZ, 'frozen')!;
+    expect(res.level).toBe('medium');
+    expect(res.hours.filter(h => h.reasons.some(r => r.key === 'frozenGround'))).toHaveLength(OBSERVED_GROUND_HOURS);
+    expect(res.reasons.map(r => r.key)).toContain('frozenGround');
+    // ohne Beobachtung unverändert
+    expect(rateTrackingWeather(hours, at(9), BERN, TZ)!.level).toBe('good');
   });
 });

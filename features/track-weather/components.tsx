@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { C } from '@/constants/colors';
-import { LEVEL_RANK, type Reason, type TrackWeatherLevel, type TrackWeatherRating } from './model';
+import { LEVEL_RANK, observedGroundFromCondition, type Reason, type TrackWeatherLevel, type TrackWeatherRating } from './model';
 import { TRACK_WEATHER_NS, levelKey, nowKey, reasonKey } from './i18n';
 import { useTrackWeather } from './useTrackWeather';
 
@@ -164,10 +164,10 @@ export function TrackWeatherHint({ onPress }: { onPress?: () => void }) {
   );
 }
 
-/** Variante B2: eine Zeile auf dem Lege-Screen vor dem Start. */
-export function TrackWeatherLine() {
+/** Variante B2: eine Zeile auf dem Lege-Screen vor dem Start. `condition` = gewählte Beschaffenheit. */
+export function TrackWeatherLine({ condition }: { condition?: string | null }) {
   const t = useWeatherT();
-  const { view } = useTrackWeather();
+  const { view } = useTrackWeather(observedGroundFromCondition(condition));
   if (view.kind !== 'ready') return null;
   const { rating } = view;
   const later = betterLaterWindow(rating);

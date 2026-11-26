@@ -1086,7 +1086,7 @@ export default function LegenScreen() {
                   </Text>
 
                   {/* Fährtenwetter: nur Anzeige, beeinflusst die Aufnahme nicht */}
-                  <TrackWeatherLine />
+                  <TrackWeatherLine condition={condition} />
 
                   {/* Hund */}
                   {dogs.length > 0 && (

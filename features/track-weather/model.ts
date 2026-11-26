@@ -27,7 +27,7 @@ export type ReasonKey =
   | 'windStrong' | 'windModerate' | 'gusts'
   | 'warm' | 'frost' | 'cold'
   | 'heavyRain' | 'rain'
-  | 'dryGround' | 'dryAir' | 'strongSun'
+  | 'dryGround' | 'frozenGround' | 'dryAir' | 'strongSun'
   | 'calm' | 'wetGround' | 'humid' | 'mild';
 
 export interface Reason {
@@ -63,6 +63,26 @@ export interface TrackWeatherRating {
   current: WeatherHour;
 }
 
+/**
+ * Beschaffenheit, die die Nutzer:in vor Ort beobachtet (Lege-Screen).
+ * Sie ersetzt die Schätzung aus dem Regenverlauf, weil sie das konkrete Feld kennt.
+ * Schnee bleibt neutral (Wirkung auf die Spur uneinheitlich).
+ */
+export type ObservedGround = 'wet' | 'dry' | 'frozen' | 'snow';
+/** Wie lange die Beobachtung gilt: laufende Stunde plus die nächsten 3. */
+export const OBSERVED_GROUND_HOURS = 4;
+
+/** Lege-Screen-Werte («Nass», «Trocken», …) → Beobachtung; «Normal»/leer → keine. */
+export function observedGroundFromCondition(condition: string | null | undefined): ObservedGround | null {
+  switch (condition) {
+    case 'Nass': return 'wet';
+    case 'Trocken': return 'dry';
+    case 'Gefroren': return 'frozen';
+    case 'Schnee': return 'snow';
+    default: return null;
+  }
+}
+
 export const HOUR_MS = 3_600_000;
 export const WINDOW_LOOKAHEAD_HOURS = 12;
 export const MIN_WINDOW_HOURS = 2;
@@ -91,7 +111,10 @@ export function isThunder(h: Pick<WeatherHour, 'symbol' | 'thunderProbability'>)
  * @param recentRainMm Regen der letzten 12 h inkl. dieser Stunde; null = unbekannt.
  * @param localHour   Stunde 0–23 in Ortszeit (für die Mittagssonne).
  */
-export function rateHour(h: WeatherHour, ctx: { recentRainMm: number | null; localHour: number; daylight: boolean }): HourRating {
+export function rateHour(
+  h: WeatherHour,
+  ctx: { recentRainMm: number | null; localHour: number; daylight: boolean; ground?: ObservedGround | null },
+): HourRating {
   const reasons: Reason[] = [];
   const add = (key: ReasonKey, weight: number, values: Record<string, number> = {}) => reasons.push({ key, weight, values });
 
@@ -128,7 +151,11 @@ export function rateHour(h: WeatherHour, ctx: { recentRainMm: number | null; loc
 
   // Boden: Regen kurz zuvor hält die Spur, lange trocken mit Sonne nicht
   const sunny = h.cloudCover != null && h.cloudCover < 30;
-  if (ctx.recentRainMm != null) {
+  if (ctx.ground) {
+    if (ctx.ground === 'wet' && (h.precipitation == null || h.precipitation <= 4)) add('wetGround', -1);
+    else if (ctx.ground === 'dry') add('dryGround', 1);
+    else if (ctx.ground === 'frozen') add('frozenGround', 2);
+  } else if (ctx.recentRainMm != null) {
     if (ctx.recentRainMm >= 0.5 && (h.precipitation == null || h.precipitation <= 4)) add('wetGround', -1);
     else if (ctx.recentRainMm === 0 && sunny && ctx.daylight) add('dryGround', 1);
   }
@@ -241,6 +268,7 @@ export function pickReasons(rating: HourRating): Reason[] {
  */
 export function rateTrackingWeather(
   hours: WeatherHour[], nowMs: number, coords: { lat: number; lng: number }, timeZoneOffsetMin: number,
+  ground: ObservedGround | null = null,
 ): TrackWeatherRating | null {
   const sorted = [...hours].filter(h => Number.isFinite(h.timeMs)).sort((a, b) => a.timeMs - b.timeMs);
   const currentHourMs = nowMs - (((nowMs % HOUR_MS) + HOUR_MS) % HOUR_MS);
@@ -249,7 +277,8 @@ export function rateTrackingWeather(
   if (!current || current.timeMs > currentHourMs + HOUR_MS) return null; // keine Daten für jetzt
   const rated = future.slice(0, 24).map(h => {
     const localHour = new Date(h.timeMs + timeZoneOffsetMin * 60_000).getUTCHours();
-    return rateHour(h, { recentRainMm: recentRain(sorted, h.timeMs), localHour, daylight: isDaylightHour(h.timeMs, coords.lat, coords.lng) });
+    const observed = ground && h.timeMs < currentHourMs + OBSERVED_GROUND_HOURS * HOUR_MS ? ground : null;
+    return rateHour(h, { recentRainMm: recentRain(sorted, h.timeMs), localHour, daylight: isDaylightHour(h.timeMs, coords.lat, coords.lng), ground: observed });
   });
   const now = rated[0];
   return {

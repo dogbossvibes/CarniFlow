@@ -111,6 +111,9 @@ describe('deriveTrackWeatherView', () => {
     const v = deriveTrackWeatherView({ status: 'ok', cache, fromCache: false }, now, 120);
     expect(v.kind).toBe('ready');
     if (v.kind === 'ready') expect(v.rating.level).toBe('good');
+    const frozen = deriveTrackWeatherView({ status: 'ok', cache, fromCache: false }, now, 120, 'frozen');
+    if (frozen.kind === 'ready') expect(frozen.rating.level).toBe('medium');
+    expect(frozen.kind).toBe('ready');
   });
   it('ohne Recht / ohne Daten', () => {
     expect(deriveTrackWeatherView({ status: 'noPermission' }, 0, 0)).toEqual({ kind: 'noPermission' });
