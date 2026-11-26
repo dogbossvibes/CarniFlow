@@ -603,6 +603,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.evaluate": "Stop & Evaluate",
   "track.searchApproachHint": "Please walk to the track start. Choose the distance to the dog and tap Start now.",
   "track.searchApproachReached": "Start reached",
+  "track.searchApproachApproximate": "Approximate · last known location, searching for GPS",
   "track.searchHandlerDistanceLabel": "distance to dog",
   "track.scale.mapLabel": "Map scale: {distance}",
   "track.scale.mapPending": "Scale …",

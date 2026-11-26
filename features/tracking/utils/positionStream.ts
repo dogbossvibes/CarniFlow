@@ -26,12 +26,11 @@ export interface PositionStreamExtras {
    */
   allowBackground?: boolean;
   /**
-   * Nur Android, nur positionSource: liefert die native Engine innerhalb dieser Zeit keinen
-   * brauchbaren Fix (gültige Koordinaten, Messzeit nicht in der Zukunft), wechselt die Quelle
-   * auf expo-location (Fused). Feldfehler 26.11.: Absuche blieb auf «GPS wird gesucht».
+   * Nur Android, nur positionSource: statt der nativen Engine (nur GPS_PROVIDER) von Anfang
+   * an expo-location (Fused) nutzen. Feldfehler 26.11.: Absuche blieb auf «GPS wird gesucht».
    * Ohne Angabe unverändert (Legen nutzt die Option nicht).
    */
-  androidNativeFixTimeoutMs?: number;
+  androidUseFusedLocation?: boolean;
 }
 
 export async function startPositionStream(

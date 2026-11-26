@@ -12,10 +12,17 @@ describe('Hintergrund-Ortung nur in der Absuche (T-206)', () => {
     expect(read('features/tracking/hooks/useTrackRecorder.ts')).not.toMatch(/allowBackground/);
     expect(read('features/tracking-distractions/DistractionScreen.tsx')).not.toMatch(/allowBackground/);
   });
-  it('nur die Absuche nutzt den Android-Wechsel auf expo-location (Feldfehler 26.11.)', () => {
-    expect(read('features/tracking/hooks/useSearchRecorder.ts')).toMatch(/androidNativeFixTimeoutMs: SEARCH_ANDROID_NATIVE_FIX_TIMEOUT_MS/);
-    expect(read('features/tracking/hooks/useTrackRecorder.ts')).not.toMatch(/androidNativeFixTimeoutMs/);
-    expect(read('features/tracking-distractions/DistractionScreen.tsx')).not.toMatch(/androidNativeFixTimeoutMs/);
+  it('nur die Absuche nutzt auf Android die Fused-Ortung (Feldfehler 26.11.)', () => {
+    expect(read('features/tracking/hooks/useSearchRecorder.ts')).toMatch(/\{ allowBackground: true, androidUseFusedLocation: true \}/);
+    expect(read('features/tracking/hooks/useTrackRecorder.ts')).not.toMatch(/androidUseFusedLocation/);
+    expect(read('features/tracking-distractions/DistractionScreen.tsx')).not.toMatch(/androidUseFusedLocation/);
+  });
+  it('der letzte bekannte Standort ist nur Anzeige: nicht im Recorder, nicht in der Ansatz-Erkennung', () => {
+    expect(read('features/tracking/hooks/useSearchRecorder.ts')).not.toMatch(/getLastKnownPositionAsync|useLastKnownApproach/);
+    expect(read('features/tracking/hooks/useStartPointApproach.ts')).not.toMatch(/getLastKnownPositionAsync|lastKnown/i);
+    const run = read('app/track/run.tsx');
+    expect(run).toMatch(/useStartPointApproach\(\{ active: arming, start: startPoint, liveFix: s\.liveFix,/);
+    expect(run).not.toMatch(/lastKnown[\s\S]{0,40}(beginSearchNow|flushSearchPoints|liveFix:)/);
   });
   it('run.tsx sagt «Gegenstand erkannt» je Fund nur einmal, auch nach dem Fortsetzen', () => {
     const run = read('app/track/run.tsx');

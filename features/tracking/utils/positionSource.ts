@@ -2,7 +2,6 @@ import { pinQaTrackingModes, loadQaPreferences } from './qaPreferences';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
 import { isExternalMode } from '@/lib/trackRecorder';
-import { GPS_FUTURE_TOLERANCE_MS } from './liveFixOrdering';
 import { startPositionStream, type PositionStreamExtras, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
@@ -111,12 +110,7 @@ async function startLegacyExpoLocation(
   return () => sub.remove();
 }
 
-// Brauchbar = gültige Koordinaten und eine Messzeit, die die Live-Zeitordnung der
-// Recorder nicht als «Zukunft» verwirft (sonst bleibt die Anzeige auf «GPS wird gesucht»).
-function isUsableFix(s: StreamSample): boolean {
-  return Number.isFinite(s.lat) && Number.isFinite(s.lng)
-    && typeof s.t === 'number' && Number.isFinite(s.t) && s.t <= Date.now() + GPS_FUTURE_TOLERANCE_MS;
-}
+export const ANDROID_FUSED_PROVIDER = 'expo-location-android';
 
 // Startet die Positionsquelle. Gibt eine stop-Funktion + statische Info zurück.
 export async function startPositionSource(
@@ -175,6 +169,22 @@ async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => 
     }
   }
 
+  // 0b) Android-Absuche (Feldfehler 26.11.): von Anfang an die normale Android-Ortung
+  //     (expo-location, Fused) — derselbe Anbieter, der beim Legen auf Android die
+  //     Aufnahme trägt (Hintergrund-Task in useTrackRecorder). Die native Engine nutzt
+  //     auf Android nur GPS_PROVIDER ohne Fused/lastKnown und lieferte in der Absuche
+  //     keinen Fix. Externes BLE-GPS bleibt Vorrang. Schlägt der Start fehl, weiter
+  //     mit der nativen Quelle unten.
+  if (extras.androidUseFusedLocation === true && Platform.OS === 'android' && !isExternalMode()) {
+    try {
+      const stop = await startLegacyExpoLocation(emit, opts, ANDROID_FUSED_PROVIDER);
+      info.source = 'expo'; info.provider = ANDROID_FUSED_PROVIDER;
+      return finishHandle(stop, info);
+    } catch (error) {
+      console.warn('[positionSource] Android: expo-location-Start fehlgeschlagen — native Quelle.', error);
+    }
+  }
+
   // 1) Bevorzugt: natives Modul / BLE über positionStream (fällt intern bereits
   //    auf expo-location zurück, wenn kein natives Modul im Build ist).
   try {
@@ -182,49 +192,8 @@ async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => 
       try { gnssSub = client.onGnssStatus(s => recordGnssDiagnostics(diagnosticId, s)); }
       catch { /* older binaries may lack diagnostics; retain the native position path */ }
     }
-    const timeoutMs = extras.androidNativeFixTimeoutMs;
-    const watchdog = Platform.OS === 'android' && info.isNativeAvailable && !isExternalMode()
-      && typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0;
-    if (!watchdog) {
-      const stop = await startPositionStream((s) => emit(s, info.source), opts, extras);
-      return finishHandle(stop, info);
-    }
-    // Android-Absuche: die native Engine nutzt nur GPS_PROVIDER (ohne Fused/lastKnown).
-    // Kommt kein brauchbarer Fix, auf expo-location (Fused) wechseln — derselbe Anbieter,
-    // der beim Legen auf Android die Aufnahme trägt. Kein Rückwechsel, keine Doppelquelle.
-    let usableNative = false;
-    let switched = false;
-    let nativeStop: (() => void) | null = null;
-    let fallbackStop: (() => void) | null = null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    nativeStop = await startPositionStream((s) => {
-      if (switched) return;
-      if (!usableNative && isUsableFix(s)) {
-        usableNative = true;
-        if (timer) { clearTimeout(timer); timer = null; }
-      }
-      emit(s, info.source);
-    }, opts, extras);
-    timer = setTimeout(() => {
-      timer = null;
-      if (stopped || usableNative) return;
-      void startLegacyExpoLocation(emit, opts, 'expo-location-android-fallback').then((stopExpo) => {
-        if (stopped || usableNative) { stopExpo(); return; }
-        switched = true;
-        fallbackStop = stopExpo;
-        const ns = nativeStop; nativeStop = null;
-        try { ns?.(); } catch { /* native stop is best-effort */ }
-        removeGnss();
-        info.source = 'expo'; info.provider = 'expo-location-android-fallback';
-        console.warn('[positionSource] Android: kein nativer Fix — Wechsel auf expo-location.');
-      }).catch((e) => { console.warn('[positionSource] Android-Fallback fehlgeschlagen — native Quelle bleibt.', e); });
-    }, timeoutMs);
-    return finishHandle(() => {
-      if (timer) { clearTimeout(timer); timer = null; }
-      const ns = nativeStop; nativeStop = null;
-      const fs = fallbackStop; fallbackStop = null;
-      try { ns?.(); } finally { fs?.(); }
-    }, info);
+    const stop = await startPositionStream((s) => emit(s, info.source), opts, extras);
+    return finishHandle(stop, info);
   } catch (e) {
     // 2) Harte Sicherung: schlägt der native Start fehl (z. B. Modul vorhanden,
     //    aber Fehler), auf reines expo-location zurückfallen. Kein Crash.
