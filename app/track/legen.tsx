@@ -70,6 +70,7 @@ import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPicker
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { RainModeOverlay } from '@/features/tracking/components/RainModeOverlay';
 import { isRainyWeatherCode } from '@/features/tracking/utils/rainMode';
+import { TrackWeatherLine } from '@/features/track-weather/components';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 import { useActiveTrackOverlays } from '@/features/tracking/hooks/useActiveTrackOverlays';
 import { TrackReferenceOverlayControl } from '@/features/tracking/components/TrackReferenceOverlayControl';
@@ -1083,6 +1084,9 @@ export default function LegenScreen() {
                   <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
                     {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : t('track.searchSatellites')}
                   </Text>
+
+                  {/* Fährtenwetter: nur Anzeige, beeinflusst die Aufnahme nicht */}
+                  <TrackWeatherLine />
 
                   {/* Hund */}
                   {dogs.length > 0 && (
