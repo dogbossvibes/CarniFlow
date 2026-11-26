@@ -62,7 +62,7 @@ export default function GroupTrackScreen() {
         try {
           const fetched = await tracks.fetch(trackId);
           ref = fetched.reference;
-          if (current.handlerUserId === userId && !local && !ownTrack) local = await importGroupTrack(userId, fetched.track, fetched.reference);
+          if (current.handlerUserId === userId && !local && !ownTrack) local = await importGroupTrack(userId, fetched.track, fetched.reference, fetched.mantrail);
         } catch (e) { if (!local) throw e; }
       }
       // Absuche lokal abgeschlossen → Status nachreichen.

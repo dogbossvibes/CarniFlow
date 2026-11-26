@@ -10,7 +10,8 @@ import { projectTrackTransferSource } from '@/features/tracking-transfer/source'
 import { parseTrackTransferReference, TRANSFER_LIMITS, type TrackTransferReference } from '@/features/tracking-transfer/reference';
 import { GroupApiError } from '@/features/tracking-exchange/groups/groupRpc';
 import { isOwnGroupTrack, type GroupTrack, type GroupTrackKind, type GroupTrackService } from '@/features/tracking-exchange/groups/trackService';
-import { emptyMantrailData, MANTRAIL_CATEGORY, MANTRAIL_SESSION_TYPE, MANTRAIL_TITLE } from '@/features/mantrailing/model';
+import { emptyMantrailData, MANTRAIL_CATEGORY, MANTRAIL_SESSION_TYPE, MANTRAIL_TITLE, sharedTrailDetails, type SharedTrailDetails } from '@/features/mantrailing/model';
+import { getLocalMantrailDetails } from '@/features/mantrailing/localRepository';
 
 // Stufe 2b Gruppentraining: lokale Seite der Fährtenübergabe.
 // Leger:in: die mit dem gewohnten Recorder gelegte Fährte wird als Paket (Format der
@@ -92,8 +93,10 @@ export async function submitHandover(service: GroupTrackService, userId: string,
   if (entry.own) await rememberOwnGroupTrack(userId, { trackId: entry.trackId, localId: entry.localId, sessionId: entry.sessionId, createdAtMs: entry.createdAtMs });
   await addPendingHandover(userId, entry);
   const { reference, dogId } = await readLaidReference(userId, entry.localId);
+  // Mantrailing: Angaben der Leger:in mitgeben (null bei IGP-Fährten → Anfrage wie bisher).
+  const mantrail = sharedTrailDetails(await getLocalMantrailDetails(entry.localId).catch(() => null));
   try {
-    await service.submit(entry.trackId, reference);
+    await service.submit(entry.trackId, reference, mantrail);
   } catch (error) {
     if (error instanceof GroupApiError && (error.code === 'GROUP_CONNECTION' || error.code === 'GROUP_INVALID_RESPONSE'
       || error.code === 'GROUP_MAINTENANCE_UNAVAILABLE' || error.code === 'GROUP_ACCOUNT_CHANGED')) return 'queued';
@@ -152,13 +155,14 @@ export function findLocalGroupTrack(userId: string, track: Pick<GroupTrack, 'tra
 }
 
 type SQLValue = string | number | null;
+const stripVersion = (d: SharedTrailDetails | null | undefined) => { if (!d) return {}; const { version: _v, ...rest } = d; return rest; };
 function insert(table: string, row: Record<string, SQLValue>) {
   const keys = Object.keys(row);
   return { sql: `insert into ${table} (${keys.join(',')}) values (${keys.map(() => '?').join(',')})`, params: keys.map(k => row[k]) };
 }
 
 /** Wie der Import der Fährten-Übergabe, aber als eigene Fährte ohne Quittung. Rein, testbar. */
-export function createGroupTrackImportPlan(input: { userId: string; dogId: string; sessionId: string; trackId: string; blind: boolean; nowMs: number; kind?: GroupTrackKind },
+export function createGroupTrackImportPlan(input: { userId: string; dogId: string; sessionId: string; trackId: string; blind: boolean; nowMs: number; kind?: GroupTrackKind; mantrail?: SharedTrailDetails | null },
   referenceValue: unknown) {
   const reference = parseTrackTransferReference(referenceValue);
   const createdAt = new Date(input.nowMs).toISOString();
@@ -180,7 +184,8 @@ export function createGroupTrackImportPlan(input: { userId: string; dogId: strin
     ...(geometry ? { manualAngleGeometry: geometry } : {}),
     [GROUP_TRACK_KEY]: marker,
     // Mantrailing (Spec 02): übergebener Trail; Doppelblind folgt der Blind-Einstellung der Gruppe.
-    ...(input.kind === 'mantrail' ? { mantrail: { ...emptyMantrailData(), trailSource: 'transfer', doubleBlind: input.blind } } : {}),
+    // Angaben der Leger:in übernehmen; «Negativtrail» zeigt der Bildschirm bei Doppelblind erst nach «Ende».
+    ...(input.kind === 'mantrail' ? { mantrail: { ...emptyMantrailData(), ...stripVersion(input.mantrail), trailSource: 'transfer', doubleBlind: input.blind } } : {}),
   };
   const mantrail = input.kind === 'mantrail';
   const parent = insert('local_training_sessions', {
@@ -212,14 +217,14 @@ export function createGroupTrackImportPlan(input: { userId: string; dogId: strin
 }
 
 /** Legt die Fährte einmalig für den eigenen Hund an. Bestehende (auch schon abgesuchte) Kopie bleibt unverändert. */
-export async function importGroupTrack(userId: string, track: GroupTrack, reference: TrackTransferReference): Promise<ImportedGroupTrack> {
+export async function importGroupTrack(userId: string, track: GroupTrack, reference: TrackTransferReference, mantrail?: SharedTrailDetails | null): Promise<ImportedGroupTrack> {
   // Eigene Fährte nie importieren: sie liegt schon als normale Fährte auf dem Gerät, das sie gelegt hat.
   if (track.handlerUserId !== userId || isOwnGroupTrack(track)) throw new GroupApiError('GROUP_UNAVAILABLE');
   const existing = await findImportedGroupTrack(userId, track.trackId);
   if (existing) return existing;
   const sessionId = Crypto.randomUUID();
   const plan = createGroupTrackImportPlan({ userId, dogId: track.dogId, sessionId, trackId: track.trackId, blind: track.blind, nowMs: Date.now(),
-    ...(track.kind === 'mantrail' ? { kind: 'mantrail' as const } : {}) }, reference);
+    ...(track.kind === 'mantrail' ? { kind: 'mantrail' as const, mantrail: mantrail ?? null } : {}) }, reference);
   const db = await getLocalDb();
   let result: ImportedGroupTrack | null = null;
   await db.withExclusiveTransactionAsync(async tx => {

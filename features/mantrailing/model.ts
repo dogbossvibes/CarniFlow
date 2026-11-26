@@ -223,3 +223,24 @@ export function mantrailStats(items: readonly MantrailStatsInput[]): MantrailSta
     byEnvironment,
   };
 }
+
+// ── Übergabe im Gruppentraining (PR B2) ──────────────────────────────────────
+/** Angaben der Leger:in, die mit dem Trail an die Hundeführer:in gehen (keine Ergebnisse). */
+export interface SharedTrailDetails {
+  version: 1;
+  scentArticle: ScentArticle | null; scentArticleLabel: string | null; scentContaminated: boolean;
+  environment: TrailEnvironment | null; surface: string | null; negative: boolean; windLay: TrailWind | null;
+}
+
+export function sharedTrailDetails(data: MantrailData | null | undefined): SharedTrailDetails | null {
+  if (!data) return null;
+  return { version: 1, scentArticle: data.scentArticle, scentArticleLabel: data.scentArticleLabel, scentContaminated: data.scentContaminated,
+    environment: data.environment, surface: data.surface, negative: data.negative, windLay: data.windLay };
+}
+
+/** Empfangene Angaben robust lesen (unbekannte/fehlerhafte Felder fallen weg). */
+export function parseSharedTrailDetails(raw: unknown): SharedTrailDetails | null {
+  if (!raw || typeof raw !== 'object' || (raw as { version?: unknown }).version !== 1) return null;
+  const d = parseMantrailData({ ...(raw as Record<string, unknown>), version: MANTRAIL_DATA_VERSION });
+  return sharedTrailDetails(d);
+}

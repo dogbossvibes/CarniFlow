@@ -71,7 +71,7 @@ export default function GroupSessionScreen() {
         let local = await findLocalGroupTrack(uid, track);
         if (!local && !ownTrack) {
           const fetched = await tracks.fetch(track.trackId).catch(() => null);
-          if (fetched) local = await importGroupTrack(uid, fetched.track, fetched.reference).catch(() => null);
+          if (fetched) local = await importGroupTrack(uid, fetched.track, fetched.reference, fetched.mantrail).catch(() => null);
         }
         if (local?.searched && track.status === 'searching') await tracks.searched(track.trackId).catch(() => null);
         // Eigene Fährte über den gewohnten Fährten-Bildschirm abgesucht: beide Schritte nachreichen.

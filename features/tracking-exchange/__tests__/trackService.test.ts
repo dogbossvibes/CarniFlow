@@ -164,6 +164,23 @@ describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
     await expect(createGroupTrackService(old.client, LAYER).assign(SESSION, PART, false, 'mantrail')).rejects.toThrow('GROUP_INVALID_RESPONSE');
   });
 
+  it('Mantrailing: Angaben gehen nur bei Trails mit und kommen geprüft zurück', async () => {
+    const pkg = { version: 1, startedAtMs: 1, finishedAtMs: 2, distanceM: null, durationSeconds: null, segments: [], markers: [], manualAngleGeometry: null,
+      points: [{ lat: 47, lng: 8, t: 1, accuracy: null, altitude: null, speed: null, heading: null, breakBefore: false, measuredDistanceM: null },
+        { lat: 47.001, lng: 8.001, t: 2, accuracy: null, altitude: null, speed: null, heading: null, breakBefore: false, measuredDistanceM: null }] };
+    const c = client((action, r) => action === 'fetch'
+      ? ok({ track: raw({ trackId: r.trackId, kind: 'mantrail', ...lying }), package: pkg, mantrail: { version: 1, scentArticle: 'sock', negative: true, evil: 'x' } })
+      : ok({ track: raw({ trackId: r.trackId, ...lying }) }));
+    const service = createGroupTrackService(c.client, LAYER);
+    const id = '50000000-0000-4000-8000-000000000001';
+    await service.submit(id, pkg as never);
+    expect(Object.keys(c.calls[0].request).sort()).toEqual(['package', 'trackId']);
+    await service.submit(id, pkg as never, { version: 1, scentArticle: 'cap', scentArticleLabel: null, scentContaminated: false, environment: null, surface: null, negative: false, windLay: null });
+    expect(c.calls[1].request).toMatchObject({ mantrail: { scentArticle: 'cap' } });
+    const fetched = await service.fetch(id);
+    expect(fetched.mantrail).toEqual({ version: 1, scentArticle: 'sock', scentArticleLabel: null, scentContaminated: false, environment: null, surface: null, negative: true, windLay: null });
+  });
+
   it('andere Fehler der Liste werden nicht als «alter Server» gedeutet', async () => {
     const c = client(() => { throw new GroupApiError('GROUP_UNAVAILABLE'); });
     await expect(createGroupTrackService(c.client, LAYER).list(SESSION)).rejects.toThrow('GROUP_UNAVAILABLE');

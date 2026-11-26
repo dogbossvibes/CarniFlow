@@ -13,6 +13,9 @@
 --      verglichen: identisch). Geändert sind nur
 --        * 'assign' nimmt optional kind='mantrail' an,
 --        * 'list' liefert Trails nur bei includeMantrail=true (ältere Apps sehen sie nicht).
+--        * 'submit' nimmt bei Trails optional 'mantrail' (Angaben der Leger:in: Geruchsträger,
+--          Umgebung, Untergrund, Negativtrail, Wind; höchstens 4 KB) an, 'fetch' gibt sie an
+--          Leger:in und Hundeführer:in zurück (gleiche Sichtbarkeit wie der genaue Verlauf).
 --      Alle Rechte-, Besitz-, Status- und Paketprüfungen bleiben wortgleich.
 --
 -- Datenwirkung: keine Zeile wird geändert oder gelöscht; neue Spalte mit Standardwert.
@@ -26,6 +29,29 @@ set check_function_bodies = off;
 alter table public.training_private_tracks add column if not exists kind text not null default 'track';
 alter table public.training_private_tracks drop constraint if exists training_private_tracks_kind_check;
 alter table public.training_private_tracks add constraint training_private_tracks_kind_check check (kind in ('track', 'mantrail'));
+alter table public.training_private_tracks add column if not exists mantrail_details jsonb;
+
+-- Angaben der Leger:in zu einem Trail: nur bekannte Schlüssel, klein, Objekt.
+create or replace function public.training_private_mantrail_details(d jsonb)
+ returns void
+ language plpgsql
+ immutable
+ set search_path to ''
+as $function$
+begin
+ if jsonb_typeof(d) is distinct from 'object' or octet_length(d::text)>4096
+    or exists(select 1 from jsonb_object_keys(d) k where k not in
+      ('version','scentArticle','scentArticleLabel','scentContaminated','environment','surface','negative','windLay'))
+    or d->'version' is distinct from '1'::jsonb
+    or (d ? 'negative' and jsonb_typeof(d->'negative') is distinct from 'boolean')
+    or (d ? 'scentContaminated' and jsonb_typeof(d->'scentContaminated') is distinct from 'boolean')
+    or (d ? 'windLay' and jsonb_typeof(d->'windLay') not in ('object','null'))
+    or exists(select 1 from jsonb_each(d) e where e.key in ('scentArticle','scentArticleLabel','environment','surface')
+      and jsonb_typeof(e.value) not in ('string','null')) then
+  raise exception using errcode='22023',message='GROUP_INVALID_REQUEST';
+ end if;
+end $function$;
+revoke all on function public.training_private_mantrail_details(jsonb) from public, anon, authenticated;
 
 create or replace function public.training_private_track_json(t uuid, viewer uuid)
  returns jsonb
@@ -114,7 +140,7 @@ begin
   else
    -- Paket ist grösser als training_private_request erlaubt: Schlüssel hier prüfen.
    if jsonb_typeof(p_request) is distinct from 'object' or octet_length(p_request::text)>4200000
-      or (select coalesce(array_agg(k order by k),'{}') from jsonb_object_keys(p_request) k)<>array['package','trackId'] then
+      or (select coalesce(array_agg(k order by k),'{}') from jsonb_object_keys(p_request) k) not in (array['package','trackId'],array['mantrail','package','trackId']) then
     raise exception using errcode='22023',message='GROUP_INVALID_REQUEST'; end if;
   end if;
   t:=public.training_private_uuid(p_request,'trackId');
@@ -132,10 +158,16 @@ begin
    update public.training_private_tracks set status='revoked',revoked_at=coalesce(revoked_at,clock_timestamp()) where id=t;
   else
    pkg:=p_request->'package'; perform public.training_private_track_package(pkg);
+   -- Mantrailing: Angaben nur bei Trails; geprüft und nur beim ersten Abgeben gespeichert.
+   if p_request ? 'mantrail' then
+    if tv.kind<>'mantrail' then raise exception using errcode='22023',message='GROUP_INVALID_REQUEST'; end if;
+    perform public.training_private_mantrail_details(p_request->'mantrail');
+   end if;
    h:=encode(sha256(convert_to(pkg::text,'UTF8')),'hex');
    if tv.status='laying' then
     if not public.training_private_participant(s,u) then raise exception using errcode='42501',message='GROUP_UNAVAILABLE'; end if;
     update public.training_private_tracks set status='lying',package=pkg,package_hash=h,area=public.training_private_track_area(pkg),
+     mantrail_details=case when p_request ? 'mantrail' then p_request->'mantrail' else null end,
      distance_m=case when jsonb_typeof(pkg->'distanceM')='number' then (pkg->>'distanceM')::numeric end,laid_at=clock_timestamp() where id=t;
    elsif tv.status='revoked' then raise exception using errcode='P0001',message='GROUP_REVOKED';
    elsif tv.package_hash is distinct from h then raise exception using errcode='P0001',message='GROUP_CONFLICT';
@@ -149,7 +181,8 @@ begin
    raise exception using errcode='42501',message='GROUP_UNAVAILABLE'; end if;
   select * into v from public.training_private_sessions where id=tv.session_id;
   if not public.training_private_member(v.group_id,u) then raise exception using errcode='42501',message='GROUP_UNAVAILABLE'; end if;
-  body:=jsonb_build_object('track',public.training_private_track_json(t,u),'package',tv.package);
+  body:=jsonb_build_object('track',public.training_private_track_json(t,u),'package',tv.package)
+   ||case when tv.kind='mantrail' and tv.mantrail_details is not null then jsonb_build_object('mantrail',tv.mantrail_details) else '{}'::jsonb end;
  when 'search_start','searched' then
   perform public.training_private_request(p_request,array['trackId']); t:=public.training_private_uuid(p_request,'trackId');
   select session_id into s from public.training_private_tracks where id=t and handler_id=u;

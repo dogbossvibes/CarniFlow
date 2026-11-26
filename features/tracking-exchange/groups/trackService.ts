@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { GroupApiError, type createGroupRpcClient } from './groupRpc';
 import { id, number, record, values } from './groupModels';
 import { parseTrackTransferReference, type TrackTransferReference } from '@/features/tracking-transfer/reference';
+import { parseSharedTrailDetails, type SharedTrailDetails } from '@/features/mantrailing/model';
 
 // Stufe 2 Gruppentraining: Fährten für andere legen. Issue #150: auch eine eigene Fährte
 // (Leger:in = Hundeführer:in, eigener angemeldeter Hund; nie «blind», keine Übergabe).
@@ -135,12 +136,15 @@ export function createGroupTrackService(client: Client, userId: string) {
     setBlind: (trackId: string, blind: boolean) => single('set_blind', { trackId, blind }, trackId),
     cancel: (trackId: string) => single('cancel', { trackId }, trackId),
     /** Paket im Format der Fährten-Übergabe: Zeitstempel und Teilstrecken bleiben für die Absuche erhalten. */
-    submit: (trackId: string, reference: TrackTransferReference) => single('submit', { trackId, package: parseTrackTransferReference(reference) }, trackId),
-    async fetch(trackId: string): Promise<{ track: GroupTrack; reference: TrackTransferReference }> {
+    /** mantrail: Angaben der Leger:in (nur bei Trails); ohne bleibt die Anfrage wie bisher. */
+    submit: (trackId: string, reference: TrackTransferReference, mantrail?: SharedTrailDetails | null) =>
+      single('submit', { trackId, package: parseTrackTransferReference(reference), ...(mantrail ? { mantrail } : {}) }, trackId),
+    async fetch(trackId: string): Promise<{ track: GroupTrack; reference: TrackTransferReference; mantrail: SharedTrailDetails | null }> {
       const data = await call('fetch', { trackId });
       const track = parseGroupTrack(data.track);
       if (track.trackId !== trackId || (track.layerUserId !== userId && track.handlerUserId !== userId)) throw new GroupApiError('GROUP_INVALID_RESPONSE');
-      try { return { track, reference: parseTrackTransferReference(data.package) }; }
+      const mantrail = track.kind === 'mantrail' ? parseSharedTrailDetails(data.mantrail) : null;
+      try { return { track, reference: parseTrackTransferReference(data.package), mantrail }; }
       catch { throw new GroupApiError('GROUP_INVALID_RESPONSE'); }
     },
     searchStart: (trackId: string) => single('search_start', { trackId }, trackId),

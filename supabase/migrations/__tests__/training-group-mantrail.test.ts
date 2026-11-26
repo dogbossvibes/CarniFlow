@@ -5,7 +5,7 @@ import { readFileSync } from 'fs';
 const strip = (sql: string) => sql.replace(/--.*$/gm, '');
 const sql = strip(readFileSync('supabase/migrations/20261125200000_training_group_mantrail.sql', 'utf8'));
 const before = strip(readFileSync('supabase/migrations/20261116230000_training_group_own_track.sql', 'utf8'));
-const fn = (src: string) => src.slice(src.indexOf('create or replace function public.training_group_tracks_v1'), src.indexOf('end $function$;'));
+const fn = (src: string) => { const start = src.indexOf('create or replace function public.training_group_tracks_v1'); return src.slice(start, src.indexOf('end $function$;', start)); };
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 describe('Migration training_group_mantrail', () => {
@@ -26,7 +26,10 @@ describe('Migration training_group_mantrail', () => {
     for (const line of fn(before).split('\n').map(norm).filter(Boolean)) {
       if (line.startsWith('insert into public.training_private_tracks') || line.startsWith('values(t,s,u,hpart.user_id')
         || line.startsWith('pkg jsonb; h text;') || line.startsWith('from public.training_private_tracks x where x.session_id=s')
-        || line.startsWith("perform public.training_private_request(p_request,array['sessionId','trackId','handlerParticipationId','blind'])")) continue;
+        || line.startsWith("perform public.training_private_request(p_request,array['sessionId','trackId','handlerParticipationId','blind'])")
+        || line.startsWith("or (select coalesce(array_agg(k order by k),'{}') from jsonb_object_keys(p_request) k)<>array['package','trackId']")
+        || line.startsWith("update public.training_private_tracks set status='lying'")
+        || line.startsWith("body:=jsonb_build_object('track',public.training_private_track_json(t,u),'package',tv.package);")) continue;
       expect(now).toContain(line);
     }
   });
@@ -35,5 +38,18 @@ describe('Migration training_group_mantrail', () => {
     expect(body).toContain("and (mantrail_too or x.kind='track')");
     expect(body).toContain(`p_request->'kind' is distinct from '"mantrail"'::jsonb`);
     expect(body).toContain('values(t,s,u,hpart.user_id,hp,hpart.dog_id,(p_request->>\'blind\')::boolean,p_request,k);');
+  });
+  it('Trail-Angaben: nur bei Trails, nur bekannte Schlüssel, klein, nur an Leger:in/Hundeführer:in', () => {
+    const body = fn(sql);
+    expect(body).toContain("not in (array['package','trackId'],array['mantrail','package','trackId'])");
+    expect(body).toContain("if tv.kind<>'mantrail' then raise exception");
+    expect(body).toContain("perform public.training_private_mantrail_details(p_request->'mantrail');");
+    expect(sql).toContain("octet_length(d::text)>4096");
+    expect(sql).toContain("('version','scentArticle','scentArticleLabel','scentContaminated','environment','surface','negative','windLay')");
+    expect(sql).toContain('revoke all on function public.training_private_mantrail_details(jsonb) from public, anon, authenticated;');
+    // 'fetch' bleibt auf Leger:in und Hundeführer:in beschränkt; die Angaben hängen nur dort an.
+    const fetch = body.slice(body.indexOf("when 'fetch' then"), body.indexOf("when 'search_start'"));
+    expect(fetch).toContain('u not in(tv.layer_id,tv.handler_id)');
+    expect(fetch).toContain("jsonb_build_object('mantrail',tv.mantrail_details)");
   });
 });

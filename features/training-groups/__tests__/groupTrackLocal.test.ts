@@ -73,6 +73,15 @@ describe('Import bei der Hundeführerin', () => {
     expect(JSON.parse(igp.session.payload_json as string).mantrail).toBeUndefined();
   });
 
+  it('Mantrailing: Angaben der Leger:in kommen mit, Ergebnisfelder nie', () => {
+    const shared = { version: 1 as const, scentArticle: 'sock' as const, scentArticleLabel: null, scentContaminated: true,
+      environment: 'forest' as const, surface: 'Waldweg', negative: true, windLay: { fromDeg: 225, speedKmh: 12, source: 'weather' as const } };
+    const { session } = rowsFromPlan(createGroupTrackImportPlan({ ...input, kind: 'mantrail', mantrail: shared }, reference));
+    const m = JSON.parse(session.payload_json as string).mantrail;
+    expect(m).toMatchObject({ version: 1, scentArticle: 'sock', scentContaminated: true, environment: 'forest', surface: 'Waldweg',
+      negative: true, windLay: { fromDeg: 225 }, trailSource: 'transfer', doubleBlind: true, result: null, indication: null, revealedEarly: false });
+  });
+
   it('ungültige Pakete werden nicht angelegt', () => {
     expect(() => createGroupTrackImportPlan(input, { ...reference, points: [reference.points[0]] })).toThrow();
   });
@@ -91,7 +100,7 @@ describe('Übergabe durch die Leger:in', () => {
   it('gesendet: Warteschlange leer, eigener Hund nicht mehr «offen»', async () => {
     const submit = jest.fn(async () => ({}));
     await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('sent');
-    expect(submit).toHaveBeenCalledWith(input.trackId, reference);
+    expect(submit).toHaveBeenCalledWith(input.trackId, reference, null);   // IGP-Fährte: keine Trail-Angaben
     expect(await listPendingHandovers(userId)).toEqual([]);
     expect(mockClearPending).toHaveBeenCalledWith('a0000000-0000-4000-8000-00000000000a');
     expect(mockRemove).toHaveBeenCalled();
@@ -128,7 +137,7 @@ describe('Eigene Fährte im Gruppentraining (Issue #150)', () => {
   it('eingetragen: kein Übergabeschritt, die Fährte bleibt für den eigenen Hund offen und unverändert', async () => {
     const submit = jest.fn(async () => ({}));
     await expect(submitHandover({ submit } as never, userId, entry)).resolves.toBe('sent');
-    expect(submit).toHaveBeenCalledWith(input.trackId, reference);
+    expect(submit).toHaveBeenCalledWith(input.trackId, reference, null);   // IGP-Fährte: keine Trail-Angaben
     expect(await listPendingHandovers(userId)).toEqual([]);
     expect(mockClearPending).not.toHaveBeenCalled();
     expect(mockRemove).not.toHaveBeenCalled();
