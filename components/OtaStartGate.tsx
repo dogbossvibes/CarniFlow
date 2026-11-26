@@ -11,9 +11,10 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import * as Location from 'expo-location';
-import { runStartCheck, type StartState } from '@/lib/otaStartCheck';
+import { runStartCheckDetailed, type Protection, type StartState } from '@/lib/otaStartCheck';
+import { addLateInfo, diagnosisFromResult, saveStartDiagnosis } from '@/lib/otaStartDiagnosis';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
-import { listPendingDogIds } from '@/features/tracking/store/trackPersist';
+import { listPendingDogIds, peekPending } from '@/features/tracking/store/trackPersist';
 import { TRACK_LOCATION_TASK } from '@/features/tracking/native/backgroundLocationTask';
 import { useT } from '@/i18n';
 
@@ -45,20 +46,69 @@ function waitUntilActive(): Promise<boolean> {
   });
 }
 
-/** Gesperrt, solange eine Fährte aufgenommen wird oder eine unterbrochene Aufnahme wartet. */
-export async function isRecordingProtected(): Promise<boolean> {
+/** Höchstens `ms` auf einen Zusatzwert für die Diagnose warten (ändert nie die Schutzentscheidung). */
+function capped<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise(resolve => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then(v => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(fallback); });
+  });
+}
+
+const DETAIL_MS = 300;
+const DAY_MS = 86_400_000;
+
+/** Kurzer Code für die offenen Registry-Einträge, z. B. «reg:laid» oder «reg:none». Ohne IDs. */
+async function registryDetail(): Promise<string> {
+  const reg = useActiveFaehrten.getState();
+  if (!reg.hydrated) await capped(reg.hydrate(), DETAIL_MS, undefined);
+  const st = useActiveFaehrten.getState();
+  if (!st.hydrated) return 'reg:?';
+  const statuses = Object.values(st.byDog).map(e => String(e.status));
+  return `reg:${statuses.length ? [...new Set(statuses)].sort().join(',') : 'none'}`;
+}
+
+/** Kurzer Code für die Puffer, z. B. «2×cancelled,laid·3-12d». Ohne IDs, Orte oder Inhalte. */
+async function pendingDetail(ids: readonly string[]): Promise<string> {
+  const read = Promise.all(ids.map(id => peekPending(id).catch(() => null)));
+  const pendings = await capped(read, DETAIL_MS, null);
+  if (!pendings) return `${ids.length}×?`;
+  const statuses = [...new Set(pendings.map(p => (p ? p.status ?? 'legacy' : '?')))].sort().join(',');
+  const now = Date.now();
+  const ages = pendings.map(p => (p && Number.isFinite(p.savedAt) ? Math.max(0, Math.floor((now - p.savedAt) / DAY_MS)) : null))
+    .filter((a): a is number => a != null);
+  const age = ages.length ? (Math.min(...ages) === Math.max(...ages) ? `${ages[0]}d` : `${Math.min(...ages)}-${Math.max(...ages)}d`) : '?d';
+  return `${ids.length}×${statuses}·${age}`;
+}
+
+/**
+ * Welche Schutzbedingung greift (null = frei). Gesperrt, solange eine Fährte aufgenommen wird
+ * oder eine unterbrochene Aufnahme wartet. Reihenfolge und Ergebnis wie bisher; neu ist nur der
+ * Grund (Diagnose im Profil).
+ */
+export async function recordingProtection(): Promise<Protection | null> {
   try {
-    if (!(await waitUntilActive())) return true;                // Hintergrundstart (z. B. iOS-Standort)
-    if (await Location.hasStartedLocationUpdatesAsync(TRACK_LOCATION_TASK).catch(() => true)) return true;
+    if (!(await waitUntilActive())) return { reason: 'background', detail: String(AppState.currentState) };   // Hintergrundstart (z. B. iOS-Standort)
+    let taskQueryFailed = false;
+    if (await Location.hasStartedLocationUpdatesAsync(TRACK_LOCATION_TASK).catch(() => { taskQueryFailed = true; return true; })) {
+      const regDetail = await registryDetail().catch(() => 'reg:?');
+      return { reason: 'location_task', detail: taskQueryFailed ? `query_failed·${regDetail}` : regDetail };
+    }
     const reg = useActiveFaehrten.getState();
     if (!reg.hydrated) await reg.hydrate();
     const open = Object.values(useActiveFaehrten.getState().byDog);
-    if (open.some(e => e.status === 'laying' || e.status === 'searching')) return true;
-    if ((await listPendingDogIds()).length > 0) return true;    // unterbrochene Aufnahme (Puffer)
-    return false;
+    const recording = open.filter(e => e.status === 'laying' || e.status === 'searching');
+    if (recording.length > 0) return { reason: 'laying_searching', detail: [...new Set(recording.map(e => e.status))].sort().join(',') };
+    const pendingIds = await listPendingDogIds();
+    if (pendingIds.length > 0) return { reason: 'pending_buffer', detail: await pendingDetail(pendingIds).catch(() => `${pendingIds.length}×?`) };   // unterbrochene Aufnahme (Puffer)
+    return null;
   } catch {
-    return true;   // im Zweifel nie neu laden
+    return { reason: 'error' };   // im Zweifel nie neu laden
   }
+}
+
+/** Gesperrt, solange eine Fährte aufgenommen wird oder eine unterbrochene Aufnahme wartet. */
+export async function isRecordingProtected(): Promise<boolean> {
+  return (await recordingProtection()) != null;
 }
 
 type Phase = 'checking' | 'fetching' | 'done';
@@ -73,12 +123,23 @@ export function OtaStartGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true;
-    if (phase !== 'checking') return () => { mounted.current = false; };
+    if (phase !== 'checking') {
+      // Startprüfung läuft gar nicht (Updates aus, Dev-Build, Notfallstart): einmal pro JS-Start vermerken.
+      if (!decided && !(devOverride ?? __DEV__)) {
+        decided = true;
+        void saveStartDiagnosis({ v: 1, at: Date.now(), reason: 'disabled', detail: Updates.isEmergencyLaunch ? 'emergency' : 'updates_off' });
+      }
+      return () => { mounted.current = false; };
+    }
     decided = true;
+    const at = Date.now();
+    // Später Ausgang (nach Timeout) erst ergänzen, wenn der Haupteintrag gespeichert ist.
+    let resolveSaved: (p: Promise<void>) => void = () => {};
+    const saved = new Promise<void>(res => { resolveSaved = p => { void p.then(res, res); }; });
     const late = () => { if (mounted.current) setPendingHint(true); };
-    void runStartCheck({
+    void runStartCheckDetailed({
       enabled,
-      isProtected: isRecordingProtected,
+      isProtected: recordingProtection,
       getState: () => Updates.latestContext as StartState,
       subscribe: listener => {
         const sub = Updates.addUpdatesStateChangeListener(e => listener(e.context as StartState));
@@ -86,9 +147,16 @@ export function OtaStartGate({ children }: { children: ReactNode }) {
       },
       onFetching: () => { if (mounted.current) setPhase('fetching'); },
       onProgress: p => { if (mounted.current) setProgress(p); },
-    }, late).then(async outcome => {
+      onLate: info => { void saved.then(() => addLateInfo(at, info)); },
+    }, late).then(async result => {
+      const outcome = result.outcome;
       if (outcome === 'reload') {
+        // Vor dem Neustart sichern: höchstens DETAIL_MS warten, nie werfend.
+        await capped(saveStartDiagnosis(diagnosisFromResult(result, at)), DETAIL_MS, undefined);
         try { await Updates.reloadAsync(); return; } catch { /* normal weiter */ }
+        void saveStartDiagnosis({ ...diagnosisFromResult(result, at), reason: 'reload_failed' });
+      } else {
+        resolveSaved(saveStartDiagnosis(diagnosisFromResult(result, at)));
       }
       if (!mounted.current) return;
       if (outcome === 'pending') setPendingHint(true);
