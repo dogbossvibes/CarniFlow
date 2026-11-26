@@ -87,4 +87,38 @@ describe('useLastKnownApproach', () => {
     }
     expect(mockGetLastKnown).toHaveBeenCalledTimes(2);
   });
+
+  it('läuft auch während der Anzeige nach 60 min ab', async () => {
+    jest.restoreAllMocks();
+    jest.useFakeTimers();
+    jest.setSystemTime(NOW);
+    try {
+      mockGetLastKnown.mockResolvedValue(loc({ ageMs: LAST_KNOWN_LIMITS.maxAgeMs - 60_000 }));   // 59 min alt
+      const out: Out = { current: null };
+      let r!: ReactTestRenderer;
+      await act(async () => { r = TestRenderer.create(<Probe active out={out} />); });
+      await flush();
+      expect(out.current).not.toBeNull();
+      await act(async () => { jest.advanceTimersByTime(59_000); });
+      expect(out.current).not.toBeNull();
+      await act(async () => { jest.advanceTimersByTime(1_000); });
+      expect(out.current).toBeNull();
+      await act(async () => { r.unmount(); });
+    } finally { jest.useRealTimers(); }
+  });
+
+  it('verwirft den Wert beim Ende der Anfahrt; ein Neustart zeigt keinen alten Wert', async () => {
+    mockGetLastKnown.mockResolvedValueOnce(loc()).mockResolvedValueOnce(null);
+    const out: Out = { current: null };
+    let r!: ReactTestRenderer;
+    await act(async () => { r = TestRenderer.create(<Probe active out={out} />); });
+    await flush();
+    expect(out.current).not.toBeNull();
+    await act(async () => { r.update(<Probe active={false} out={out} />); });
+    await act(async () => { r.update(<Probe active out={out} />); });
+    await flush();
+    expect(mockGetLastKnown).toHaveBeenCalledTimes(2);
+    expect(out.current).toBeNull();
+    await act(async () => { r.unmount(); });
+  });
 });

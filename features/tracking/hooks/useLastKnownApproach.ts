@@ -45,7 +45,11 @@ export function approximateApproach(
   return { position, distanceM, accuracy: accuracy ?? null };
 }
 
-/** Liest einmal je Anfahrt den letzten bekannten Standort (startet keine neue Ortung). */
+/**
+ * Liest einmal je Anfahrt den letzten bekannten Standort (startet keine neue Ortung).
+ * Der Wert läuft auch während der Anzeige nach maxAgeMs ab und wird beim Ende bzw.
+ * Neustart der Anfahrt verworfen (kein alter Wert aus einer früheren Anfahrt).
+ */
 export function useLastKnownApproach(active: boolean, start: LatLng | null): ApproximateApproach | null {
   const [read, setRead] = useState<{ loc: Location.LocationObject; atMs: number } | null>(null);
   useEffect(() => {
@@ -55,7 +59,14 @@ export function useLastKnownApproach(active: boolean, start: LatLng | null): App
       maxAge: LAST_KNOWN_LIMITS.maxAgeMs, requiredAccuracy: LAST_KNOWN_LIMITS.maxAccuracyM,
     }).then(loc => { if (alive && loc) setRead({ loc, atMs: Date.now() }); })
       .catch(() => { /* nur Anzeige: ohne Wert bleibt «GPS wird gesucht» */ });
-    return () => { alive = false; };
+    return () => { alive = false; setRead(null); };
   }, [active]);
+  // Ablauf während der Anzeige: genau dann verwerfen, wenn der Wert 60 min alt wird.
+  useEffect(() => {
+    if (!read) return;
+    const remainingMs = read.loc.timestamp + LAST_KNOWN_LIMITS.maxAgeMs - Date.now();
+    const id = setTimeout(() => setRead(null), Math.max(0, remainingMs));
+    return () => clearTimeout(id);
+  }, [read]);
   return useMemo(() => (active && read ? approximateApproach(read.loc, start, read.atMs) : null), [active, read, start]);
 }

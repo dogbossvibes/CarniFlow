@@ -36,6 +36,18 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { TrackComparisonLines } from './TrackComparisonLines';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
+const APPROX_MIN_RADIUS_M = 25;
+const BASE_DELTA = 0.0016;
+
+/** Ausschnitt, der Ansatz und ungefähren Standort sicher umfasst (mit Rand). Rein/testbar. */
+export function approximateFitRegion(start: LatLng, approx: LatLng) {
+  return {
+    latitude:  (start.lat + approx.lat) / 2,
+    longitude: (start.lng + approx.lng) / 2,
+    latitudeDelta:  Math.max(BASE_DELTA, Math.abs(start.lat - approx.lat) * 1.6),
+    longitudeDelta: Math.max(BASE_DELTA, Math.abs(start.lng - approx.lng) * 1.6),
+  };
+}
 
 const MARKER_COLOR: Record<MarkerType, string> = {
   gegenstand:   C.trackPrimary,
@@ -161,6 +173,16 @@ interface Props {
   onMarkerPress?:   (m: MapMarker) => void;   // Tap auf einen gespeicherten Feature-Marker (Logbuch-Detail)
   onEndPress?:      () => void;               // Tap auf das Ziel-Fähnchen (Logbuch-Detail „Fährtenende")
   currentPosition:  LatLng | null;
+  /**
+   * Absuche-Anfahrt (Feldfehler 26.11.): letzter bekannter Standort, nur Anzeige.
+   * Blass dargestellt (kein Positionspfeil), wird nicht verfolgt.
+   */
+  approximatePosition?: { lat: number; lng: number; accuracy: number | null } | null;
+  /**
+   * Nur Absuche: Startete die Karte ohne Position auf dem Fallback, einmalig auf den Ansatz
+   * (bzw. Ansatz + ungefähren Standort) zentrieren. Nie nach einer eigenen Kartengeste.
+   */
+  centerOnTrackWithoutFix?: boolean;
   showUserLocation?: boolean;
   dogPosition?:     LatLng | null;
   /** T-217: möglicher Bereich des Hundes als Stück der gelegten Linie. Gesetzt → Band statt Pfote. */
@@ -257,7 +279,7 @@ const CornerGlow = memo(function CornerGlow({ Polyline, parts, color: baseColor 
 });
 
 export function TrackingMap({
-  comparison = false, comparisonPaused = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, dogRange, laidDone, cornerGlow, heading,
+  comparison = false, comparisonPaused = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, approximatePosition = null, centerOnTrackWithoutFix = false, showUserLocation = true, dogPosition, dogRange, laidDone, cornerGlow, heading,
   smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -459,18 +481,31 @@ export function TrackingMap({
     });
   }, [fitToTrackToken, initialFitCoords, mapReady]);
 
-  // initialRegion gilt nur beim Mount. Stand dort noch keine Position und keine gelegte
-  // Linie zur Verfügung (Daten laden nach, Blindsuche nur mit startAnchor, GPS noch ohne Fix),
-  // blieb die Karte auf dem Zürich-Fallback (Feldfehler 26.11.). Einmalig auf den ersten
-  // echten Ort zentrieren; danach gewinnt Follow bzw. die Nutzerinteraktion.
+  // initialRegion gilt nur beim Mount. Startete die Absuche-Karte ohne Position und ohne
+  // gelegte Linie (Daten laden nach, Blindsuche nur mit startAnchor, GPS ohne Fix), blieb
+  // sie auf dem Zürich-Fallback (Feldfehler 26.11.). Nur in der Absuche (Prop), nur bis zum
+  // ersten echten Fix und nie nach einer eigenen Kartengeste.
   const startedOnFallbackRef = useRef((currentPosition ?? layPoints[0] ?? null) == null);
+  const userPannedRef = useRef(false);
+  const autoCenterRef = useRef<'none' | 'start' | 'approx'>('none');
+  const approxKey = approximatePosition ? `${approximatePosition.lat},${approximatePosition.lng}` : null;
   useEffect(() => {
-    if (!startedOnFallbackRef.current || !mapReady || !mapRef.current || initialFitCoords.length >= 2) return;
-    const target = currentPosition ?? startAnchor ?? layPoints[0] ?? null;
-    if (!target || !Number.isFinite(target.lat) || !Number.isFinite(target.lng)) return;
-    startedOnFallbackRef.current = false;
-    mapRef.current.animateToRegion({ latitude: target.lat, longitude: target.lng, latitudeDelta: 0.0016, longitudeDelta: 0.0016 }, 0);
-  }, [currentPosition, startAnchor, layPoints, mapReady, initialFitCoords.length]);
+    if (!centerOnTrackWithoutFix || userPannedRef.current || currentPosition || !mapReady || !mapRef.current) return;
+    if (initialFitCoords.length >= 2) return;
+    const start = startAnchor ?? layPoints[0] ?? null;
+    if (!start || !Number.isFinite(start.lat) || !Number.isFinite(start.lng)) return;
+    if (approximatePosition && autoCenterRef.current !== 'approx') {
+      autoCenterRef.current = 'approx';
+      mapRef.current.animateToRegion(approximateFitRegion(start, approximatePosition), 0);
+      return;
+    }
+    if (!approximatePosition && autoCenterRef.current === 'none' && startedOnFallbackRef.current) {
+      autoCenterRef.current = 'start';
+      mapRef.current.animateToRegion({ latitude: start.lat, longitude: start.lng, latitudeDelta: 0.0016, longitudeDelta: 0.0016 }, 0);
+    }
+  // approxKey statt Objektidentität: neu zentrieren nur bei neuem Ort, nicht bei jedem Render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerOnTrackWithoutFix, currentPosition, startAnchor, layPoints, mapReady, initialFitCoords.length, approxKey]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -523,6 +558,7 @@ export function TrackingMap({
           // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
           // automatisches Zurückspringen). Der Recenter-Button holt sie zurück.
           if (smartFollow) camera.onUserGesture();
+          userPannedRef.current = true;
           onUserPan?.();
         }}
         initialRegion={{
@@ -696,6 +732,17 @@ export function TrackingMap({
           </Marker>
         ))}
 
+        {approximatePosition && !currentPosition && (
+          <Fragment>
+            {Circle && <Circle center={{ latitude: approximatePosition.lat, longitude: approximatePosition.lng }}
+              radius={Math.max(approximatePosition.accuracy ?? 0, APPROX_MIN_RADIUS_M)}
+              fillColor="rgba(200,210,215,0.16)" strokeColor="rgba(230,235,238,0.5)" strokeWidth={1} zIndex={5} />}
+            <Marker testID="approximate-position" coordinate={{ latitude: approximatePosition.lat, longitude: approximatePosition.lng }}
+              anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+              <View style={s.approxDot} />
+            </Marker>
+          </Fragment>
+        )}
         {currentPosition && (
           <Marker coordinate={{ latitude: currentPosition.lat, longitude: currentPosition.lng }} anchor={{ x: 0.5, y: 0.5 }} flat>
             <View style={s.posGlow}>
@@ -956,6 +1003,8 @@ const s = StyleSheet.create({
   cylTop:      { position: 'absolute', top: -3, left: -0.75, width: 14, height: 6, borderRadius: 3, backgroundColor: '#ff8a94', borderWidth: 1, borderColor: '#3a0000' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
+  // Ungefährer Standort: blasser Hohlpunkt ohne Pfeil — sieht bewusst nicht wie ein echter Fix aus.
+  approxDot:   { width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(230,235,238,0.25)', borderWidth: 1.5, borderColor: 'rgba(230,235,238,0.7)', borderStyle: 'dashed' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },
   posCore:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   dogGlow:     { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,255,204,0.22)', alignItems: 'center', justifyContent: 'center' },

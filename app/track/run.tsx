@@ -1512,7 +1512,10 @@ export default function TrackRunScreen() {
               layPoints={blindSearch ? [] : snapData.laidLatLng} dimLay
               {...(blindSearch ? { startAnchor: snapData.laidLatLng[0] ?? null } : {})}
               runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
-              currentPosition={arming ? (approach.position ?? approxApproach?.position ?? null) : curPos}
+              currentPosition={arming ? approach.position : curPos}
+              // Feldfehler 26.11.: ungefährer Standort nur blass anzeigen; Karte zeigt Ansatz + Punkt.
+              approximatePosition={arming && approxApproach ? { ...approxApproach.position, accuracy: approxApproach.accuracy } : null}
+              centerOnTrackWithoutFix
               smartFollow={!arming}
               dogRange={hideLaidOverlays ? null : dogRange}
               laidDone={hideLaidOverlays ? null : laidDone}

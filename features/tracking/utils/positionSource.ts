@@ -10,8 +10,11 @@ import { beginPositionDiagnostics, recordPositionDiagnostics, recordGnssDiagnost
 
 // Zentrale Positionsquelle für die Fährtenaufnahme.
 //
-// Reihenfolge: natives Precision-Modul (via positionStream) → bei fehlendem Modul
-// ODER Fehler automatisch expo-location. Liefert ein einheitliches Sample inkl.
+// Reihenfolge: QA-Schalter LEGACY → reines expo-location. Android-Absuche
+// (`androidUseFusedLocation`, Feldfehler 26.11.) → expo-location (Fused), bei
+// Startfehler weiter nativ. Sonst natives Precision-Modul (via positionStream,
+// externes BLE-GPS hat dort Vorrang) → bei fehlendem Modul ODER Fehler
+// automatisch expo-location. Liefert ein einheitliches Sample inkl.
 // Debug-Metadaten (source/provider) und einen statischen Info-Block.
 //
 // Bewusst schlank: kapselt nur die Quelle, ändert KEINE Filter-/Schwellenlogik.

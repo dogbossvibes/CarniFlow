@@ -23,6 +23,9 @@ describe('Hintergrund-Ortung nur in der Absuche (T-206)', () => {
     const run = read('app/track/run.tsx');
     expect(run).toMatch(/useStartPointApproach\(\{ active: arming, start: startPoint, liveFix: s\.liveFix,/);
     expect(run).not.toMatch(/lastKnown[\s\S]{0,40}(beginSearchNow|flushSearchPoints|liveFix:)/);
+    // Karte: echte Position nur aus dem echten Fix; der ungefähre Punkt hat eine eigene, blasse Darstellung.
+    expect(run).toMatch(/currentPosition=\{arming \? approach\.position : curPos\}/);
+    expect(run).toMatch(/approximatePosition=\{arming && approxApproach/);
   });
   it('run.tsx sagt «Gegenstand erkannt» je Fund nur einmal, auch nach dem Fortsetzen', () => {
     const run = read('app/track/run.tsx');
