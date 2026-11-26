@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 import { SPEECH_RECOGNITION_AVAILABLE, SpeechModule, useSpeechRecognitionEvent } from '@/features/voice/services/speechRecognition';
 import { FIELD_CONTEXT_STRINGS, type FieldVoiceMode } from '@/features/voice/services/fieldVoiceCommands';
 import { createFieldVoiceController, type FieldVoiceEffect } from '@/features/voice/services/fieldVoiceController';
-import { acceptsRecognition } from '@/features/voice/services/speechEchoGate';
+import { acceptsRecognition, sessionOverlapsSpeech, shouldMute } from '@/features/voice/services/speechEchoGate';
 import { chooseRecognitionSetup, type RecognitionSetup } from '@/features/voice/services/recognitionSetup';
+import {
+  bestTranscript, classifyError, createSessionGate, isLegacyIos, recognitionOptions, restartDelay,
+} from '@/features/voice/services/recognitionPlan';
 import { appSpeechActivity } from '@/features/tracking/utils/voiceEvents';
 
-// Sprachsteuerung beim Legen/Suchen (Spec 03). Hört nur, solange eingeschaltet
-// und der Screen offen ist; erkannter Text bleibt im Speicher dieses Hooks und
-// wird weder gespeichert noch geloggt. Wirkung: onEffect – der Screen führt
-// eine Aktion mit derselben Funktion wie die Taste aus.
-// Nicht im Hintergrund / bei gesperrtem Bildschirm (Stufe 2, nativer Build).
+// Sprachsteuerung beim Legen/Suchen (Spec 03). Hört nur, solange eingeschaltet,
+// der Screen offen und die App im Vordergrund ist; erkannter Text bleibt im
+// Speicher dieses Hooks und wird weder gespeichert noch geloggt. Wirkung: onEffect –
+// der Screen führt eine Aktion mit derselben Funktion wie die Taste aus.
+// Betriebsregeln (Ergebnis, iOS bis 17, Neustart): services/recognitionPlan.ts.
+// Echo-Schutz (eigene Ansage): services/speechEchoGate.ts.
 
 export type FieldVoiceStatus = 'off' | 'starting' | 'listening' | 'unavailable' | 'denied' | 'error';
+
+const TICK_MS = 200;
+const platform = () => ({ os: Platform.OS, version: Platform.Version });
 
 export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: FieldVoiceEffect) => void) {
   const [status, setStatus] = useState<FieldVoiceStatus>(SPEECH_RECOGNITION_AVAILABLE ? 'off' : 'unavailable');
@@ -21,38 +29,110 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   const setupRef = useRef<RecognitionSetup | null>(null);
   const controller = useRef(createFieldVoiceController(mode));
   const onEffectRef = useRef(onEffect);
+  // Laufzeitzustand der Erkennung (ausserhalb des Renderns).
+  const runRef = useRef({ active: false, muted: false, background: false, failures: 0, sessionStartMs: 0, timer: null as ReturnType<typeof setTimeout> | null });
+  const gateRef = useRef(createSessionGate());
+  const scheduleRef = useRef<() => void>(() => undefined);
   useEffect(() => { onEffectRef.current = onEffect; }, [onEffect]);
   useEffect(() => { controller.current = createFieldVoiceController(mode); }, [mode]);
 
+  const clearTimer = () => { const r = runRef.current; if (r.timer) { clearTimeout(r.timer); r.timer = null; } };
+
   const start = useCallback(() => {
-    const s = setupRef.current;
-    if (!SpeechModule || !s) return;
+    const s = setupRef.current, r = runRef.current;
+    clearTimer();
+    if (!SpeechModule || !s || !enabledRef.current || r.muted || r.background || r.active) return;
     try {
-      SpeechModule.start({
-        lang: s.lang, interimResults: false, continuous: true, addsPunctuation: false,
-        requiresOnDeviceRecognition: s.onDevice,
-        contextualStrings: [...FIELD_CONTEXT_STRINGS[mode]],
-      });
+      SpeechModule.start(recognitionOptions(platform(), s, FIELD_CONTEXT_STRINGS[mode]));
+      r.active = true; r.sessionStartMs = Date.now();
+      gateRef.current.newSession();
       setStatus('listening');
-    } catch { setStatus('error'); }
+    } catch {
+      r.failures += 1;
+      scheduleRef.current();
+    }
   }, [mode]);
 
+  // Neustart mit Pause; nach zu vielen Fehlern in Folge aufhören (kein Dauer-Neustart).
+  const scheduleRestart = useCallback(() => {
+    const r = runRef.current;
+    clearTimer();
+    if (!enabledRef.current || r.muted || r.background) return;
+    const delay = restartDelay(r.failures);
+    if (delay == null) { enabledRef.current = false; setStatus('error'); return; }
+    if (r.failures > 0) setStatus('starting');
+    r.timer = setTimeout(() => { r.timer = null; start(); }, delay);
+  }, [start]);
+  useEffect(() => { scheduleRef.current = scheduleRestart; }, [scheduleRestart]);
+
+  const stopSession = () => {
+    const r = runRef.current;
+    if (!r.active) return;
+    r.active = false;
+    try { SpeechModule?.abort?.(); } catch { try { SpeechModule?.stop(); } catch { /* egal */ } }
+  };
+
+  const deliver = (text: string | null) => {
+    if (!enabledRef.current || !text) return;
+    const effect = controller.current.handle(text, Date.now());
+    if (effect.kind === 'ignored') return;
+    onEffectRef.current(effect);
+    if (isLegacyIos(platform())) {
+      // iOS bis 17: ein Befehl je Sitzung; das spätere Endergebnis derselben Äusserung nicht auswerten.
+      gateRef.current.consume();
+      stopSession();
+    }
+  };
+
   useSpeechRecognitionEvent('result', (e: { results?: { transcript?: string }[]; isFinal?: boolean }) => {
-    if (!enabledRef.current) return;
-    if (!acceptsRecognition(Date.now(), appSpeechActivity())) return;   // eigene Ansage
-    const results = e?.results ?? [];
-    const text = results[results.length - 1]?.transcript ?? results[0]?.transcript;
-    const effect = controller.current.handle(text ?? null, Date.now());
-    if (effect.kind !== 'ignored') onEffectRef.current(effect);
+    const r = runRef.current;
+    if (!enabledRef.current || r.muted) return;
+    const activity = appSpeechActivity();
+    if (!acceptsRecognition(Date.now(), activity) || sessionOverlapsSpeech(r.sessionStartMs, activity)) return;   // eigene Ansage
+    r.failures = 0;   // Erkennung funktioniert
+    const text = bestTranscript(e?.results);
+    if (isLegacyIos(platform())) deliver(gateRef.current.push(text, e?.isFinal === true, Date.now()));
+    else if (e?.isFinal !== false) deliver(text);
   });
   useSpeechRecognitionEvent('end', () => {
-    if (enabledRef.current) start();   // Erkenner endet nach Stille: neu starten, solange an
-    else setStatus(cur => (cur === 'unavailable' ? cur : 'off'));
+    runRef.current.active = false;
+    if (enabledRef.current) scheduleRestart();   // Erkenner endet nach Stille/Befehl: neu starten, solange an
+    // Status «denied»/«error» bleibt stehen – sonst würde der Screen sofort wieder einschalten.
+    else setStatus(cur => (cur === 'unavailable' || cur === 'denied' || cur === 'error' ? cur : 'off'));
   });
   useSpeechRecognitionEvent('error', (e: { error?: string }) => {
-    if (e?.error === 'not-allowed') { enabledRef.current = false; setStatus('denied'); return; }
-    // «no-speech» u. a. sind normal im Feld; das folgende 'end' startet neu.
+    const kind = classifyError(e?.error);
+    if (kind === 'fatal') { enabledRef.current = false; clearTimer(); setStatus('denied'); return; }
+    if (kind === 'transient') runRef.current.failures += 1;
+    // Das folgende 'end' startet mit passender Pause neu (bzw. hört nach zu vielen Fehlern auf).
   });
+
+  // Takt: Stummschalten während eigener Ansagen, stabile Zwischenergebnisse (iOS bis 17).
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (!enabledRef.current) return;
+      const r = runRef.current;
+      const mute = shouldMute(Date.now(), appSpeechActivity());
+      if (mute && !r.muted) { r.muted = true; clearTimer(); stopSession(); }
+      else if (!mute && r.muted) { r.muted = false; start(); }
+      if (!r.muted && isLegacyIos(platform())) {
+        const activity = appSpeechActivity();
+        if (!sessionOverlapsSpeech(r.sessionStartMs, activity)) deliver(gateRef.current.due(Date.now()));
+      }
+    }, TICK_MS);
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start]);
+
+  // Hintergrund / gesperrter Bildschirm: nicht zuhören; zurück im Vordergrund wieder an.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      const r = runRef.current;
+      if (next === 'active') { if (r.background) { r.background = false; r.failures = 0; start(); } }
+      else if (!r.background) { r.background = true; clearTimer(); stopSession(); }
+    });
+    return () => sub.remove();
+  }, [start]);
 
   const enable = useCallback(async () => {
     if (!SPEECH_RECOGNITION_AVAILABLE || !SpeechModule) { setStatus('unavailable'); return; }
@@ -68,6 +148,8 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
       });
       setupRef.current = chosen; setSetup(chosen);
       controller.current.reset();
+      const r = runRef.current;
+      r.failures = 0; r.muted = false; r.background = AppState.currentState !== 'active' && AppState.currentState != null;
       enabledRef.current = true;
       start();
     } catch { setStatus('error'); }
@@ -75,7 +157,9 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
 
   const disable = useCallback(() => {
     enabledRef.current = false;
+    clearTimer();
     controller.current.reset();
+    stopSession();
     try { SpeechModule?.stop(); } catch { /* egal */ }
     setStatus(SPEECH_RECOGNITION_AVAILABLE ? 'off' : 'unavailable');
   }, []);
@@ -84,7 +168,12 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   const noteManualAction = useCallback(() => controller.current.noteManualAction(), []);
 
   // Screen verlassen: sauber stoppen.
-  useEffect(() => () => { enabledRef.current = false; try { SpeechModule?.stop(); } catch { /* egal */ } }, []);
+  useEffect(() => () => {
+    enabledRef.current = false;
+    const r = runRef.current;
+    if (r.timer) clearTimeout(r.timer);
+    try { SpeechModule?.stop(); } catch { /* egal */ }
+  }, []);
 
   return { status, offline: setup?.onDevice ?? null, enable, disable, noteManualAction, available: SPEECH_RECOGNITION_AVAILABLE };
 }
