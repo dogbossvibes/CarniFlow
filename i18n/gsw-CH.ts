@@ -889,6 +889,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'profile.messages':        'Nachrichte',
   'profile.helpCenter':      'Hilfecenter',
   'profile.sendFeedback':    'Feedback schicke',
+  'profile.rateApp':    'App bewerte',
+  'profile.rateAppError': 'Store het nöd chöne göffnet werde.',
   'profile.terms':           'Nutzigsbedingige (AGB)',
   'profile.privacy':         'Dateschutz',
 
