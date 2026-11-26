@@ -10,6 +10,8 @@ import { ContactScreenHeader } from '@/features/contacts/ContactScreenHeader';
 import { contactStyles as cs } from '@/features/contacts/contactStyles';
 import type { GroupErrorCode } from '@/features/tracking-exchange/groups/groupRpc';
 import { formatGroupCode, GROUP_CODE_LENGTH, parseGroupCode, type GroupJoinPreview } from '@/features/tracking-exchange/groups/joinService';
+import { useSession } from '@/hooks/useSession';
+import { savePendingGroupJoin } from '@/stores/pendingGroupJoin';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
 
 type Phase = { kind: 'idle' } | { kind: 'invalid' } | { kind: 'preview'; code: string; preview: GroupJoinPreview } | { kind: 'sent'; groupTitle: string };
@@ -19,6 +21,10 @@ export default function GroupJoinScreen() {
   const router = useRouter();
   const { t } = useT();
   const services = useGroupServices();
+  const { loading: sessionLoading } = useSession();
+  // Ohne Anmeldung gibt es keinen Beitrittsdienst: Hinweis statt stillem «Prüfen».
+  const signedOut = !services.join && !sessionLoading;
+  const waitingForSession = !services.join && sessionLoading;
   const initialCode = typeof linkCode === 'string' ? parseGroupCode(linkCode) : '';
   const [code, setCode] = useState(initialCode);
   const [displayName, setDisplayName] = useState('');
@@ -66,6 +72,11 @@ export default function GroupJoinScreen() {
     }
   };
 
+  const toLogin = async () => {
+    await savePendingGroupJoin(code);
+    router.push('/(auth)/login' as never);
+  };
+
   const errorKey = groupErrorText(error);
   const preview = phase.kind === 'preview' ? phase.preview : null;
   return (
@@ -94,10 +105,18 @@ export default function GroupJoinScreen() {
                   placeholder={t('groups.codePlaceholder')} placeholderTextColor={C.trackTextMut} accessibilityLabel={t('groups.codeLabel')}
                   autoCapitalize="characters" autoCorrect={false} maxLength={GROUP_CODE_LENGTH + 2} />
                 {phase.kind === 'invalid' ? <Text style={[cs.body, { marginTop: 8 }]} accessibilityRole="alert">{t('groups.invalidCode')}</Text> : null}
-                {!preview ? (
+                {signedOut ? (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    <Text style={cs.rowTitle} accessibilityRole="alert" accessibilityLiveRegion="polite">{t('groups.signInFirst')}</Text>
+                    <Text style={cs.body}>{t('groups.signInFirstHint')}</Text>
+                    <View style={cs.actions}>
+                      <AnyvoButton style={cs.flex} label={t('groups.signInToJoin')} onPress={() => { void toLogin(); }} />
+                    </View>
+                  </View>
+                ) : !preview ? (
                   <View style={cs.actions}>
-                    <AnyvoButton style={cs.flex} label={t('groups.check')} loading={busy}
-                      disabled={code.length !== GROUP_CODE_LENGTH || busy} onPress={() => { void check(code); }} />
+                    <AnyvoButton style={cs.flex} label={t('groups.check')} loading={busy || waitingForSession}
+                      disabled={code.length !== GROUP_CODE_LENGTH || busy || waitingForSession} onPress={() => { void check(code); }} />
                   </View>
                 ) : (
                   <View style={{ gap: 8, marginTop: 12 }}>
