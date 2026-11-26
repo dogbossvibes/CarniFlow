@@ -1,6 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { getLocalDb, SQLITE_AVAILABLE } from '@/lib/localDb/client';
-import { buildExam, parseExam, visibleExams, type ExamInput, type ExamResult } from './model';
+import { buildExam, parseExam, REPLACED_LOCAL_MAX, visibleExams, type ExamInput, type ExamResult } from './model';
 
 // Lokaler Speicher des Prüfungsbuchs. SQLite ist die lokale Wahrheit: Anlegen,
 // Bearbeiten, Entfernen und Rückgängig wirken sofort und offline; sync.ts gleicht
@@ -113,11 +113,21 @@ function nextTimestamp(previous?: string | null): string {
   return new Date(prev != null && prev >= now ? prev + 1 : now).toISOString();
 }
 
-export async function openExamOperations(ownerId: string, limit = 200): Promise<ExamRow[]> {
+export async function openExamOperations(ownerId: string, limit = 200, nowMs = Date.now()): Promise<ExamRow[]> {
   if (!SQLITE_AVAILABLE || !ownerId) return [];
   const db = await getLocalDb();
-  return db.getAllAsync<ExamRow>(
+  const rows = await db.getAllAsync<ExamRow>(
     `select * from ${TABLE} where owner_id=? and state='pending' order by updated_at, id limit ?`, ownerId, limit);
+  return rows.filter(r => shouldRetryWaiting(r.last_error, nowMs));
+}
+
+/** Einträge eines Hundes, die dauerhaft auf den Server warten (Hinweis in der Oberfläche). */
+export async function listWaitingIds(ownerId: string, dogId: string): Promise<string[]> {
+  if (!SQLITE_AVAILABLE || !ownerId || !dogId) return [];
+  const db = await getLocalDb();
+  const rows = await db.getAllAsync<{ id: string; last_error: string | null }>(
+    `select id, last_error from ${TABLE} where owner_id=? and dog_id=? and state='pending' and last_error like '${WAITING_PREFIX}%'`, ownerId, dogId);
+  return rows.filter(r => (parseWaiting(r.last_error)?.attempts ?? 0) >= WAIT_RETRY_FREE).map(r => r.id);
 }
 
 export async function countOpenExamOperations(ownerId: string): Promise<{ pending: number; conflict: number }> {
@@ -133,13 +143,24 @@ export async function countOpenExamOperations(ownerId: string): Promise<{ pendin
 
 export const examFromRow = rowToExam;
 
-// Bestätigungen gelten nur, wenn die Zeile seit dem Lesen unverändert ist (updated_at):
-// eine zwischenzeitliche Eingabe gewinnt und wird erneut synchronisiert.
+// Nach bestätigtem Upload: Der Server hat jetzt genau den hochgeladenen Stand. Die
+// Grundlage (base_updated_at) rückt IMMER auf diesen Stand vor – auch wenn die Zeile
+// während des Uploads bearbeitet, entfernt oder per «Rückgängig» wiederhergestellt wurde.
+// Sonst hielte der nächste Upload den eigenen Stand für eine Änderung «vom anderen Gerät»
+// (unechter Konflikt). Als «synced» gilt die Zeile nur, wenn sie unverändert ist; eine
+// zwischenzeitliche Eingabe bleibt «pending» und wird danach hochgeladen. Nie rückwärts.
 export async function confirmExamSynced(row: ExamRow, serverUpdatedAt: string): Promise<void> {
   const db = await getLocalDb();
+  const current = await db.getFirstAsync<{ base_updated_at: string | null }>(
+    `select base_updated_at from ${TABLE} where id=? and owner_id=? and state='pending'`, row.id, row.owner_id);
+  if (!current) return;   // inzwischen Konflikt o. Ä.: nichts überschreiben
+  // Zeitvergleich als Zahl (Server und Gerät schreiben Zeitstempel unterschiedlich).
+  const baseMs = ms(current.base_updated_at), serverMs = ms(serverUpdatedAt);
+  const base = baseMs != null && (serverMs == null || baseMs >= serverMs) ? current.base_updated_at : serverUpdatedAt;
   await db.runAsync(
-    `update ${TABLE} set state='synced', base_updated_at=?, last_error=null where id=? and owner_id=? and state='pending' and updated_at=?`,
-    serverUpdatedAt, row.id, row.owner_id, row.updated_at);
+    `update ${TABLE} set base_updated_at=?, state=case when updated_at=? then 'synced' else state end, last_error=null
+     where id=? and owner_id=? and state='pending'`,
+    base, row.updated_at, row.id, row.owner_id);
 }
 
 export async function markExamConflict(row: ExamRow): Promise<void> {
@@ -147,6 +168,27 @@ export async function markExamConflict(row: ExamRow): Promise<void> {
   await db.runAsync(
     `update ${TABLE} set state='conflict', last_error='CONFLICT' where id=? and owner_id=? and state='pending' and updated_at=?`,
     row.id, row.owner_id, row.updated_at);
+}
+
+// Dauerhaft wartende Uploads (z. B. Hund auf dem Server nicht vorhanden): Anzahl und Zeit
+// des letzten Versuchs stehen in last_error («WAITING_FOR_SERVER:<n>:<ms>»), ohne
+// Schemaänderung. Nach WAIT_RETRY_FREE Versuchen nur noch alle WAIT_RETRY_MS.
+export const WAITING_PREFIX = 'WAITING_FOR_SERVER';
+export const WAIT_RETRY_FREE = 3;
+export const WAIT_RETRY_MS = 6 * 60 * 60 * 1000;
+export function parseWaiting(lastError: string | null | undefined): { attempts: number; lastMs: number } | null {
+  if (!lastError || !lastError.startsWith(WAITING_PREFIX)) return null;
+  const [, n, t] = lastError.split(':');
+  const attempts = Number(n); const lastMs = Number(t);
+  return { attempts: Number.isFinite(attempts) && attempts > 0 ? attempts : 1, lastMs: Number.isFinite(lastMs) ? lastMs : 0 };
+}
+export function waitingError(previous: string | null | undefined, nowMs: number): string {
+  return `${WAITING_PREFIX}:${(parseWaiting(previous)?.attempts ?? 0) + 1}:${nowMs}`;
+}
+/** Soll ein wartender Eintrag jetzt erneut hochgeladen werden? (Bearbeiten setzt den Zähler zurück.) */
+export function shouldRetryWaiting(lastError: string | null | undefined, nowMs: number): boolean {
+  const w = parseWaiting(lastError);
+  return !w || w.attempts < WAIT_RETRY_FREE || nowMs - w.lastMs >= WAIT_RETRY_MS;
 }
 
 export async function noteExamError(row: ExamRow, error: string | null): Promise<void> {
@@ -174,7 +216,10 @@ export async function acceptServerVersion(ownerId: string, remote: unknown): Pro
   const row = await getRow(ownerId, exam.id);
   if (!row || row.state !== 'conflict') return false;
   const db = await getLocalDb();
-  const payload = JSON.stringify({ ...exam, replaced_local: row.payload_json.slice(0, 20000) });
+  // Frühere eigene Fassung ohne deren eigene ältere Kopie (keine Verschachtelung), gekürzt.
+  const previous = rowToExam(row);
+  const kept = previous ? JSON.stringify({ ...previous, replaced_local: undefined }) : row.payload_json;
+  const payload = JSON.stringify({ ...exam, replaced_local: kept.slice(0, REPLACED_LOCAL_MAX) });
   await db.runAsync(
     `update ${TABLE} set dog_id=?, exam_date=?, payload_json=?, state='synced', base_updated_at=?, deleted_at=?, updated_at=?, last_error=null
      where owner_id=? and id=? and state='conflict' and updated_at=?`,
@@ -189,6 +234,12 @@ export async function acceptServerVersion(ownerId: string, remote: unknown): Pro
  * - lokal wartend oder Konflikt → unangetastet (Konflikt wird beim Hochladen erkannt)
  * Lokale Zeilen werden nie gelöscht.
  */
+/** Serverstand übernehmen, die lokal aufbewahrte frühere Fassung aber behalten. */
+function withReplaced(exam: ExamResult, row: ExamRow): ExamResult {
+  const keep = rowToExam(row)?.replaced_local;
+  return keep ? { ...exam, replaced_local: keep } : exam;
+}
+
 export async function mergeRemoteExams(ownerId: string, remote: readonly unknown[]): Promise<{ inserted: number; updated: number }> {
   const result = { inserted: 0, updated: 0 };
   if (!SQLITE_AVAILABLE || !ownerId) return result;
@@ -208,7 +259,7 @@ export async function mergeRemoteExams(ownerId: string, remote: readonly unknown
       await db.runAsync(
         `update ${TABLE} set dog_id=?, exam_date=?, payload_json=?, base_updated_at=?, deleted_at=?, updated_at=?, last_error=null
          where owner_id=? and id=? and state='synced' and updated_at=?`,
-        exam.dog_id, exam.exam_date, JSON.stringify(exam), exam.updated_at, exam.deleted_at, exam.updated_at,
+        exam.dog_id, exam.exam_date, JSON.stringify(withReplaced(exam, row)), exam.updated_at, exam.deleted_at, exam.updated_at,
         ownerId, exam.id, row.updated_at);
       result.updated++;
     }
