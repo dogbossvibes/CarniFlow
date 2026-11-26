@@ -3162,4 +3162,5 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "voiceField.undoNotInSearch": "Rückgängig gaht bi de Absuechi nöd.",
   "voiceField.notNow": "Jetzt nöd möglich.",
   "exam.waitingServer": "Wartet uf dä Server – blibt uf däm Gerät gspeicheret",
+  "voiceField.failed": "Sprachstüürig isch usgfalle. Tipp ufs Mikrofon, zum nomal probiere.",
 };

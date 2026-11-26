@@ -1289,6 +1289,13 @@ export default function TrackRunScreen() {
   const voiceListening = voiceControl.status === 'listening' || voiceControl.status === 'starting';
   useTrackVoiceAudioSession(voiceOn || voiceListening);
   const { enable: enableVoice, disable: disableVoice } = voiceControl;
+  // Hinweis, wenn die Sprachsteuerung aufgibt (zu viele Fehler) oder Rechte fehlen – als Ansage,
+  // weil das Handy bei der Absuche oft in der Tasche ist.
+  useEffect(() => {
+    if (!voicePref.wanted) return;
+    if (voiceControl.status === 'error') speakVoiceControl('voiceField.failed');
+    else if (voiceControl.status === 'denied') speakVoiceControl('voiceField.denied');
+  }, [voiceControl.status, voicePref.wanted, speakVoiceControl]);
   // Gemerkt «an»: während der Absuche wieder einschalten; danach aus.
   useEffect(() => {
     if (!s.recording || finishing) { disableVoice(); return; }

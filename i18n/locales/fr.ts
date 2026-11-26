@@ -3175,4 +3175,5 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "voiceField.undoNotInSearch": "Annuler n'est pas possible pendant la recherche.",
   "voiceField.notNow": "Pas possible maintenant.",
   "exam.waitingServer": "En attente du serveur – reste enregistré sur cet appareil",
+  "voiceField.failed": "La commande vocale s’est arrêtée. Touche le micro pour réessayer.",
 };
