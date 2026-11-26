@@ -197,8 +197,9 @@ export default function MantrailRunScreen() {
   useEffect(() => {
     if (phase !== 'leaving') return;
     Alert.alert(t('mantrail.savedTitle'), t('mantrail.savedText'));
-    router.replace('/(tabs)/training' as never);
-  }, [phase, router, t]);
+    // Direkt zur Auswertung des eben gespeicherten Trails (PR C).
+    router.replace((id ? `/mantrail/${id}` : '/mantrail') as never);
+  }, [phase, router, t, id]);
 
   if (phase === 'loading') return <SafeAreaView style={st.safe}><ActivityIndicator style={{ marginTop: 80 }} color={ACCENT} /></SafeAreaView>;
   if (phase === 'missing' || !id || !dogId) {

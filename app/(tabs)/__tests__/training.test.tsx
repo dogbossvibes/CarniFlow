@@ -173,12 +173,12 @@ describe('Training-Tab — Mantrailing-Karte (Spec 02)', () => {
     expect(pressableTexts(node)).toHaveLength(4);
   });
 
-  it('mit Sparte «Mantrailing»: Karte öffnet «Trail legen»', () => {
+  it('mit Sparte «Mantrailing»: Karte öffnet die Mantrailing-Übersicht', () => {
     mockSparten = ['Fährte', 'Mantrailing'];
     const node = render(deCH as unknown as Record<string, string>);
     const card = cardContaining(node, deCH['mantrail.entrySub']);
     expect(card).toBeDefined();
     act(() => { card?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/mantrail/legen');
+    expect(mockPush).toHaveBeenCalledWith('/mantrail');
   });
 });

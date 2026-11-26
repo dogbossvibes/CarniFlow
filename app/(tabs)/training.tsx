@@ -88,7 +88,7 @@ export default function TrainingScreen() {
 
         {/* Mantrailing mit GPS (Spec 02) – nur, wenn die Sparte im Profil eingeschaltet ist. */}
         {mantrailingOn && (
-          <AnimatedPressable accessibilityRole="button" accessibilityLabel={t('mantrail.entryTitle')} style={[s.faehrteCard, { marginTop: 12 }]} scale={0.98} onPress={() => router.push('/mantrail/legen' as never)}>
+          <AnimatedPressable accessibilityRole="button" accessibilityLabel={t('mantrail.entryTitle')} style={[s.faehrteCard, { marginTop: 12 }]} scale={0.98} onPress={() => router.push('/mantrail' as never)}>
             <View style={[s.actionIcon, { backgroundColor: '#38BDF81A' }]}>
               <Ionicons name="search" size={28} color="#38BDF8" />
             </View>
