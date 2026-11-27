@@ -32,11 +32,12 @@ describe('track-weather – MET-Antwort', () => {
     expect(hours.map(h => h.time)).toEqual(['2026-04-15T08:00:00.000Z', '2026-04-15T09:00:00.000Z']);
     expect(hours[0]).toMatchObject({ windSpeed: 18, windGust: 36, temperature: 11.3, precipitation: 0.4, symbol: 'lightrain', thunderProbability: null });
   });
-  it('fehlerhafte Werte werden null, nie 0; höchstens 24 Stunden', () => {
+  it('fehlerhafte Werte werden null, nie 0; höchstens MAX_HOURS (72) Stunden', () => {
     const bad = step('2026-04-15T08:00:00Z');
     (bad.data.instant.details as Record<string, unknown>).wind_speed = 'x';
     expect(mapMetForecast({ properties: { timeseries: [bad] } }, NOW)[0].windSpeed).toBeNull();
-    const many = Array.from({ length: 40 }, (_, i) => step(new Date(Date.parse('2026-04-15T08:00:00Z') + i * 3_600_000).toISOString()));
+    const many = Array.from({ length: 90 }, (_, i) => step(new Date(Date.parse('2026-04-15T08:00:00Z') + i * 3_600_000).toISOString()));
+    expect(MAX_HOURS).toBe(72);
     expect(mapMetForecast({ properties: { timeseries: many } }, NOW)).toHaveLength(MAX_HOURS);
     expect(mapMetForecast({}, NOW)).toEqual([]);
   });

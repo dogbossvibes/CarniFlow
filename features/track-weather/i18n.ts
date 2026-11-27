@@ -2,6 +2,12 @@ import { registerGroupResources } from '@/features/training-groups/registerResou
 import type { ReasonKey, TrackWeatherLevel } from './model';
 
 const de = {
+  'day.0': 'Heute', 'day.1': 'Morgen', 'day.2': 'Übermorgen',
+  daysLabel: 'Nächste Tage',
+  dayWindow: 'Bestes Fenster: {from}–{to} Uhr',
+  dayNoWindow: 'Kein Fenster bei Tageslicht',
+  dayA11y: '{day}: {level}. {window}',
+  dayExpand: 'Stunden anzeigen',
   title: 'Fährtenwetter heute',
   'level.good': 'Gut', 'level.medium': 'Mittel', 'level.hard': 'Schwierig',
   'now.good': 'Jetzt gut', 'now.medium': 'Jetzt mittel', 'now.hard': 'Jetzt schwierig',
@@ -44,6 +50,11 @@ type Dict = typeof de;
 
 const gsw: Dict = {
   ...de,
+  'day.0': 'Hüt', 'day.1': 'Morn', 'day.2': 'Übermorn',
+  daysLabel: 'Nächschti Täg',
+  dayWindow: 'Bescht Fänschter: {from}–{to} Uhr',
+  dayNoWindow: 'Keis Fänschter bi Tagesliecht',
+  dayExpand: 'Stunde aazeige',
   title: 'Fährtewetter hüt',
   'now.good': 'Jetzt guet', 'level.good': 'Guet', 'now.hard': 'Jetzt schwierig',
   'reason.storm': 'Sturmböe bis {gust} km/h',
@@ -75,6 +86,12 @@ const gsw: Dict = {
 };
 
 const en: Dict = {
+  'day.0': 'Today', 'day.1': 'Tomorrow', 'day.2': 'Day after tomorrow',
+  daysLabel: 'Next days',
+  dayWindow: 'Best window: {from}–{to}',
+  dayNoWindow: 'No daylight window',
+  dayA11y: '{day}: {level}. {window}',
+  dayExpand: 'Show hours',
   title: 'Tracking weather today',
   'level.good': 'Good', 'level.medium': 'Fair', 'level.hard': 'Difficult',
   'now.good': 'Good right now', 'now.medium': 'Fair right now', 'now.hard': 'Difficult right now',
@@ -115,6 +132,12 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'day.0': 'Aujourd’hui', 'day.1': 'Demain', 'day.2': 'Après-demain',
+  daysLabel: 'Prochains jours',
+  dayWindow: 'Meilleur créneau : {from}–{to}',
+  dayNoWindow: 'Pas de créneau de jour',
+  dayA11y: '{day} : {level}. {window}',
+  dayExpand: 'Afficher les heures',
   title: 'Météo pistage du jour',
   'level.good': 'Bon', 'level.medium': 'Moyen', 'level.hard': 'Difficile',
   'now.good': 'Bon maintenant', 'now.medium': 'Moyen maintenant', 'now.hard': 'Difficile maintenant',
@@ -155,6 +178,12 @@ const fr: Dict = {
 };
 
 const it: Dict = {
+  'day.0': 'Oggi', 'day.1': 'Domani', 'day.2': 'Dopodomani',
+  daysLabel: 'Prossimi giorni',
+  dayWindow: 'Fascia migliore: {from}–{to}',
+  dayNoWindow: 'Nessuna fascia di giorno',
+  dayA11y: '{day}: {level}. {window}',
+  dayExpand: 'Mostra le ore',
   title: 'Meteo pista di oggi',
   'level.good': 'Buono', 'level.medium': 'Medio', 'level.hard': 'Difficile',
   'now.good': 'Ora buono', 'now.medium': 'Ora medio', 'now.hard': 'Ora difficile',
@@ -201,3 +230,4 @@ registerGroupResources(TRACK_WEATHER_NS, trackWeatherResources);
 export const levelKey = (l: TrackWeatherLevel) => `level.${l}` as const;
 export const nowKey = (l: TrackWeatherLevel) => `now.${l}` as const;
 export const reasonKey = (k: ReasonKey) => `reason.${k}` as const;
+export const dayKey = (offset: number) => `day.${Math.min(2, Math.max(0, offset))}` as 'day.0' | 'day.1' | 'day.2';
