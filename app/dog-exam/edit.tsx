@@ -58,6 +58,8 @@ export default function ExamEditScreen() {
   const [form, setForm] = useState<ExamInput>(() => emptyInput(dogId));
   const [totalText, setTotalText] = useState('');
   const [placementText, setPlacementText] = useState('');
+  // Eingabetext der Abteilungspunkte roh halten («85.» bleibt beim Tippen stehen); gerechnet wird mit der Zahl.
+  const [pointsText, setPointsText] = useState<Record<number, string>>({});
   const [loaded, setLoaded] = useState(!examId);
   const [issues, setIssues] = useState<ExamIssue[]>([]);
   const [saving, setSaving] = useState(false);
@@ -91,10 +93,10 @@ export default function ExamEditScreen() {
   const suggestion = useMemo(() => suggestFromSections(form.exam_type, form.sections), [form.exam_type, form.sections]);
   const set = <K extends keyof ExamInput>(key: K, value: ExamInput[K]) => setForm(f => ({ ...f, [key]: value }));
 
-  const chooseType = (key: string) => setForm(f => f.exam_type === key ? f : ({
+  const chooseType = (key: string) => { if (key !== form.exam_type) setPointsText({}); setForm(f => f.exam_type === key ? f : ({
     ...f, exam_type: key, exam_level: null, sections: sectionsFromTemplate(key),
     exam_type_label: key === 'other' ? f.exam_type_label : null,
-  }));
+  })); };
   const setSection = (index: number, patch: Partial<ExamSection>) =>
     setForm(f => ({ ...f, sections: f.sections.map((sec, i) => i === index ? { ...sec, ...patch } : sec) }));
 
@@ -102,6 +104,7 @@ export default function ExamEditScreen() {
     if (savingRef.current) return;
     const input: ExamInput = {
       ...form,
+      sections: form.sections.map((sec, i) => (i in pointsText ? { ...sec, points: parseNum(pointsText[i]) } : sec)),
       total_points: parseNum(totalText),
       max_points: sum.max ?? form.max_points,
       placement: (() => { const n = parseNum(placementText); return n != null && Number.isInteger(n) && n >= 1 ? n : null; })(),
@@ -183,8 +186,8 @@ export default function ExamEditScreen() {
                 <YesNo value={sec.passed ?? null} onChange={v => setSection(i, { passed: v })} />
               ) : <>
                 <TextInput
-                  style={s.pointsInput} keyboardType="decimal-pad" value={numText(sec.points)}
-                  onChangeText={v => setSection(i, { points: parseNum(v) })}
+                  style={s.pointsInput} keyboardType="decimal-pad" value={pointsText[i] ?? numText(sec.points)}
+                  onChangeText={v => { setPointsText(p => ({ ...p, [i]: v })); setSection(i, { points: parseNum(v) }); }}
                   accessibilityLabel={`${sec.label} ${t('exam.points')}`} maxLength={7}
                 />
                 {sec.maxPoints != null ? <Text style={s.muted}>{t('exam.maxPoints', { max: sec.maxPoints })}</Text> : null}

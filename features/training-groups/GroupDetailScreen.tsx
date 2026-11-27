@@ -21,6 +21,7 @@ import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, secondsUntilMidn
 import { parseSession } from '@/features/tracking-exchange/groups/groupModels';
 import type { EvaluationSummary } from '@/features/tracking-exchange/groups/evaluationService';
 import { formatEvalLine } from './evaluationFormat';
+import { GroupPlansCard } from './plans/GroupPlansCard';
 
 type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; evaluations: EvaluationSummary[]; serverNowMs: number };
 
@@ -209,6 +210,21 @@ export default function GroupDetailScreen() {
                 </View>
               ))}
               <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.startHint')}</Text>
+            </AnyvoCard>
+          )}
+
+          {/* Vereinsmodus (Spec 04): Trainingstage planen und zusagen. */}
+          {group?.status === 'active' ? <GroupPlansCard groupId={groupId} /> : null}
+
+          {/* #144: Verleitung anfragen direkt im Gruppentraining (älterer Bereich, gleiche Gruppen). */}
+          {group?.status === 'active' && (
+            <AnyvoCard>
+              <Text style={cs.section}>{t('groups.distractions')}</Text>
+              <Text style={cs.hint}>{t('groups.distractionsHint')}</Text>
+              <View style={cs.actions}>
+                <AnyvoButton style={cs.flex} label={t('groups.requestDistraction')} icon="shuffle-outline" variant="secondary"
+                  onPress={() => router.push({ pathname: '/track/group-tasks', params: { groupId } } as never)} />
+              </View>
             </AnyvoCard>
           )}
 

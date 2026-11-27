@@ -23,10 +23,14 @@ const mockHasStarted = jest.fn();
 jest.mock('expo-location', () => ({ hasStartedLocationUpdatesAsync: (...a: unknown[]) => mockHasStarted(...a) }));
 jest.mock('@/features/tracking/native/backgroundLocationTask', () => ({ TRACK_LOCATION_TASK: 'anyvo-faehrte-bg' }));
 const mockPending = jest.fn();
-jest.mock('@/features/tracking/store/trackPersist', () => ({ listPendingDogIds: () => mockPending() }));
+const mockPeek = jest.fn();
+jest.mock('@/features/tracking/store/trackPersist', () => ({ listPendingDogIds: () => mockPending(), peekPending: (id: string) => mockPeek(id) }));
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 let mockByDog: Record<string, { status: string }> = {};
+let mockHydrated = true;
 jest.mock('@/features/tracking/store/activeFaehrten', () => ({
-  useActiveFaehrten: { getState: () => ({ hydrated: true, hydrate: async () => {}, byDog: mockByDog }) },
+  useActiveFaehrten: { getState: () => ({ hydrated: mockHydrated, hydrate: async () => { mockHydrated = true; }, byDog: mockByDog }) },
 }));
 let mockAppState = 'active';
 let mockAppListener: ((s: string) => void) | null = null;
@@ -38,14 +42,21 @@ jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 
 // eslint-disable-next-line import/first -- nach den jest.mock-Aufrufen importieren
-import { OtaStartGate, isRecordingProtected, __resetOtaStartGateForTests } from '../OtaStartGate';
+import { OtaStartGate, isRecordingProtected, recordingProtection, __resetOtaStartGateForTests } from '../OtaStartGate';
+// eslint-disable-next-line import/first -- nach den jest.mock-Aufrufen importieren
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// eslint-disable-next-line import/first -- nach den jest.mock-Aufrufen importieren
+import { OTA_START_DIAGNOSIS_KEY, loadStartDiagnosis } from '@/lib/otaStartDiagnosis';
 
 let r: ReactTestRenderer;
 const texts = () => r.root.findAllByType(Text).map(n => [].concat(n.props.children).join(''));
 
-beforeEach(() => {
+beforeEach(async () => {
   __resetOtaStartGateForTests(false);
-  mockAppState = 'active'; mockByDog = {};
+  await AsyncStorage.clear();
+  mockAppState = 'active'; mockByDog = {}; mockHydrated = true;
+  mockPeek.mockReset().mockResolvedValue(null);
+  mockUpdates.isEnabled = true as never; mockUpdates.isEmergencyLaunch = false as never;
   mockHasStarted.mockResolvedValue(false); mockPending.mockResolvedValue([]);
   mockCtx = { ...mockBase }; mockListeners.clear(); mockAppListener = null;
   mockUpdates.reloadAsync.mockReset().mockResolvedValue(undefined);
@@ -145,5 +156,130 @@ describe('OtaStartGate', () => {
     expect(mockUpdates.reloadAsync).not.toHaveBeenCalled();
     expect(mockListeners.size).toBe(0);
     r.unmount();
+  });
+});
+
+describe('recordingProtection: welche Bedingung greift (Diagnose)', () => {
+  it('null, wenn nichts läuft', async () => { expect(await recordingProtection()).toBeNull(); });
+  it('background', async () => {
+    mockAppState = 'background';
+    expect(await recordingProtection()).toEqual({ reason: 'background', detail: 'background' });
+  });
+  it('location_task, mit offenen Registry-Einträgen als Code', async () => {
+    mockHasStarted.mockResolvedValue(true);
+    expect(await recordingProtection()).toEqual({ reason: 'location_task', detail: 'reg:none' });
+    mockByDog = { d1: { status: 'laid' }, d2: { status: 'resting' } };
+    expect(await recordingProtection()).toEqual({ reason: 'location_task', detail: 'reg:laid,resting' });
+  });
+  it('location_task auch, wenn die Abfrage scheitert (wie bisher geschützt)', async () => {
+    mockHasStarted.mockRejectedValue(new Error('x'));
+    expect(await recordingProtection()).toEqual({ reason: 'location_task', detail: 'query_failed·reg:none' });
+  });
+  it('laying_searching', async () => {
+    mockByDog = { d1: { status: 'searching' }, d2: { status: 'laid' } };
+    expect(await recordingProtection()).toEqual({ reason: 'laying_searching', detail: 'searching' });
+  });
+  it('pending_buffer: Anzahl, Status und Alter, ohne IDs', async () => {
+    const now = Date.now();
+    mockPending.mockResolvedValue(['dog-a', 'dog-b']);
+    mockPeek.mockImplementation(async (id: string) => id === 'dog-a'
+      ? { status: 'cancelled', savedAt: now - 12 * 86_400_000 }
+      : { savedAt: now - 3 * 86_400_000 });
+    const p = await recordingProtection();
+    expect(p).toEqual({ reason: 'pending_buffer', detail: '2×cancelled,legacy·3-12d' });
+    expect(p?.detail).not.toContain('dog-');
+  });
+  it('pending_buffer bleibt geschützt, auch wenn das Detail nicht lesbar ist', async () => {
+    mockPending.mockResolvedValue(['d1']);
+    mockPeek.mockRejectedValue(new Error('x'));
+    expect(await recordingProtection()).toEqual({ reason: 'pending_buffer', detail: '1×?·?d' });
+  });
+  it('error: im Zweifel geschützt', async () => {
+    mockPending.mockRejectedValue(new Error('x'));
+    expect(await recordingProtection()).toEqual({ reason: 'error' });
+  });
+});
+
+describe('OtaStartGate: speichert den letzten Grund lokal', () => {
+  const mount = async () => { await act(async () => { r = TestRenderer.create(<OtaStartGate><Text>APP</Text></OtaStartGate>); }); };
+  const flush = () => act(async () => { await new Promise(res => setTimeout(res, 0)); });
+
+  it('no_update', async () => {
+    await mount();
+    await act(async () => { setCtx({ isStartupProcedureRunning: false }); });
+    await flush();
+    expect(await loadStartDiagnosis()).toMatchObject({ v: 1, reason: 'no_update' });
+    act(() => { r.unmount(); });
+  });
+
+  it('protected mit Puffer-Code, ohne IDs im Speicher', async () => {
+    mockPending.mockResolvedValue(['secret-dog-id']);
+    mockPeek.mockResolvedValue({ status: 'cancelled', savedAt: Date.now() });
+    mockCtx = { ...mockBase, isUpdatePending: true };
+    await mount();
+    await flush();
+    expect(await loadStartDiagnosis()).toMatchObject({ reason: 'protected', protect: 'pending_buffer', detail: '1×cancelled·0d' });
+    expect(await AsyncStorage.getItem(OTA_START_DIAGNOSIS_KEY)).not.toContain('secret-dog-id');
+    expect(mockUpdates.reloadAsync).not.toHaveBeenCalled();
+    act(() => { r.unmount(); });
+  });
+
+  it('reloaded wird vor dem Neustart gespeichert; der nächste JS-Start macht daraus reloaded_ok', async () => {
+    mockCtx = { ...mockBase, isUpdatePending: true, isStartupProcedureRunning: false };
+    await mount();
+    await flush();
+    expect(mockUpdates.reloadAsync).toHaveBeenCalledTimes(1);
+    expect(await loadStartDiagnosis()).toMatchObject({ reason: 'reloaded' });
+    act(() => { r.unmount(); });
+    __resetOtaStartGateForTests(false);
+    mockCtx = { ...mockBase, restartCount: 1 };
+    await mount();
+    await flush();
+    expect(await loadStartDiagnosis()).toMatchObject({ reason: 'reloaded_ok' });
+    act(() => { r.unmount(); });
+  });
+
+  it('reload_failed, wenn der Neustart scheitert', async () => {
+    mockUpdates.reloadAsync.mockRejectedValue(new Error('x'));
+    mockCtx = { ...mockBase, isUpdatePending: true, isStartupProcedureRunning: false };
+    await mount();
+    await flush();
+    expect(await loadStartDiagnosis()).toMatchObject({ reason: 'reload_failed' });
+    expect(texts()).toEqual(['APP']);
+    act(() => { r.unmount(); });
+  });
+
+  it('check_timeout mit spätem Ausgang', async () => {
+    jest.useFakeTimers();
+    try {
+      await act(async () => { r = TestRenderer.create(<OtaStartGate><Text>APP</Text></OtaStartGate>); });
+      await act(async () => { jest.advanceTimersByTime(1600); });
+      await act(async () => { await Promise.resolve(); });
+      jest.useRealTimers();
+      await flush();
+      expect(await loadStartDiagnosis()).toMatchObject({ reason: 'check_timeout' });
+      await act(async () => { setCtx({ isUpdatePending: true, isStartupProcedureRunning: false }); });
+      await flush(); await flush();
+      const d = await loadStartDiagnosis();
+      expect(d?.late).toMatchObject({ phase: 'ready' });
+      act(() => { r.unmount(); });
+    } finally { jest.useRealTimers(); }
+  });
+
+  it('disabled bei Notfallstart', async () => {
+    mockUpdates.isEmergencyLaunch = true as never;
+    await mount();
+    await flush();
+    expect(await loadStartDiagnosis()).toMatchObject({ reason: 'disabled', detail: 'emergency' });
+    expect(texts()).toEqual(['APP']);
+    act(() => { r.unmount(); });
+  });
+
+  it('im Entwicklungsbuild wird nichts gespeichert', async () => {
+    __resetOtaStartGateForTests(true);
+    await mount();
+    await flush();
+    expect(await loadStartDiagnosis()).toBeNull();
+    act(() => { r.unmount(); });
   });
 });

@@ -4,6 +4,7 @@ import { SpeechModule, useSpeechRecognitionEvent, SPEECH_RECOGNITION_AVAILABLE }
 import { useVoiceStore } from '@/features/voice/store/voiceStore';
 import { parseVoiceCommand, type VoiceCommand } from '@/features/voice/services/voiceCommandParser';
 import { useT } from '@/i18n';
+import { bestTranscript } from '@/features/voice/services/recognitionPlan';
 
 // Live-Sprachsteuerung (expo-speech-recognition) für den Fährtenmodus. Erkennt
 // kurze Befehle, parst sie und führt onCommand aus. Continuous: startet nach
@@ -18,13 +19,14 @@ export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
   const begin = useCallback(() => {
     if (!SpeechModule) return;
     try {
-      SpeechModule.start({ lang: 'de-DE', interimResults: false, continuous: true });
+      SpeechModule.start({ lang: 'de-DE', interimResults: false, continuous: true, maxAlternatives: 1 });
       store.getState().setListening(true);
     } catch (e) { console.warn('[useVoiceCommands] start', e); }
   }, [store]);
 
   useSpeechRecognitionEvent('result', (e: any) => {
-    const t = e?.results?.[e.results.length - 1]?.transcript ?? e?.results?.[0]?.transcript;
+    // results = Alternativen derselben Äusserung, die beste zuerst (Release-Review 2026-11-25).
+    const t = bestTranscript(e?.results);
     if (!t) return;
     const cmd = parseVoiceCommand(String(t));
     if (cmd) { store.getState().setLastRecognizedCommand(cmd); onCmdRef.current(cmd); }

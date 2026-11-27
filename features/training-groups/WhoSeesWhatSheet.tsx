@@ -9,6 +9,7 @@ const ROWS: { label: TranslationKey; who: TranslationKey | 'location'; muted?: b
   { label: 'groups.wsArea', who: 'groups.wsAll' },
   { label: 'groups.wsCourse', who: 'groups.wsCourseWho' },
   { label: 'groups.wsLocation', who: 'location' },
+  { label: 'groups.wsPlan', who: 'groups.wsAll' },
   { label: 'groups.wsSearch', who: 'groups.wsOnlyYou', muted: true },
   { label: 'groups.wsPrivate', who: 'groups.wsNever', muted: true },
 ];

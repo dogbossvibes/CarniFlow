@@ -1,7 +1,7 @@
 import { registerGroupResources } from '@/features/training-groups/registerResources';
 const de = {
   "back": "Zurück",
-  "title": "Gruppenfährten",
+  "title": "Verleitung in der Gruppe",
   "pending": "Gruppenaufgaben sind noch nicht verfügbar. Du kannst die Fährte bereits per Datei teilen.",
   "active": "Für neue Gruppenaufgaben brauchst du ACTIVE.",
   "incomplete": "Diese Hauptfährte lässt sich noch nicht vollständig übertragen. Es wurde nichts verändert.",
@@ -46,7 +46,7 @@ const de = {
 };
 const en: Record<keyof typeof de, string> = {
   "back": "Back",
-  "title": "Group tracks",
+  "title": "Distraction in the group",
   "pending": "Group tasks are not available yet. You can share the track as a file.",
   "active": "ACTIVE is required for new group tasks.",
   "incomplete": "This main track cannot be transferred completely yet. Nothing was changed.",
@@ -91,7 +91,7 @@ const en: Record<keyof typeof de, string> = {
 };
 const fr: Record<keyof typeof de, string> = {
   "back": "Retour",
-  "title": "Pistes de groupe",
+  "title": "Diversion dans le groupe",
   "pending": "Les tâches de groupe ne sont pas encore disponibles. Tu peux partager la piste par fichier.",
   "active": "ACTIVE est nécessaire pour de nouvelles tâches de groupe.",
   "incomplete": "Cette piste ne peut pas encore être transmise intégralement. Rien n’a été modifié.",
@@ -136,7 +136,7 @@ const fr: Record<keyof typeof de, string> = {
 };
 const it: Record<keyof typeof de, string> = {
   "back": "Indietro",
-  "title": "Piste di gruppo",
+  "title": "Distrazione nel gruppo",
   "pending": "I compiti di gruppo non sono ancora disponibili. Puoi condividere la pista tramite file.",
   "active": "Serve ACTIVE per nuovi compiti di gruppo.",
   "incomplete": "Questa pista non può ancora essere trasferita completamente. Nulla è stato modificato.",
