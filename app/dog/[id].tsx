@@ -1,4 +1,5 @@
 import { DogTrackingPanel } from '@/features/tracking/components/DogTrackingPanel';
+import { DogCoachWeekPanel } from '@/features/ai/components/DogCoachWeekPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -297,6 +298,7 @@ export default function DogHubRoute() {
         onOpenCalendar: () => router.push('/training-hub' as never),
         onOpenAppointment: appointment => router.push({ pathname: '/training-hub', params: { eventId: appointment.id } } as never),
       }}
+      coachPanel={dog && dog.owner_id === userId ? <DogCoachWeekPanel key={`coach:${userId}:${id}`} dog={dog} isPro={isPremium} onUpgrade={() => router.push('/premium' as never)} /> : undefined}
       trackingPanel={dog?.owner_id === userId ? <DogTrackingPanel key={`${userId}:${id}`} userId={userId} dogId={id} dogName={dog?.name ?? ''} lastTrackId={lastFaehrteId} /> : undefined}
       activeFaehrte={activeFaehrte}
       onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}
