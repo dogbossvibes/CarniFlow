@@ -59,7 +59,7 @@ jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGro
 jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: (...args: unknown[]) => { mockLiveArgs.push(args); return { positions: [] }; } }));
 jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, findLocalGroupTrack: async () => null, importGroupTrack: async () => null,
   flushPendingHandovers: async () => {}, listPendingHandovers: async () => [], findFinishedLayings: async () => [],
-  pickLayerDog: (ids: string[]) => ids[0] }));
+  pickLayerDog: (ids: string[], busy: (id: string) => boolean) => ids.find(id => !busy(id)) ?? ids[0] }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 
 const text = (tree: ReactTestRenderer) => tree.root.findAll(n => n.type === 'Text')

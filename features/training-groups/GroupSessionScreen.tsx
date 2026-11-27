@@ -25,6 +25,7 @@ import { isLiveShareReleaseReady } from '@/features/tracking-exchange/live/relea
 import { findFinishedLayings, findLocalGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers, pickLayerDog, submitHandover, type PendingHandover } from './groupTrackLocal';
 import { localTrackNeedsHomeZoneWarning } from '@/features/home-zone/confirm';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
 
 type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean;
   /** Fertig gelegt, aber noch nicht eingetragen/übergeben (z. B. über den gewohnten Fährten-Weg fortgesetzt, #156). */
@@ -217,6 +218,17 @@ export default function GroupSessionScreen() {
     const layerDog = ownChoice?.dogId ?? pickLayerDog(mine.map(p => p.dogId), dogId => !!useActiveFaehrten.getState().get(dogId));
     if (!layerDog || busy) return;
     const own = !!ownChoice;
+    // Ein-Hund-Fall (#156): hat auch der gewählte Hund eine offene Fährte, vor dem Eintragen darauf
+    // hinweisen. Es wird nichts angemeldet, so bleibt kein Eintrag auf «wird gelegt» hängen.
+    const busyTrack = own ? null : useActiveFaehrten.getState().get(layerDog);
+    if (busyTrack) {
+      const dog = mine.find(p => p.dogId === layerDog)?.dogName ?? dogs.find(d => d.id === layerDog)?.name ?? '—';
+      Alert.alert(t('groups.layerDogBusyTitle', { dog }), t('groups.layerDogBusyText'), [
+        { text: t('groups.layerDogBusyOpen'), onPress: () => router.push(reopenTarget(busyTrack) as never) },
+        { text: t('groups.layerDogBusyClose'), style: 'cancel' },
+      ]);
+      return;
+    }
     setBusy('assign'); setError(null);
     void (async () => {
       try {
