@@ -55,3 +55,10 @@ describe('Datenschutzerklärung nennt die Sprachsteuerung', () => {
     expect(privacy).toContain('weder Audio noch erkannten Text');
   });
 });
+
+describe('legen.tsx — Hinweis bei Ausfall (Review #295, H4)', () => {
+  it('zeigt einen Hinweis, wenn die Sprachsteuerung nach Fehlern aufgibt', () => {
+    const legen = readFileSync('app/track/legen.tsx', 'utf8');
+    expect(legen).toContain("else if (voiceControl.status === 'error' && voicePref.wanted) showToast(t('voiceField.failed'));");
+  });
+});
