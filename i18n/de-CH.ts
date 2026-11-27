@@ -3311,6 +3311,23 @@ export const deCH = {
   "plans.finish": "Tag abschliessen",
   "plans.finishText": "Der Plan wird als abgeschlossen markiert. Das Gruppentraining und alle Fährten bleiben unverändert.",
   "groups.notifyPlans": "Trainingstage (neu, geändert, du bist dran)",
+  "coach.reason.examDays": "«{label}» in {days} Tagen.",
+  "coach.reason.examWeeks": "«{label}» in {weeks} Wochen.",
+  "coach.reason.pause": "Letztes Training vor {days} Tagen.",
+  "coach.reason.corner": "Am {corner}. Winkel im Schnitt {avg} m Abweichung (letzte {n} Fährten).",
+  "coach.reason.lyingUp": "{n}× {from} Min. Liegezeit, alle Gegenstände gefunden: jetzt {to} Min.",
+  "coach.reason.ratingFalling": "Bewertung gesunken: von {from} auf {to} (letzte 3 Trainings).",
+  "coach.reason.ratingLow": "Bewertung im Schnitt {avg} (letzte 3 Trainings).",
+  "coach.reason.balance": "{total} Trainings in 30 Tagen, keines in dieser Sparte.",
+  "coach.reason.heat": "Läufigkeit erfasst: kein Schutzdienst diese Woche.",
+  "coach.reason.fewSignals": "Wenige Hinweise in deinen Daten: darum nur wenige Vorschläge.",
+  "coach.focus.corners": "Winkel üben",
+  "coach.focus.lying": "Liegezeit steigern",
+  "coach.focus.basics": "Grundlagen festigen",
+  "coach.focus.exam_run": "Prüfungsablauf üben",
+  "coach.focus.maintain": "Dranbleiben",
+  "coach.week.noData": "Noch zu wenig Daten für einen Wochenvorschlag. Erfasse ein paar Trainings, dann schlägt der Coach eine Woche vor.",
+  "coach.week.preview": "Vorschau: ein Vorschlag pro Woche. Mit Premium siehst du die ganze Woche.",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere
