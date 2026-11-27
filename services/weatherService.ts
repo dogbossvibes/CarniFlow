@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { fetchMetCurrent } from './metWeather';
 
 export interface WeatherInfo {
   location: string;
@@ -41,34 +42,25 @@ export async function getLiveConditions(): Promise<LiveConditions | null> {
     const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
     const { latitude, longitude } = position.coords;
 
-    const [geocode, weatherRes] = await Promise.all([
+    const [geocode, c] = await Promise.all([
       Location.reverseGeocodeAsync({ latitude, longitude }),
-      fetch(
-        `https://api.open-meteo.com/v1/forecast` +
-        `?latitude=${latitude}&longitude=${longitude}` +
-        `&current=temperature_2m,relative_humidity_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
-        `&wind_speed_unit=kmh&timezone=auto`
-      ),
+      fetchMetCurrent(latitude, longitude),
     ]);
 
     const place = geocode[0];
     const location = place?.city ?? place?.district ?? place?.subregion ?? '';
 
-    const data = await weatherRes.json();
-    const c = data.current ?? {};
-    const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
-
     return {
       lat:        latitude,
       lng:        longitude,
       location,
-      emoji:      wetterBeschreibung(c.weather_code ?? -1),
-      temp:       c.temperature_2m != null ? Math.round(c.temperature_2m) : null,
-      humidity:   num(c.relative_humidity_2m),
-      windSpeed:  c.wind_speed_10m != null ? Math.round(c.wind_speed_10m) : null,
-      windDir:    num(c.wind_direction_10m),
-      windGusts:  c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) : null,
-      cloudCover: num(c.cloud_cover),
+      emoji:      wetterBeschreibung(c?.wmoCode ?? -1),
+      temp:       c?.temperature != null ? Math.round(c.temperature) : null,
+      humidity:   c?.humidity ?? null,
+      windSpeed:  c?.windSpeed != null ? Math.round(c.windSpeed) : null,
+      windDir:    c?.windDirection ?? null,
+      windGusts:  c?.windGust != null ? Math.round(c.windGust) : null,
+      cloudCover: c?.cloudCover ?? null,
     };
   } catch (e) {
     console.error('[WeatherService] live', e);
@@ -78,7 +70,7 @@ export async function getLiveConditions(): Promise<LiveConditions | null> {
 
 // ── Aktuelles Wetter zu einer bekannten Position (für die Fährten-Aufnahme) ──
 // Nutzt eine bereits vorhandene GPS-Position (kein erneuter Permission-Prompt)
-// und liefert exakte Werte + deutsche Wetterlage aus dem WMO-Code.
+// und liefert die Werte + deutsche Wetterlage (MET-Symbol → WMO-Code).
 export interface CurrentWeather {
   temperature:      number;   // °C
   windSpeed:        number;   // km/h
@@ -111,27 +103,17 @@ export function weatherLabel(code: number): string {
 // Holt das aktuelle Wetter für lat/lng. null bei Fehler/kein Netz — darf das
 // Fährtenlegen nie blockieren.
 export async function fetchCurrentWeather(lat: number, lng: number): Promise<CurrentWeather | null> {
-  try {
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
-      `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const json = await res.json();
-    const c = json?.current;
-    if (!c || typeof c.temperature_2m !== 'number') return null;
-    const code = Number(c.weather_code);
-    return {
-      temperature:      c.temperature_2m,
-      windSpeed:        c.wind_speed_10m ?? 0,
-      windDirection:    typeof c.wind_direction_10m === 'number' && Number.isFinite(c.wind_direction_10m) ? c.wind_direction_10m : null,
-      humidity:         c.relative_humidity_2m ?? 0,
-      weatherCode:      code,
-      weatherCondition: weatherLabel(code),
-    };
-  } catch {
-    return null;
-  }
+  const c = await fetchMetCurrent(lat, lng);
+  if (!c || c.temperature == null) return null;
+  const code = c.wmoCode ?? -1;
+  return {
+    temperature:      c.temperature,
+    windSpeed:        c.windSpeed ?? 0,
+    windDirection:    c.windDirection,
+    humidity:         c.humidity ?? 0,
+    weatherCode:      code,
+    weatherCondition: weatherLabel(code),
+  };
 }
 
 export async function getLocationAndWeather(): Promise<WeatherInfo> {
@@ -144,13 +126,9 @@ export async function getLocationAndWeather(): Promise<WeatherInfo> {
     });
     const { latitude, longitude } = position.coords;
 
-    const [geocode, weatherRes] = await Promise.all([
+    const [geocode, c] = await Promise.all([
       Location.reverseGeocodeAsync({ latitude, longitude }),
-      fetch(
-        `https://api.open-meteo.com/v1/forecast` +
-        `?latitude=${latitude}&longitude=${longitude}` +
-        `&current=temperature_2m,weather_code&timezone=auto`
-      ),
+      fetchMetCurrent(latitude, longitude),
     ]);
 
     // Ortsname
@@ -164,10 +142,10 @@ export async function getLocationAndWeather(): Promise<WeatherInfo> {
       ? isChDE ? city : `${city}, ${country}`
       : '';
 
-    // Wetter (Open-Meteo — kostenlos, kein API-Key)
-    const data        = await weatherRes.json();
-    const temp        = Math.round(data.current.temperature_2m);
-    const emoji       = wetterBeschreibung(data.current.weather_code);
+    // Wetter (MET Norway über ANYVO-Funktion)
+    if (!c || c.temperature == null) return { location: locationStr, weather: '' };
+    const temp        = Math.round(c.temperature);
+    const emoji       = wetterBeschreibung(c.wmoCode ?? -1);
     const weatherStr  = `${emoji} ${temp}°C`;
 
     return { location: locationStr, weather: weatherStr };
