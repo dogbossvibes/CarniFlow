@@ -3159,6 +3159,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.undoNotInSearch": "Annullare non è possibile durante la ricerca.",
   "voiceField.notNow": "Non possibile adesso.",
   "exam.waitingServer": "In attesa del server – resta salvato su questo dispositivo",
+  "voiceField.failed": "Il comando vocale si è interrotto. Tocca il microfono per riprovare.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Giornate di allenamento",
   "plans.sectionHint": "Chi gestisce il gruppo pianifica le giornate. Tutti nel gruppo vedono i piani pubblicati e confermano da sé.",

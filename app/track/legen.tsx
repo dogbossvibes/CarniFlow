@@ -388,6 +388,7 @@ export default function LegenScreen() {
   useEffect(() => {
     if (voiceControl.status === 'denied') showToast(t('voiceField.denied'));
     else if (voiceControl.status === 'unavailable' && voicePref.wanted) showToast(t('voiceField.unavailable'));
+    else if (voiceControl.status === 'error' && voicePref.wanted) showToast(t('voiceField.failed'));
   }, [voiceControl.status, voicePref.wanted, showToast, t]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
