@@ -45,3 +45,11 @@ describe('run.tsx — Sprachsteuerung', () => {
     expect(run).toContain('onStop={handleFinish}');
   });
 });
+
+describe('run.tsx — Hinweis bei Ausfall (Review #295, H4)', () => {
+  it('sagt an, wenn die Sprachsteuerung aufgibt oder Rechte fehlen', () => {
+    const run = readFileSync('app/track/run.tsx', 'utf8');
+    expect(run).toContain("if (voiceControl.status === 'error') speakVoiceControl('voiceField.failed');");
+    expect(run).toContain("else if (voiceControl.status === 'denied') speakVoiceControl('voiceField.denied');");
+  });
+});

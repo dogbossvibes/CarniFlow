@@ -3184,6 +3184,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "voiceField.undoNotInSearch": "Annuler n'est pas possible pendant la recherche.",
   "voiceField.notNow": "Pas possible maintenant.",
   "exam.waitingServer": "En attente du serveur – reste enregistré sur cet appareil",
+  "voiceField.failed": "La commande vocale s’est arrêtée. Touche le micro pour réessayer.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Journées d’entraînement",
   "plans.sectionHint": "Les responsables du groupe planifient les journées. Tout le groupe voit les plans publiés et s’inscrit soi-même.",

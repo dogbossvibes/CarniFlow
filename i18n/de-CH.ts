@@ -3209,6 +3209,7 @@ export const deCH = {
   "voiceField.undoNotInSearch": "Rückgängig ist bei der Absuche nicht möglich.",
   "voiceField.notNow": "Jetzt nicht möglich.",
   "exam.waitingServer": "Wartet auf den Server – bleibt auf diesem Gerät gespeichert",
+  "voiceField.failed": "Sprachsteuerung ist ausgefallen. Tippe auf das Mikrofon, um es erneut zu versuchen.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Trainingstage",
   "plans.sectionHint": "Trainingstage plant, wer die Gruppe verwaltet. Alle in der Gruppe sehen veröffentlichte Pläne und sagen selbst zu.",

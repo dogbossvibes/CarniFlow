@@ -20,6 +20,8 @@ import { appSpeechActivity } from '@/features/tracking/utils/voiceEvents';
 export type FieldVoiceStatus = 'off' | 'starting' | 'listening' | 'unavailable' | 'denied' | 'error';
 
 const TICK_MS = 200;
+/** Eine Sitzung, die so lange ohne Fehler lief, gilt als erfolgreich gestartet (Fehlerzähler zurück). */
+export const STABLE_SESSION_MS = 3000;
 const platform = () => ({ os: Platform.OS, version: Platform.Version });
 
 export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: FieldVoiceEffect) => void) {
@@ -30,7 +32,11 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   const controller = useRef(createFieldVoiceController(mode));
   const onEffectRef = useRef(onEffect);
   // Laufzeitzustand der Erkennung (ausserhalb des Renderns).
-  const runRef = useRef({ active: false, muted: false, background: false, failures: 0, sessionStartMs: 0, timer: null as ReturnType<typeof setTimeout> | null });
+  const runRef = useRef({ active: false, muted: false, background: false, failures: 0, sessionStartMs: 0, sessionErrored: false, timer: null as ReturnType<typeof setTimeout> | null });
+  // Mount-/Generationsschutz: ein enable(), dessen awaits nach disable() oder dem Verlassen des
+  // Screens enden, startet die Erkennung nicht mehr (Mikrofon nie ohne offenen Screen).
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
   const gateRef = useRef(createSessionGate());
   const scheduleRef = useRef<() => void>(() => undefined);
   useEffect(() => { onEffectRef.current = onEffect; }, [onEffect]);
@@ -41,10 +47,12 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   const start = useCallback(() => {
     const s = setupRef.current, r = runRef.current;
     clearTimer();
-    if (!SpeechModule || !s || !enabledRef.current || r.muted || r.background || r.active) return;
+    if (!SpeechModule || !s || !mountedRef.current || !enabledRef.current || r.muted || r.background || r.active) return;
+    // Live prüfen, nicht erst im Takt: nie zu Beginn einer eigenen Ansage starten.
+    if (shouldMute(Date.now(), appSpeechActivity())) { r.muted = true; return; }
     try {
       SpeechModule.start(recognitionOptions(platform(), s, FIELD_CONTEXT_STRINGS[mode]));
-      r.active = true; r.sessionStartMs = Date.now();
+      r.active = true; r.sessionStartMs = Date.now(); r.sessionErrored = false;
       gateRef.current.newSession();
       setStatus('listening');
     } catch {
@@ -95,7 +103,10 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
     else if (e?.isFinal !== false) deliver(text);
   });
   useSpeechRecognitionEvent('end', () => {
-    runRef.current.active = false;
+    const r = runRef.current;
+    // Sitzung lief stabil ohne Fehler: Fehlerzähler zurück (nicht erst nach einem Ergebnis).
+    if (r.active && !r.sessionErrored && Date.now() - r.sessionStartMs >= STABLE_SESSION_MS) r.failures = 0;
+    r.active = false;
     if (enabledRef.current) scheduleRestart();   // Erkenner endet nach Stille/Befehl: neu starten, solange an
     // Status «denied»/«error» bleibt stehen – sonst würde der Screen sofort wieder einschalten.
     else setStatus(cur => (cur === 'unavailable' || cur === 'denied' || cur === 'error' ? cur : 'off'));
@@ -103,7 +114,7 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   useSpeechRecognitionEvent('error', (e: { error?: string }) => {
     const kind = classifyError(e?.error);
     if (kind === 'fatal') { enabledRef.current = false; clearTimer(); setStatus('denied'); return; }
-    if (kind === 'transient') runRef.current.failures += 1;
+    if (kind === 'transient') { runRef.current.failures += 1; runRef.current.sessionErrored = true; }
     // Das folgende 'end' startet mit passender Pause neu (bzw. hört nach zu vielen Fehlern auf).
   });
 
@@ -136,12 +147,16 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
 
   const enable = useCallback(async () => {
     if (!SPEECH_RECOGNITION_AVAILABLE || !SpeechModule) { setStatus('unavailable'); return; }
+    const generation = ++generationRef.current;
+    const current = () => mountedRef.current && generation === generationRef.current;
     setStatus('starting');
     try {
       const perm = await SpeechModule.requestPermissionsAsync();
+      if (!current()) return;
       if (!perm?.granted) { setStatus('denied'); return; }
       let installed: string[] = [];
       try { installed = (await SpeechModule.getSupportedLocales({}))?.installedLocales ?? []; } catch { installed = []; }
+      if (!current()) return;   // Screen inzwischen verlassen oder ausgeschaltet: nicht starten
       const chosen = chooseRecognitionSetup({
         supportsOnDevice: typeof SpeechModule.supportsOnDeviceRecognition === 'function' && !!SpeechModule.supportsOnDeviceRecognition(),
         installedLocales: installed,
@@ -152,10 +167,11 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
       r.failures = 0; r.muted = false; r.background = AppState.currentState !== 'active' && AppState.currentState != null;
       enabledRef.current = true;
       start();
-    } catch { setStatus('error'); }
+    } catch { if (current()) setStatus('error'); }
   }, [start]);
 
   const disable = useCallback(() => {
+    generationRef.current++;   // ein noch laufendes enable() verwerfen
     enabledRef.current = false;
     clearTimer();
     controller.current.reset();
@@ -167,12 +183,19 @@ export function useFieldVoiceControl(mode: FieldVoiceMode, onEffect: (effect: Fi
   /** Taste auf dem Bildschirm benutzt: Sprach-Rückgängig gilt nicht mehr für die frühere Sprachaktion. */
   const noteManualAction = useCallback(() => controller.current.noteManualAction(), []);
 
-  // Screen verlassen: sauber stoppen.
-  useEffect(() => () => {
-    enabledRef.current = false;
-    const r = runRef.current;
-    if (r.timer) clearTimeout(r.timer);
-    try { SpeechModule?.stop(); } catch { /* egal */ }
+  // Screen verlassen: hart stoppen – auch wenn enable() noch auf Rechte/Sprachen wartet.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current++;
+      enabledRef.current = false;
+      const r = runRef.current;
+      if (r.timer) { clearTimeout(r.timer); r.timer = null; }
+      r.active = false;
+      try { SpeechModule?.abort?.(); } catch { /* egal */ }
+      try { SpeechModule?.stop(); } catch { /* egal */ }
+    };
   }, []);
 
   return { status, offline: setup?.onDevice ?? null, enable, disable, noteManualAction, available: SPEECH_RECOGNITION_AVAILABLE };

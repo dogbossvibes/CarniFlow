@@ -204,7 +204,7 @@ export default function LegenScreen() {
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
-  const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (MET Norway)
   // Prüfungsvorlage (T-200): reine Führungshilfe beim Legen, nicht gespeichert.
   const [examTemplateId, setExamTemplateId] = useState<ExamTemplateId | null>(null);
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
@@ -390,6 +390,7 @@ export default function LegenScreen() {
   useEffect(() => {
     if (voiceControl.status === 'denied') showToast(t('voiceField.denied'));
     else if (voiceControl.status === 'unavailable' && voicePref.wanted) showToast(t('voiceField.unavailable'));
+    else if (voiceControl.status === 'error' && voicePref.wanted) showToast(t('voiceField.failed'));
   }, [voiceControl.status, voicePref.wanted, showToast, t]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
@@ -1191,7 +1192,7 @@ export default function LegenScreen() {
 
                   <ExamTemplateChooser selected={examTemplate} onSelect={chooseExamTemplate} t={t} />
 
-                  {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
+                  {/* Wetter — echt & automatisch zur GPS-Position (MET Norway), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
                     {weatherState === 'loading' ? (
