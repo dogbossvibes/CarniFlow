@@ -3350,7 +3350,6 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "plans.dayDone": "fertig",
   "plans.lyingReached": "Liegeziit erreicht",
   "plans.layForName": "Fährte lege für {name}",
-  "plans.mantrailLater": "Mantrailing-Trails chasch da lege, sobald d Mantrailing-Übergab i de App isch.",
   "plans.toSession": "Zum Gruppetraining",
   "plans.dayEvaluation": "Tagesuswärtig",
   "plans.evalNotShared": "nöd teilt",
@@ -3359,4 +3358,5 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "plans.finish": "Tag abschliesse",
   "plans.finishText": "Dä Plan wird als abgschlosse markiert. S Gruppetraining und alli Fährte bliibed unveränderet.",
   "groups.notifyPlans": "Trainingstäg (neu, gänderet, du bisch dra)",
+  "plans.layTrailForName": "Trail lege für {name}",
 };
