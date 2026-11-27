@@ -16,6 +16,7 @@ import type { GroupMember } from '@/features/tracking-exchange/groups/groupModel
 import type { EntryInput, PlanEntry, TrainingPlanDetail } from '@/features/tracking-exchange/groups/planService';
 import { groupErrorCode, groupErrorText, useGroupServices } from '../groupHub';
 import { EntryEditorSheet } from './EntryEditorSheet';
+import { PlanDayCard } from './PlanDayCard';
 import { canEditEntries, canEditPlan, canRespond, entryState, KIND_KEY, moveEntry, myEntries, nextPosition, STATUS_KEY } from './planLogic';
 
 /** Trainingstag (Spec 04, PR B): Plan, Startliste, eigene Zusage, Planen für Organisator:innen. */
@@ -110,6 +111,9 @@ export default function GroupPlanScreen() {
                 ) : null}
                 {plan.status === 'draft' ? <Text style={[cs.hint, { marginTop: 8 }]}>{t('plans.draftHint')}</Text> : null}
               </AnyvoCard>
+
+              {/* Am Tag (PR C): starten, Ablaufliste, Tagesauswertung */}
+              <PlanDayCard plan={plan} canPlan={canPlan} onPlan={setPlan} />
 
               {/* Eigene Zeilen: zusagen, eigenen Hund wählen, als Leger:in bestätigen */}
               {mine.handler.map(e => {
