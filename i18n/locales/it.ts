@@ -3259,4 +3259,5 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "plans.evalHint": "Appaiono solo le valutazioni condivise col gruppo dal conduttore.",
   "plans.finish": "Chiudi la giornata",
   "plans.finishText": "Il piano sarà segnato come concluso. Allenamento e tracce restano invariati.",
+  "groups.notifyPlans": "Giornate (nuova, modificata, tocca a te)",
 };

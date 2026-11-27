@@ -3259,4 +3259,5 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "plans.evalHint": "Only evaluations the handler shared with the group appear.",
   "plans.finish": "Finish day",
   "plans.finishText": "The plan is marked as done. The group training and all tracks stay unchanged.",
+  "groups.notifyPlans": "Training days (new, changed, your turn)",
 };

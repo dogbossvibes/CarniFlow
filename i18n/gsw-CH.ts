@@ -3267,4 +3267,5 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "plans.evalHint": "Es erschiined nur Uswärtige, wo d Hundefüehrer:in für d Gruppe teilt het.",
   "plans.finish": "Tag abschliesse",
   "plans.finishText": "Dä Plan wird als abgschlosse markiert. S Gruppetraining und alli Fährte bliibed unveränderet.",
+  "groups.notifyPlans": "Trainingstäg (neu, gänderet, du bisch dra)",
 };
