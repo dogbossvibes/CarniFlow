@@ -3318,4 +3318,11 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "coach.discipline.mantrailing": "Mantrailing",
   "coach.discipline.obedience": "Obedience",
   "coach.discipline.other": "Training",
+  "coach.week.toCalendar": "In Kaländer",
+  "coach.week.inCalendar": "Im Kaländer",
+  "coach.week.takeAll": "Ganzi Wuche übernäh",
+  "coach.week.takeDone": "Iitreit: {n} Termin(e). Du chasch si im Kaländer bearbeite.",
+  "coach.week.takeFailed": "{n} Termin(e) händ nöd chöne iitreit werde. Probier s nomal.",
+  "coach.week.takeNone": "Scho im Kaländer, nüt Neus iitreit.",
+  "coach.week.eventNote": "Vom Coach vorgschlage.",
 };

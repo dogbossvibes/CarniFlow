@@ -58,4 +58,29 @@ describe('CoachWeekCard', () => {
     expect(allText(r)).toContain('Not enough data');
     expect(r.root.findAll((n: ReactTestInstance) => String(n.props.testID ?? '').startsWith('coach-suggestion-'))).toHaveLength(0);
   });
+
+  it('Übernehmen: einzeln, ganze Woche, «Im Kalender» statt Knopf, Ergebnis-Hinweis', async () => {
+    const two: CoachWeek = { ...week, suggestions: [week.suggestions[0], { ...week.suggestions[0], key: 'coach:v1:d1:2026-11-30:pause:unterordnung', rule: 'pause', discipline: 'unterordnung', focus: 'maintain', date: '2026-11-30', params: {}, reasons: [{ key: 'coach.reason.pause', params: { days: 9 } }] }] };
+    const onTakeOver = jest.fn(async (l: unknown[]) => ({ created: l.length, skipped: 0, failed: 0 }));
+    let r!: ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<CoachWeekCard week={two} isPro disabledCount={0} planned={[]} onTakeOver={onTakeOver} onDismiss={noop} onDisableRule={noop} onEnableAll={noop} />); });
+    await act(async () => { byId(r, 'coach-take-corner-faehrte').props.onPress(); });
+    expect(onTakeOver).toHaveBeenLastCalledWith([two.suggestions[0]]);
+    expect(allText(r)).toContain('Added 1 event(s)');
+    const all = r.root.findAll((n: ReactTestInstance) => n.props.label === 'Add the whole week')[0];
+    await act(async () => { all.props.onPress(); });
+    expect(onTakeOver).toHaveBeenLastCalledWith(two.suggestions);
+    act(() => { r.update(<CoachWeekCard week={two} isPro disabledCount={0} planned={[two.suggestions[0].key]} onTakeOver={onTakeOver} onDismiss={noop} onDisableRule={noop} onEnableAll={noop} />); });
+    expect(byId(r, 'coach-planned-corner-faehrte')).toBeDefined();
+    expect(byId(r, 'coach-take-corner-faehrte')).toBeUndefined();
+    expect(r.root.findAll((n: ReactTestInstance) => n.props.label === 'Add the whole week')).toHaveLength(0);
+  });
+
+  it('Übernehmen fehlgeschlagen: Fehlerhinweis', async () => {
+    const onTakeOver = jest.fn(async () => ({ created: 0, skipped: 0, failed: 1 }));
+    let r!: ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<CoachWeekCard week={week} isPro disabledCount={0} onTakeOver={onTakeOver} onDismiss={noop} onDisableRule={noop} onEnableAll={noop} />); });
+    await act(async () => { byId(r, 'coach-take-corner-faehrte').props.onPress(); });
+    expect(allText(r)).toContain("Couldn’t add 1 event(s)");
+  });
 });

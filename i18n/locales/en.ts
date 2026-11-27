@@ -3310,4 +3310,11 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "coach.discipline.mantrailing": "Mantrailing",
   "coach.discipline.obedience": "Obedience",
   "coach.discipline.other": "Training",
+  "coach.week.toCalendar": "Add to calendar",
+  "coach.week.inCalendar": "In calendar",
+  "coach.week.takeAll": "Add the whole week",
+  "coach.week.takeDone": "Added {n} event(s). You can edit them in the calendar.",
+  "coach.week.takeFailed": "Couldn’t add {n} event(s). Try again.",
+  "coach.week.takeNone": "Already in your calendar, nothing new added.",
+  "coach.week.eventNote": "Suggested by the coach.",
 };

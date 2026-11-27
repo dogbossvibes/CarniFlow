@@ -3331,4 +3331,11 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "coach.discipline.mantrailing": "Mantrailing",
   "coach.discipline.obedience": "Obedience",
   "coach.discipline.other": "Entraînement",
+  "coach.week.toCalendar": "Au calendrier",
+  "coach.week.inCalendar": "Dans le calendrier",
+  "coach.week.takeAll": "Reprendre toute la semaine",
+  "coach.week.takeDone": "Ajouté : {n} rendez-vous. Tu peux les modifier dans le calendrier.",
+  "coach.week.takeFailed": "{n} rendez-vous n’ont pas pu être ajoutés. Réessaie.",
+  "coach.week.takeNone": "Déjà dans le calendrier, rien de nouveau ajouté.",
+  "coach.week.eventNote": "Proposé par le coach.",
 };

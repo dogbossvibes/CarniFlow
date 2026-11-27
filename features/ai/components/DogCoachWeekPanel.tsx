@@ -1,5 +1,6 @@
+import { useT } from '@/i18n';
 import { useCoachWeek } from '@/features/ai/hooks/useCoachWeek';
-import { CoachWeekCard } from '@/features/ai/components/CoachWeekCard';
+import { CoachWeekCard, suggestionEventTexts } from '@/features/ai/components/CoachWeekCard';
 import type { Dog } from '@/types';
 
 // Coach PR B: Block «Coach · deine Woche» im Hundeprofil. Nur für eigene Hunde;
@@ -10,6 +11,7 @@ export function DogCoachWeekPanel({ dog, isPro, onUpgrade }: {
   isPro: boolean;
   onUpgrade?: () => void;
 }) {
+  const { t } = useT();
   const c = useCoachWeek(dog, isPro);
   if (!c.own || c.prefs.hiddenInProfile) return null;
   return (
@@ -18,6 +20,9 @@ export function DogCoachWeekPanel({ dog, isPro, onUpgrade }: {
       isPro={isPro}
       isLoading={c.isLoading}
       disabledCount={c.prefs.disabledRules[dog.id]?.length ?? 0}
+      planned={c.planned}
+      busy={c.busy}
+      onTakeOver={list => c.takeOver(list.map(sg => ({ suggestion: sg, ...suggestionEventTexts(sg, t) })))}
       onDismiss={key => { void c.dismiss(key); }}
       onDisableRule={rule => { void c.setRule(rule, false); }}
       onEnableAll={() => { void c.enableAllRules(); }}

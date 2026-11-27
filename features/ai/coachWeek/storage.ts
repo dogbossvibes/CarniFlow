@@ -75,3 +75,30 @@ export async function dismissCoachSuggestion(uid: string, dogId: string, key: st
     });
   } catch { /* lokal bleibt ausgeblendet */ }
 }
+
+// ── PR C: übernommene Vorschläge (Schlüssel → Termin-ID), nur auf dem Gerät ──
+const plannedKey = (uid: string) => `anyvo.coachWeek.planned.v1:${uid}`;
+const MAX_PLANNED = 300;
+
+export function parsePlanned(raw: string | null): Record<string, string> {
+  try {
+    const v = raw ? JSON.parse(raw) : null;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, id] of Object.entries(v)) if (k.startsWith('coach:') && typeof id === 'string' && id) out[k] = id;
+    return out;
+  } catch { return {}; }
+}
+
+export async function loadPlannedCoachEvents(uid: string): Promise<Record<string, string>> {
+  try { return parsePlanned(await AsyncStorage.getItem(plannedKey(uid))); } catch { return {}; }
+}
+
+export async function rememberPlannedCoachEvent(uid: string, key: string, eventId: string): Promise<void> {
+  try {
+    const cur = parsePlanned(await AsyncStorage.getItem(plannedKey(uid)));
+    delete cur[key];
+    const entries = [...Object.entries(cur), [key, eventId] as const].slice(-MAX_PLANNED);
+    await AsyncStorage.setItem(plannedKey(uid), JSON.stringify(Object.fromEntries(entries)));
+  } catch { /* Abgleich Hund · Tag · Typ erkennt den Termin trotzdem */ }
+}
