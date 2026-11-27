@@ -177,8 +177,9 @@ export default function GroupTrackScreen() {
           {handler && imported && track && (track.status === 'lying' || track.status === 'searching') ? (
             <AnyvoButton label={t('groups.search')} icon="play" loading={busy === 'search'} onPress={() => { void search(); }} />
           ) : null}
-          {imported && imported.kind !== 'mantrail' && (track?.status === 'searched' || imported.searched) ? (
-            <AnyvoButton label={t('groups.openResult')} variant="secondary" onPress={() => router.push(`/track/${imported.localId}` as never)} />
+          {imported && (track?.status === 'searched' || imported.searched) ? (
+            <AnyvoButton label={t('groups.openResult')} variant="secondary"
+              onPress={() => router.push((imported.kind === 'mantrail' ? `/mantrail/${imported.localId}` : `/track/${imported.localId}`) as never)} />
           ) : null}
           {!handler && track ? <Text style={[cs.hint, { textAlign: 'center' }]}>{t('groups.layerView')}</Text> : null}
           <AnyvoButton label={t('groups.toTraining')} variant="ghost"
