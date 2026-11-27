@@ -13,7 +13,8 @@ import { it as itLocale } from '@/i18n/locales/it';
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
-const AT = Date.UTC(2026, 10, 26, 6, 0);
+// Lokale Zeit (nicht UTC): Die Anzeige zeigt die Gerätezeit, der Test muss in jeder Zeitzone gleich laufen (CI = UTC).
+const AT = new Date(2026, 10, 26, 7, 0).getTime();
 // Einfache Übersetzung für die Formatprüfung: deutsche Texte mit {param}-Ersetzung.
 const t = (key: string, params?: Record<string, string | number>) =>
   (deCH as Record<string, string>)[key].replace(/\{(\w+)\}/g, (_, k) => String(params?.[k] ?? ''));
