@@ -5,7 +5,7 @@ import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/f
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { loadLayRecovery } from '@/features/tracking/services/trackRecoveryService';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,6 +79,7 @@ import { useFieldVoiceControl } from '@/features/voice/hooks/useFieldVoiceContro
 import { useVoiceControlPreference } from '@/features/voice/hooks/useVoiceControlPreference';
 import { layVoiceStep } from '@/features/voice/services/layVoiceBridge';
 import type { FieldVoiceEffect } from '@/features/voice/services/fieldVoiceController';
+import { rememberLayingGroupTrack } from '@/features/training-groups/groupTrackLocal';
 
 const NO_REFERENCE_OVERLAYS: TrackReferenceOverlay[] = [];
 
@@ -185,8 +186,9 @@ export default function LegenScreen() {
   // nur das Ziel nach dem Stoppen ist die Übergabe statt der eigenen Liegezeit.
   // own (Issue #150): eigene Fährte für den eigenen Hund. Sie bleibt die eigene, offene Fährte;
   // nach dem Stoppen wird nur ihre Fläche im Gruppentraining eingetragen.
-  const groupHandover = typeof params.groupTrackId === 'string' && typeof params.groupId === 'string' && typeof params.groupSessionId === 'string'
-    ? { trackId: params.groupTrackId, groupId: params.groupId, sessionId: params.groupSessionId, own: params.groupOwn === '1' } : null;
+  const groupHandover = useMemo(() => (typeof params.groupTrackId === 'string' && typeof params.groupId === 'string' && typeof params.groupSessionId === 'string'
+    ? { trackId: params.groupTrackId, groupId: params.groupId, sessionId: params.groupSessionId, own: params.groupOwn === '1' } : null),
+  [params.groupTrackId, params.groupId, params.groupSessionId, params.groupOwn]);
   const { session } = useSession();
   const { dogs, refresh: refreshDogs } = useDogs();
   useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
@@ -202,7 +204,7 @@ export default function LegenScreen() {
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
-  const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (MET Norway)
   // Prüfungsvorlage (T-200): reine Führungshilfe beim Legen, nicht gespeichert.
   const [examTemplateId, setExamTemplateId] = useState<ExamTemplateId | null>(null);
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
@@ -388,6 +390,7 @@ export default function LegenScreen() {
   useEffect(() => {
     if (voiceControl.status === 'denied') showToast(t('voiceField.denied'));
     else if (voiceControl.status === 'unavailable' && voicePref.wanted) showToast(t('voiceField.unavailable'));
+    else if (voiceControl.status === 'error' && voicePref.wanted) showToast(t('voiceField.failed'));
   }, [voiceControl.status, voicePref.wanted, showToast, t]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
@@ -575,6 +578,11 @@ export default function LegenScreen() {
         claimPendingRef.current = false;   // Fährte läuft → Buchung zählt
         setPhase('recording');
         sessionIdRef.current = clientUuid;
+        // Gruppentraining (#156): merken, zu welcher Gruppenfährte diese Aufnahme gehört. Wird sie
+        // unterbrochen und über den gewohnten Weg fertig gelegt, bietet das Gruppentraining das
+        // Eintragen bzw. Übergeben danach an (statt dauerhaft «wird gelegt»). Aufnahme unverändert.
+        if (groupHandover && uid) void rememberLayingGroupTrack(uid, { trackId: groupHandover.trackId, localId: clientUuid,
+          groupId: groupHandover.groupId, sessionId: groupHandover.sessionId, createdAtMs: Date.now(), ...(groupHandover.own ? { own: true } : {}) }).catch(() => null);
         hapticSuccess();
         showToast(t('toast.trackRunning'));
         // Regen-Vorschlag: höchstens einmal, nur beim frischen Start (nicht beim Fortsetzen)
@@ -610,7 +618,7 @@ export default function LegenScreen() {
       },
     });   // UI/Timer wurden per Callback gestartet; lokale Session ist jetzt angelegt
     if (r.error) { beganRef.current = false; showToast(r.error === 'gps_not_ready' ? t('track.gpsPreparing') : r.error); return; }
-  }, [session, activeDog, rec, showToast, t, tRain, surface, condition, weather, currentPosition, isPro, router, params.id]);
+  }, [session, activeDog, rec, showToast, t, tRain, surface, condition, weather, currentPosition, isPro, router, params.id, groupHandover]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
@@ -1184,7 +1192,7 @@ export default function LegenScreen() {
 
                   <ExamTemplateChooser selected={examTemplate} onSelect={chooseExamTemplate} t={t} />
 
-                  {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
+                  {/* Wetter — echt & automatisch zur GPS-Position (MET Norway), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
                     {weatherState === 'loading' ? (

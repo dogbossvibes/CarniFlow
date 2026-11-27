@@ -3036,6 +3036,10 @@ export const deCH = {
   "groups.ownHint": "Eigene Fährte: keine Übergabe, kein «blind». Die Gruppe sieht nur die Fläche.",
   "groups.ownSoon": "Eigene Fährten im Gruppentraining sind noch nicht freigeschaltet. Deine Fährte kannst du wie gewohnt unter «Fährten» legen.",
   "groups.ownUnavailable": "Die eigene Fährte konnte im Gruppentraining nicht angemeldet werden. Es wurde nichts verändert. Deine Fährte kannst du wie gewohnt unter «Fährten» legen.",
+  "groups.layerDogBusyTitle": "{dog} hat noch eine offene Fährte",
+  "groups.layerDogBusyText": "Für andere kannst du legen, sobald diese Fährte abgesucht oder abgebrochen ist.",
+  "groups.layerDogBusyOpen": "Zur offenen Fährte",
+  "groups.layerDogBusyClose": "Schliessen",
   "groups.ownTrackTitle": "Eigene Fährte",
   "groups.ownSending": "Fläche wird im Gruppentraining eingetragen …",
   "groups.ownSent": "Eingetragen. Die Gruppe sieht die Fläche, die Liegezeit läuft.",
@@ -3208,6 +3212,7 @@ export const deCH = {
   "voiceField.undoNotInSearch": "Rückgängig ist bei der Absuche nicht möglich.",
   "voiceField.notNow": "Jetzt nicht möglich.",
   "exam.waitingServer": "Wartet auf den Server – bleibt auf diesem Gerät gespeichert",
+  "voiceField.failed": "Sprachsteuerung ist ausgefallen. Tippe auf das Mikrofon, um es erneut zu versuchen.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Trainingstage",
   "plans.sectionHint": "Trainingstage plant, wer die Gruppe verwaltet. Alle in der Gruppe sehen veröffentlichte Pläne und sagen selbst zu.",

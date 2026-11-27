@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { AppState, Platform } from 'react-native';
-import { useFieldVoiceControl } from '../useFieldVoiceControl';
+import { STABLE_SESSION_MS, useFieldVoiceControl } from '../useFieldVoiceControl';
 import type { FieldVoiceEffect } from '@/features/voice/services/fieldVoiceController';
-import { NORMAL_RESTART_MS, RESTART_BACKOFF_MS, STABLE_MS } from '@/features/voice/services/recognitionPlan';
+import { IOS_RECOGNITION_CATEGORY, NORMAL_RESTART_MS, RESTART_BACKOFF_MS, STABLE_MS } from '@/features/voice/services/recognitionPlan';
 import { ECHO_GRACE_MS } from '@/features/voice/services/speechEchoGate';
 
 // Verhalten des Hooks mit nachgebildeter Spracherkennung (Release-Review 2026-11-25).
@@ -37,8 +37,12 @@ function setPlatform(os: 'ios' | 'android', version: string | number) {
   Object.defineProperty(Platform, 'OS', { configurable: true, get: () => os });
   Object.defineProperty(Platform, 'Version', { configurable: true, get: () => version });
 }
+let renderer: ReactTestRenderer | null = null;
+async function render(mode: 'lay' | 'search' = 'lay') {
+  await act(async () => { renderer = TestRenderer.create(<Probe mode={mode} />); });
+}
 async function mount(mode: 'lay' | 'search' = 'lay') {
-  await act(async () => { TestRenderer.create(<Probe mode={mode} />); });
+  await render(mode);
   await act(async () => { await probe.api!.enable(); });
 }
 const emit = (name: string, e: unknown = {}) => act(() => { mockHandlers[name]?.(e); });
@@ -145,5 +149,75 @@ describe('5) keine Rechte', () => {
     await advance(30_000);
     expect(probe.api!.status).toBe('denied');
     expect(mockModule.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Review #295 – H1 Screen verlassen während enable()', () => {
+  it('startet nicht mehr, wenn der Screen vor dem Ende der awaits geschlossen wurde; harter Stopp', async () => {
+    let release!: (v: { installedLocales: string[] }) => void;
+    mockModule.getSupportedLocales.mockImplementationOnce(() => new Promise(r => { release = r; }));
+    await render();
+    let pending!: Promise<void>;
+    act(() => { pending = probe.api!.enable(); });
+    await act(async () => { await Promise.resolve(); });
+    act(() => { renderer!.unmount(); });
+    expect(mockModule.abort).toHaveBeenCalled();
+    await act(async () => { release({ installedLocales: ['de-DE'] }); await pending; });
+    await advance(10_000);
+    expect(mockModule.start).not.toHaveBeenCalled();
+  });
+  it('ausgeschaltet während enable(): kein Start', async () => {
+    let release!: (v: { granted: boolean }) => void;
+    mockModule.requestPermissionsAsync.mockImplementationOnce(() => new Promise(r => { release = r; }));
+    await render();
+    let pending!: Promise<void>;
+    act(() => { pending = probe.api!.enable(); });
+    act(() => { probe.api!.disable(); });
+    await act(async () => { release({ granted: true }); await pending; });
+    await advance(5000);
+    expect(mockModule.start).not.toHaveBeenCalled();
+    expect(probe.api!.status).toBe('off');
+  });
+});
+
+describe('Review #295 – H2 kein Start zu Beginn einer Ansage', () => {
+  it('Neustart nach «end» prüft die Ansage live, nicht erst im Takt', async () => {
+    await mount();
+    emit('end');
+    mockSpeech = { speaking: true, endedAtMs: 0 };   // Ansage beginnt genau vor dem Neustart
+    await advance(NORMAL_RESTART_MS);
+    expect(mockModule.start).toHaveBeenCalledTimes(1);
+    mockSpeech = { speaking: false, endedAtMs: Date.now() };
+    await advance(2000);
+    expect(mockModule.start).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Review #295 – H3 iOS-Audio-Sitzung', () => {
+  it('mixWithOthers, Lautsprecher, Bluetooth, mode default – kein duckOthers, kein measurement', async () => {
+    setPlatform('ios', '18.1');
+    await mount();
+    expect(mockModule.start).toHaveBeenLastCalledWith(expect.objectContaining({
+      iosCategory: { category: 'playAndRecord', categoryOptions: ['mixWithOthers', 'defaultToSpeaker', 'allowBluetooth'], mode: 'default' },
+    }));
+    expect(IOS_RECOGNITION_CATEGORY.categoryOptions).not.toContain('duckOthers');
+  });
+});
+
+describe('Review #295 – H4 Fehlerzähler', () => {
+  it('stabile Sitzung ohne Fehler setzt den Zähler zurück, nicht erst ein Ergebnis', async () => {
+    await mount();
+    for (let i = 0; i < 4; i++) { emit('error', { error: 'network' }); emit('end'); await advance(RESTART_BACKOFF_MS[i]); }
+    expect(mockModule.start).toHaveBeenCalledTimes(5);
+    await advance(STABLE_SESSION_MS);   // diese Sitzung läuft stabil
+    emit('end');
+    await advance(NORMAL_RESTART_MS);
+    expect(mockModule.start).toHaveBeenCalledTimes(6);
+    // Danach wieder fünf Fehler möglich, bevor aufgegeben wird.
+    for (let i = 0; i < 5; i++) { emit('error', { error: 'network' }); emit('end'); await advance(RESTART_BACKOFF_MS[i]); }
+    expect(probe.api!.status).not.toBe('error');
+    emit('error', { error: 'network' }); emit('end');
+    await advance(60_000);
+    expect(probe.api!.status).toBe('error');
   });
 });

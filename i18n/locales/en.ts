@@ -2990,6 +2990,10 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "groups.ownHint": "Own track: no handover, no “blind”. The group only sees the area.",
   "groups.ownSoon": "Own tracks in group training are not enabled yet. You can lay your track as usual under “Tracks”.",
   "groups.ownUnavailable": "Your own track could not be registered in the group training. Nothing was changed. You can lay your track as usual under “Tracks”.",
+  "groups.layerDogBusyTitle": "{dog} still has an open track",
+  "groups.layerDogBusyText": "You can lay for others once this track has been searched or cancelled.",
+  "groups.layerDogBusyOpen": "Go to open track",
+  "groups.layerDogBusyClose": "Close",
   "groups.ownTrackTitle": "Own track",
   "groups.ownSending": "Adding the area to the group training …",
   "groups.ownSent": "Added. The group sees the area, the ageing time is running.",
@@ -3162,6 +3166,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.undoNotInSearch": "Undo isn't possible while searching.",
   "voiceField.notNow": "Not possible right now.",
   "exam.waitingServer": "Waiting for the server – stays saved on this device",
+  "voiceField.failed": "Voice control stopped. Tap the microphone to try again.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Training days",
   "plans.sectionHint": "Group managers plan training days. Everyone in the group sees published plans and confirms for themselves.",

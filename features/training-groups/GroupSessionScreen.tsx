@@ -22,9 +22,14 @@ import { GroupTracksMap, type CourseView } from './GroupTracksMap';
 import { WhoSeesWhatSheet } from './WhoSeesWhatSheet';
 import { useGroupLivePositions } from '@/features/tracking-exchange/live/useGroupLivePositions';
 import { isLiveShareReleaseReady } from '@/features/tracking-exchange/live/releaseGate';
-import { findLocalGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers } from './groupTrackLocal';
+import { findFinishedLayings, findLocalGroupTrack, flushPendingHandovers, importGroupTrack, listPendingHandovers, pickLayerDog, submitHandover, type PendingHandover } from './groupTrackLocal';
+import { localTrackNeedsHomeZoneWarning } from '@/features/home-zone/confirm';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
 
-type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean };
+type State = { group: TrainingGroup | null; summary: GroupSessionSummary | null; session: GroupSession | null; tracks: GroupTrack[]; serverNowMs: number; verifiedAt: number; pendingHandover: string[]; ownTracks: boolean;
+  /** Fertig gelegt, aber noch nicht eingetragen/übergeben (z. B. über den gewohnten Fährten-Weg fortgesetzt, #156). */
+  finishedLayings: PendingHandover[] };
 
 export function dogColor(dogId: string, colorKey: string | null): string {
   return colorKey && /^#[\da-f]{6}$/i.test(colorKey) ? colorKey : trackOverlayColor(resolveTrackOverlayColorKey(dogId, colorKey));
@@ -111,10 +116,24 @@ export default function GroupSessionScreen() {
       }
       // Ohne Netz gelegte Fährten nachreichen, bevor die Liste gelesen wird.
       if (summary && services.userId) await flushPendingHandovers(tracks, services.userId, sessionId);
-      const trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs, ownTracks: true };
+      let trackList = summary ? await tracks.list(sessionId) : { tracks: [], serverNowMs: list.serverNowMs, ownTracks: true };
+      // #156: Unterbrochen und über den gewohnten Fährten-Weg fertig gelegt → wie nach dem Stoppen
+      // eintragen bzw. übergeben. Berührt die Fährte die Heimzone, erst auf Antippen fragen (Übergabe-Bildschirm).
+      const finishedLayings: PendingHandover[] = [];
+      if (summary && services.userId) {
+        const uid = services.userId;
+        const layingIds = new Set(trackList.tracks.filter(tr => tr.status === 'laying' && tr.layerUserId === uid).map(tr => tr.trackId));
+        let sent = false;
+        for (const entry of await findFinishedLayings(uid, sessionId, layingIds).catch(() => [])) {
+          if (await localTrackNeedsHomeZoneWarning(entry.localId).catch(() => true)) { finishedLayings.push(entry); continue; }
+          const result = await submitHandover(tracks, uid, { ...entry, createdAtMs: Date.now() }).catch(() => null);
+          if (result === 'sent' || result === 'dropped') sent = true;
+        }
+        if (sent) trackList = await tracks.list(sessionId);
+      }
       const pendingHandover = services.userId ? (await listPendingHandovers(services.userId)).filter(e => e.sessionId === sessionId).map(e => e.trackId) : [];
       if (token !== generation.current) return;
-      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover, ownTracks: trackList.ownTracks !== false });
+      setData({ group, summary, session, tracks: trackList.tracks, serverNowMs: trackList.serverNowMs, verifiedAt: requestedAt, pendingHandover, ownTracks: trackList.ownTracks !== false, finishedLayings });
       if (services.userId) { void prepareHandlerTracks(services.userId, trackList.tracks); void loadCourses(services.userId, trackList.tracks); }
       setError(null);
     } catch (e) {
@@ -194,9 +213,22 @@ export default function GroupSessionScreen() {
     const tracks = services.tracks;
     if (!tracks || !handlerParticipation) return;
     // Eigene Fährte: Aufzeichnung für den gewählten eigenen Hund, nie blind.
-    const layerDog = ownChoice?.dogId ?? mine[0]?.dogId;
+    // Für andere (#156): die Aufnahme braucht einen eigenen Hund nur als Ablage. Einen Hund ohne offene
+    // Fährte nehmen, sonst erscheint beim Legen «Aktive Fährte vorhanden» und der Eintrag bliebe hängen.
+    const layerDog = ownChoice?.dogId ?? pickLayerDog(mine.map(p => p.dogId), dogId => !!useActiveFaehrten.getState().get(dogId));
     if (!layerDog || busy) return;
     const own = !!ownChoice;
+    // Ein-Hund-Fall (#156): hat auch der gewählte Hund eine offene Fährte, vor dem Eintragen darauf
+    // hinweisen. Es wird nichts angemeldet, so bleibt kein Eintrag auf «wird gelegt» hängen.
+    const busyTrack = own ? null : useActiveFaehrten.getState().get(layerDog);
+    if (busyTrack) {
+      const dog = mine.find(p => p.dogId === layerDog)?.dogName ?? dogs.find(d => d.id === layerDog)?.name ?? '—';
+      Alert.alert(t('groups.layerDogBusyTitle', { dog }), t('groups.layerDogBusyText'), [
+        { text: t('groups.layerDogBusyOpen'), onPress: () => router.push(reopenTarget(busyTrack) as never) },
+        { text: t('groups.layerDogBusyClose'), style: 'cancel' },
+      ]);
+      return;
+    }
     setBusy('assign'); setError(null);
     void (async () => {
       try {
@@ -215,13 +247,14 @@ export default function GroupSessionScreen() {
     })();
   };
 
-  const pendingHandover = new Set(data?.pendingHandover ?? []);
+  const finishedLayings = new Map((data?.finishedLayings ?? []).map(e => [e.trackId, e] as const));
+  const pendingHandover = new Set([...(data?.pendingHandover ?? []), ...finishedLayings.keys()]);
   const openable = (track: GroupTrack) => (track.layerUserId === userId || track.handlerUserId === userId)
     && (track.status !== 'laying' || pendingHandover.has(track.trackId)) && track.status !== 'revoked';
   const openTrack = (track: GroupTrack) => {
     if (track.status === 'laying') {
       void listPendingHandovers(userId ?? '').then(list => {
-        const entry = list.find(e => e.trackId === track.trackId);
+        const entry = list.find(e => e.trackId === track.trackId) ?? finishedLayings.get(track.trackId);
         if (entry) router.push({ pathname: '/groups/handover', params: { trackId: entry.trackId, localId: entry.localId, groupId, sessionId, ...(entry.own ? { own: '1' } : {}) } } as never);
       });
       return;

@@ -25,9 +25,27 @@ export function isLegacyIos(platform: PlatformInfo): boolean {
   return Number.isFinite(major) && major < 18;
 }
 
+/**
+ * iOS-Audio-Sitzung während der Erkennung (Review #295, H3). Ohne Angabe setzt
+ * expo-speech-recognition playAndRecord/measurement OHNE mixWithOthers: Musik anderer Apps
+ * würde unterbrochen und Ansagen leiser. Darum wie die Ansage-Sitzung (T-204):
+ *   • mixWithOthers – Musik/Podcast laufen weiter; bewusst KEIN duckOthers, weil die
+ *     Erkennung während der ganzen Fährte zuhört und andere Audio sonst dauernd leiser wäre,
+ *   • defaultToSpeaker – Ansagen über den Lautsprecher statt die Hörmuschel,
+ *   • allowBluetooth – Headset-Mikrofon wie bisher (Standard der Bibliothek),
+ *   • mode default – «measurement» senkt die Wiedergabe-Lautstärke spürbar.
+ * Unterstützt in expo-speech-recognition 58.0.1 (ios/SpeechRecognitionOptions.swift). Android ignoriert es.
+ */
+export const IOS_RECOGNITION_CATEGORY = Object.freeze({
+  category: 'playAndRecord' as const,
+  categoryOptions: ['mixWithOthers', 'defaultToSpeaker', 'allowBluetooth'] as ('mixWithOthers' | 'defaultToSpeaker' | 'allowBluetooth')[],
+  mode: 'default' as const,
+});
+
 export interface ListenOptions {
   lang: string; interimResults: boolean; continuous: boolean; maxAlternatives: 1; addsPunctuation: false;
   requiresOnDeviceRecognition: boolean; contextualStrings: string[];
+  iosCategory: typeof IOS_RECOGNITION_CATEGORY;
 }
 
 export function recognitionOptions(platform: PlatformInfo, setup: RecognitionSetup, contextualStrings: readonly string[]): ListenOptions {
@@ -36,6 +54,7 @@ export function recognitionOptions(platform: PlatformInfo, setup: RecognitionSet
     lang: setup.lang, maxAlternatives: 1, addsPunctuation: false, requiresOnDeviceRecognition: setup.onDevice,
     contextualStrings: [...contextualStrings],
     interimResults: legacy, continuous: !legacy,
+    iosCategory: { ...IOS_RECOGNITION_CATEGORY, categoryOptions: [...IOS_RECOGNITION_CATEGORY.categoryOptions] },
   };
 }
 

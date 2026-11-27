@@ -3011,6 +3011,10 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "groups.ownHint": "Propre piste : pas de remise, pas de « à l’aveugle ». Le groupe ne voit que la zone.",
   "groups.ownSoon": "Les propres pistes en entraînement de groupe ne sont pas encore activées. Tu peux poser ta piste comme d’habitude sous « Pistes ».",
   "groups.ownUnavailable": "Ta propre piste n’a pas pu être inscrite dans l’entraînement de groupe. Rien n’a été modifié. Tu peux poser ta piste comme d’habitude sous « Pistes ».",
+  "groups.layerDogBusyTitle": "{dog} a encore une piste ouverte",
+  "groups.layerDogBusyText": "Tu pourras poser pour d’autres dès que cette piste aura été travaillée ou annulée.",
+  "groups.layerDogBusyOpen": "Vers la piste ouverte",
+  "groups.layerDogBusyClose": "Fermer",
   "groups.ownTrackTitle": "Propre piste",
   "groups.ownSending": "Inscription de la zone dans l’entraînement de groupe …",
   "groups.ownSent": "Inscrite. Le groupe voit la zone, le temps de repos court.",
@@ -3183,6 +3187,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "voiceField.undoNotInSearch": "Annuler n'est pas possible pendant la recherche.",
   "voiceField.notNow": "Pas possible maintenant.",
   "exam.waitingServer": "En attente du serveur – reste enregistré sur cet appareil",
+  "voiceField.failed": "La commande vocale s’est arrêtée. Touche le micro pour réessayer.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Journées d’entraînement",
   "plans.sectionHint": "Les responsables du groupe planifient les journées. Tout le groupe voit les plans publiés et s’inscrit soi-même.",

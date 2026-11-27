@@ -2998,6 +2998,10 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "groups.ownHint": "Eigeni Fährte: kei Übergab, kei «blind». D’Gruppe gseht nur d’Flächi.",
   "groups.ownSoon": "Eigeni Fährte im Gruppetraining sind no nöd freigschalte. Dini Fährte chasch wie gwohnt under «Fährte» legge.",
   "groups.ownUnavailable": "Di eigeni Fährte het im Gruppetraining nöd chöne aagmäldet werde. Es isch nüt veränderet worde. Dini Fährte chasch wie gwohnt under «Fährte» legge.",
+  "groups.layerDogBusyTitle": "{dog} het no e offeni Fährte",
+  "groups.layerDogBusyText": "Für anderi chasch legge, sobald die Fährte abgsuecht oder abbroche isch.",
+  "groups.layerDogBusyOpen": "Zur offene Fährte",
+  "groups.layerDogBusyClose": "Schliesse",
   "groups.ownTrackTitle": "Eigeni Fährte",
   "groups.ownSending": "Flächi wird im Gruppetraining iitreit …",
   "groups.ownSent": "Iitreit. D’Gruppe gseht d’Flächi, d’Liegeziit lauft.",
@@ -3170,6 +3174,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "voiceField.undoNotInSearch": "Rückgängig gaht bi de Absuechi nöd.",
   "voiceField.notNow": "Jetzt nöd möglich.",
   "exam.waitingServer": "Wartet uf dä Server – blibt uf däm Gerät gspeicheret",
+  "voiceField.failed": "Sprachstüürig isch usgfalle. Tipp ufs Mikrofon, zum nomal probiere.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Trainingstäg",
   "plans.sectionHint": "Trainingstäg plant, wer d Gruppe verwaltet. Alli i de Gruppe gsehnd veröffentlichti Plän und säged sälber zue.",

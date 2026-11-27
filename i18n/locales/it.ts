@@ -2990,6 +2990,10 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "groups.ownHint": "Pista propria: nessuna consegna, niente «alla cieca». Il gruppo vede solo l’area.",
   "groups.ownSoon": "Le piste proprie nell’allenamento di gruppo non sono ancora attive. Puoi posare la tua pista come sempre sotto «Piste».",
   "groups.ownUnavailable": "Non è stato possibile registrare la tua pista nell’allenamento di gruppo. Nulla è stato modificato. Puoi posare la tua pista come sempre sotto «Piste».",
+  "groups.layerDogBusyTitle": "{dog} ha ancora una pista aperta",
+  "groups.layerDogBusyText": "Potrai posare per altri appena questa pista sarà stata lavorata o annullata.",
+  "groups.layerDogBusyOpen": "Alla pista aperta",
+  "groups.layerDogBusyClose": "Chiudi",
   "groups.ownTrackTitle": "Pista propria",
   "groups.ownSending": "Registrazione dell’area nell’allenamento di gruppo …",
   "groups.ownSent": "Registrata. Il gruppo vede l’area, il tempo di riposo scorre.",
@@ -3162,6 +3166,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "voiceField.undoNotInSearch": "Annullare non è possibile durante la ricerca.",
   "voiceField.notNow": "Non possibile adesso.",
   "exam.waitingServer": "In attesa del server – resta salvato su questo dispositivo",
+  "voiceField.failed": "Il comando vocale si è interrotto. Tocca il microfono per riprovare.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Giornate di allenamento",
   "plans.sectionHint": "Chi gestisce il gruppo pianifica le giornate. Tutti nel gruppo vedono i piani pubblicati e confermano da sé.",

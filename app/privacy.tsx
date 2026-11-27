@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const UPDATED = '26. November 2026';
+const UPDATED = '27. November 2026';
 
 // Verantwortliche Stelle (revDSG: Identität der verantwortlichen Person).
 const CONTROLLER_NAME    = 'Sandra Müller (ANYVO)';
@@ -34,7 +34,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '4. Drittanbieter / Auftragsbearbeiter',
-    body:  '• Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher (Fotos, Videos, Sprachnotizen). Übertragung verschlüsselt; Speicherung in der EU (Region Irland).\n• Open-Meteo (Deutschland/EU) — Wetterdienst ohne API-Schlüssel; übermittelt werden nur GPS-Koordinaten.\n• MET Norway (Meteorologisk institutt, Norwegen/EWR) — Wettervorhersage für das Fährtenwetter; übermittelt wird nur der auf etwa 1 km gerundete Standort, über einen ANYVO-Server (Supabase), ohne IP-Adresse und Konto. Wetterdaten: MET Norway, Lizenz CC BY 4.0.\n• RevenueCat (USA) — Abwicklung/Verwaltung von Abos und Käufen.\n• Sentry (Functional Software Inc., USA; Datenspeicherung in der EU/Deutschland) — Absturz-/Fehlerdiagnose; in der App deaktivierbar.\n• Apple — Anmeldung mit Apple, Push (APNs), Kaufabwicklung im App Store, Spracherkennung der Sprachsteuerung auf iOS (sofern nicht offline auf dem Gerät). Google (FCM) für Push auf Android; Spracherkennung der Sprachsteuerung auf Android (sofern nicht offline auf dem Gerät).\n• Expo (USA) — Zustellung von Push-Mitteilungen (Push-Token).',
+    body:  '• Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher (Fotos, Videos, Sprachnotizen). Übertragung verschlüsselt; Speicherung in der EU (Region Irland).\n• MET Norway (Meteorologisk institutt, Norwegen/EWR) — Wettervorhersage für das Fährtenwetter und das Wetter beim Legen einer Fährte oder Ablenkung; übermittelt wird nur der auf etwa 1 km gerundete Standort, über einen ANYVO-Server (Supabase), ohne IP-Adresse und Konto. Wetterdaten: MET Norway, Lizenz CC BY 4.0.\n• RevenueCat (USA) — Abwicklung/Verwaltung von Abos und Käufen.\n• Sentry (Functional Software Inc., USA; Datenspeicherung in der EU/Deutschland) — Absturz-/Fehlerdiagnose; in der App deaktivierbar.\n• Apple — Anmeldung mit Apple, Push (APNs), Kaufabwicklung im App Store, Spracherkennung der Sprachsteuerung auf iOS (sofern nicht offline auf dem Gerät). Google (FCM) für Push auf Android; Spracherkennung der Sprachsteuerung auf Android (sofern nicht offline auf dem Gerät).\n• Expo (USA) — Zustellung von Push-Mitteilungen (Push-Token).',
   },
   {
     title: '5. Bekanntgabe ins Ausland',
