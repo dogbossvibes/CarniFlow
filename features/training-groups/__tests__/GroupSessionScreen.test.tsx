@@ -58,7 +58,8 @@ const mockStartNamedResult = jest.fn(async (): Promise<string> => 'started');
 jest.mock('@/features/tracking-exchange/live/LiveShareProvider', () => ({ useGroupLiveShare: () => ({ stop: jest.fn(async () => {}), startNamed: jest.fn(async () => true), startNamedResult: mockStartNamedResult, client: {}, state: { phase: 'idle' } }) }));
 jest.mock('@/features/tracking-exchange/live/useGroupLivePositions', () => ({ useGroupLivePositions: (...args: unknown[]) => { mockLiveArgs.push(args); return { positions: [] }; } }));
 jest.mock('../groupTrackLocal', () => ({ findImportedGroupTrack: async () => null, findLocalGroupTrack: async () => null, importGroupTrack: async () => null,
-  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [] }));
+  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [], findFinishedLayings: async () => [],
+  pickLayerDog: (ids: string[]) => ids[0] }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 
 const text = (tree: ReactTestRenderer) => tree.root.findAll(n => n.type === 'Text')

@@ -64,7 +64,8 @@ jest.mock('@/features/home-zone/i18n', () => ({ HOME_ZONE_NS: 'homeZone' }));
 jest.mock('../groupTrackLocal', () => ({
   findLocalGroupTrack: async (_u: string, tr: { trackId: string }) => mockLocal[tr.trackId] ?? null,
   importGroupTrack: (...a: unknown[]) => mockImport(...(a as [])),
-  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [],
+  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [], findFinishedLayings: async () => [],
+  pickLayerDog: (ids: string[]) => ids[0],
   submitHandover: (...a: unknown[]) => mockSubmitHandover(...a) }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 
