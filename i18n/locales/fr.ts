@@ -3298,6 +3298,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "mantrail.sourceNone": "sans trace du traceur",
   "mantrail.fromServer": "Chargé depuis le serveur (p. ex. autre appareil).",
   "exam.waitingServer": "En attente du serveur – reste enregistré sur cet appareil",
+  "voiceField.failed": "La commande vocale s’est arrêtée. Touche le micro pour réessayer.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Journées d’entraînement",
   "plans.sectionHint": "Les responsables du groupe planifient les journées. Tout le groupe voit les plans publiés et s’inscrit soi-même.",

@@ -3277,6 +3277,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "mantrail.sourceNone": "senza traccia del tracciatore",
   "mantrail.fromServer": "Caricato dal server (p. es. altro dispositivo).",
   "exam.waitingServer": "In attesa del server – resta salvato su questo dispositivo",
+  "voiceField.failed": "Il comando vocale si è interrotto. Tocca il microfono per riprovare.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Giornate di allenamento",
   "plans.sectionHint": "Chi gestisce il gruppo pianifica le giornate. Tutti nel gruppo vedono i piani pubblicati e confermano da sé.",

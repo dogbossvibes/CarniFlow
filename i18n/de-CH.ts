@@ -3323,6 +3323,7 @@ export const deCH = {
   "mantrail.sourceNone": "ohne Trailer-Spur",
   "mantrail.fromServer": "Vom Server geladen (z. B. von einem anderen Gerät).",
   "exam.waitingServer": "Wartet auf den Server – bleibt auf diesem Gerät gespeichert",
+  "voiceField.failed": "Sprachsteuerung ist ausgefallen. Tippe auf das Mikrofon, um es erneut zu versuchen.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Trainingstage",
   "plans.sectionHint": "Trainingstage plant, wer die Gruppe verwaltet. Alle in der Gruppe sehen veröffentlichte Pläne und sagen selbst zu.",

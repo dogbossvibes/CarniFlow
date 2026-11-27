@@ -3285,6 +3285,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "mantrail.sourceNone": "ohni Trailer-Spur",
   "mantrail.fromServer": "Vom Server glade (z. B. vo emne andere Gerät).",
   "exam.waitingServer": "Wartet uf dä Server – blibt uf däm Gerät gspeicheret",
+  "voiceField.failed": "Sprachstüürig isch usgfalle. Tipp ufs Mikrofon, zum nomal probiere.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Trainingstäg",
   "plans.sectionHint": "Trainingstäg plant, wer d Gruppe verwaltet. Alli i de Gruppe gsehnd veröffentlichti Plän und säged sälber zue.",

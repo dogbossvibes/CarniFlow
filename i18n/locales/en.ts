@@ -3277,6 +3277,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "mantrail.sourceNone": "without trail layer’s track",
   "mantrail.fromServer": "Loaded from the server (e.g. another device).",
   "exam.waitingServer": "Waiting for the server – stays saved on this device",
+  "voiceField.failed": "Voice control stopped. Tap the microphone to try again.",
   // Vereinsmodus: Trainingstage (Spec 04, PR B)
   "plans.sectionTitle": "Training days",
   "plans.sectionHint": "Group managers plan training days. Everyone in the group sees published plans and confirms for themselves.",
