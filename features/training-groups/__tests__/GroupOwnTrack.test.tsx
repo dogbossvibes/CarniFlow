@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import renderer, { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import Screen from '../GroupSessionScreen';
 import HandoverScreen from '../GroupHandoverScreen';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 
 // Issue #150: eigene Fährte im Gruppentraining («Für mich»), neben «Für andere».
 const ME = 'a1111111-1111-4111-8111-111111111111', BEA = 'b2222222-2222-4222-8222-222222222222';
@@ -65,7 +66,8 @@ jest.mock('@/features/home-zone/i18n', () => ({ HOME_ZONE_NS: 'homeZone' }));
 jest.mock('../groupTrackLocal', () => ({
   findLocalGroupTrack: async (_u: string, tr: { trackId: string }) => mockLocal[tr.trackId] ?? null,
   importGroupTrack: (...a: unknown[]) => mockImport(...(a as [])),
-  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [],
+  flushPendingHandovers: async () => {}, listPendingHandovers: async () => [], findFinishedLayings: async () => [],
+  pickLayerDog: (ids: string[], busy: (id: string) => boolean) => ids.find(id => !busy(id)) ?? ids[0],
   submitHandover: (...a: unknown[]) => mockSubmitHandover(...a) }));
 jest.mock('../groupHub', () => ({ ...jest.requireActual('../groupHub'), useGroupServices: () => mockServices }));
 
@@ -157,6 +159,52 @@ describe('Mantrailing im Gruppentraining (Spec 02, PR B2)', () => {
   it('Server ohne Trail-Migration: kein Schalter, Fährte wie bisher', async () => {
     tree = await openPicker();
     expect(tree.root.findAll(n => n.props.testID === 'group-assign-mantrail')).toHaveLength(0);
+  });
+});
+
+describe('#156 Hund mit offener Fährte bei «Für andere»', () => {
+  afterEach(() => { useActiveFaehrten.setState({ byDog: {} }); });
+  const busy = (dogId: string) => useActiveFaehrten.getState().upsert(dogId, { status: 'resting', sessionId: `open-${dogId}`, layStartedAt: 1 });
+
+  it('nimmt einen eigenen Hund ohne offene Fährte, kein Hinweis', async () => {
+    busy('dog-a');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    tree = await openPicker();
+    act(() => { radios(tree)[2].props.onPress(); });
+    await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/track/legen',
+      params: { dogId: 'dog-z', groupTrackId: 'new-track', groupId: GROUP, groupSessionId: SESSION } });
+  });
+
+  it('Ein-Hund-Fall: Hinweis, nichts wird angemeldet; «Zur offenen Fährte» öffnet sie', async () => {
+    mockParticipants = ALL.filter(p => p.dogId !== 'dog-z');
+    busy('dog-a');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    tree = await openPicker();
+    act(() => { radios(tree)[1].props.onPress(); });
+    await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
+    expect(mockAssign).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(1);
+    const [title, body, buttons] = alert.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
+    expect(title).toBe('groups.layerDogBusyTitle Ayla');
+    expect(body).toBe('groups.layerDogBusyText');
+    expect(buttons.map(b => b.text)).toEqual(['groups.layerDogBusyOpen', 'groups.layerDogBusyClose']);
+    act(() => { buttons[0].onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/track/liegen?dogId=dog-a&id=open-dog-a');
+    // Die offene Fährte bleibt unverändert.
+    expect(useActiveFaehrten.getState().get('dog-a')).toMatchObject({ status: 'resting', sessionId: 'open-dog-a' });
+  });
+
+  it('eigene Fährte («Für mich») unverändert: kein Hinweis', async () => {
+    mockParticipants = ALL.filter(p => p.dogId !== 'dog-z');
+    busy('dog-a');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    tree = await openPicker();
+    act(() => { radios(tree)[0].props.onPress(); });
+    await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-me', false, 'track');
   });
 });
 

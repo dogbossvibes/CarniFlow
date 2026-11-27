@@ -1,3 +1,4 @@
+import { takePendingGroupJoin } from '@/stores/pendingGroupJoin';
 import { groupNotificationPath } from '@/features/training-groups/groupNotificationPath';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -90,6 +91,16 @@ export default function TabLayout() {
   useEffect(() => {
     if (uid && onboardingGate === 'skip') registerForPush(uid, { prompt: !pushDeclined });
   }, [uid, onboardingGate, pushDeclined]);
+
+  // Gruppen-Beitrittscode, der ohne Anmeldung geöffnet wurde: nach Anmeldung und
+  // Einführung «Gruppe beitreten» mit diesem Code wieder öffnen (einmalig).
+  useEffect(() => {
+    if (!uid || onboardingGate !== 'skip') return;
+    // Ohne Abbruch-Flag: der Code wird beim Lesen entfernt und darf nicht verloren gehen.
+    void takePendingGroupJoin().then(code => {
+      if (code) router.push({ pathname: '/groups/join', params: { code } } as never);
+    });
+  }, [uid, onboardingGate, router]);
 
   // Push-/Notification-Tap → in den passenden Bereich navigieren (data.type).
   useEffect(() => {
