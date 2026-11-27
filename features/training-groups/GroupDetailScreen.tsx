@@ -21,6 +21,7 @@ import { groupErrorCode, groupErrorText, memberRole, ROLE_TEXT, secondsUntilMidn
 import { parseSession } from '@/features/tracking-exchange/groups/groupModels';
 import type { EvaluationSummary } from '@/features/tracking-exchange/groups/evaluationService';
 import { formatEvalLine } from './evaluationFormat';
+import { GroupPlansCard } from './plans/GroupPlansCard';
 
 type State = { group: TrainingGroup | null; sessions: GroupSessionSummary[]; requests: PendingJoinRequest[]; evaluations: EvaluationSummary[]; serverNowMs: number };
 
@@ -211,6 +212,9 @@ export default function GroupDetailScreen() {
               <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.startHint')}</Text>
             </AnyvoCard>
           )}
+
+          {/* Vereinsmodus (Spec 04): Trainingstage planen und zusagen. */}
+          {group?.status === 'active' ? <GroupPlansCard groupId={groupId} /> : null}
 
           {/* #144: Verleitung anfragen direkt im Gruppentraining (älterer Bereich, gleiche Gruppen). */}
           {group?.status === 'active' && (

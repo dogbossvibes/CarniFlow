@@ -1212,7 +1212,8 @@ export function useSearchRecorder(opts: {
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
         // T-206: Absuche per Audio mit Handy in der Tasche — bei gesperrtem Bildschirm liefert iOS
         // sonst keine Positionen, und die Sprachführung verstummt. Gilt, solange der Laufbildschirm offen ist.
-        { allowBackground: true },
+        // Android-Feldfehler 26.11.: Absuche nutzt auf Android die normale Ortung (Fused) wie das Legen.
+        { allowBackground: true, androidUseFusedLocation: true },
       );
       if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
       watchRef.current = { remove: handle.stop };

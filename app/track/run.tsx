@@ -55,6 +55,7 @@ import { dogTrackSettingsStore, hapticsEnabled, runIndication, voiceEnabled } fr
 import { cancelLayReminder } from '@/features/tracking/native/liegezeitReminder';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
+import { useLastKnownApproach } from '@/features/tracking/hooks/useLastKnownApproach';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import {
   DEFAULT_APPROACH_CONFIG, nextStartZonePhase, type StartMode,
@@ -334,6 +335,10 @@ export default function TrackRunScreen() {
   }, []);
   const approach = useStartPointApproach({ active: arming, start: startPoint, liveFix: s.liveFix,
     onDiagnostic: recordApproachFix });
+  // Nur Anzeige bis zum ersten echten Fix (Feldfehler 26.11.): letzter bekannter Standort,
+  // als «ungefähr» markiert. Läuft nie in Ansatz-Erkennung, Start oder Aufzeichnung.
+  const lastKnown = useLastKnownApproach(arming && s.ready, startPoint);
+  const approxApproach = approach.accuracy == null && approach.position == null ? lastKnown : null;
   useEffect(() => {
     if (arming) {
       approachOriginRef.current ??= Date.now(); approachQaRef.current = null;
@@ -1515,6 +1520,9 @@ export default function TrackRunScreen() {
               {...(blindSearch ? { startAnchor: snapData.laidLatLng[0] ?? null } : {})}
               runPoints={runPoints} markers={blindSearch ? [] : mapMarkers} segments={blindSearch ? [] : snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
+              // Feldfehler 26.11.: ungefährer Standort nur blass anzeigen; Karte zeigt Ansatz + Punkt.
+              approximatePosition={arming && approxApproach ? { ...approxApproach.position, accuracy: approxApproach.accuracy } : null}
+              centerOnTrackWithoutFix
               smartFollow={!arming}
               dogRange={hideLaidOverlays ? null : dogRange}
               laidDone={hideLaidOverlays ? null : laidDone}
@@ -1688,7 +1696,8 @@ export default function TrackRunScreen() {
                 </View>
                 <Text className="text-[13px] font-bold text-ft-text text-center leading-[19px] max-w-[280px]">{t('track.searchApproachHint')}</Text>
                 <Text className="text-[48px] font-black text-ft-text mt-1" style={{ fontVariant: ['tabular-nums'] }}>
-                  {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m` : '– m'}
+                  {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m`
+                    : approxApproach ? `≈ ${Math.round(approxApproach.distanceM)} m` : '– m'}
                 </Text>
                 <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">Distanz zum Ansatz</Text>
                 {/* Status: Distanz + gemeldete GPS-Genauigkeit (keine falsche cm-Präzision). */}
@@ -1708,7 +1717,9 @@ export default function TrackRunScreen() {
                   ) : approach.accuracy == null ? (
                     <>
                       <Ionicons name="navigate" size={13} color={FT.muted} />
-                      <Text className="text-[12px] font-bold text-ft-muted">GPS wird gesucht…</Text>
+                      <Text className="text-[12px] font-bold text-ft-muted">
+                        {approxApproach ? t('track.searchApproachApproximate') : 'GPS wird gesucht…'}
+                      </Text>
                     </>
                   ) : approach.accuracy > DEFAULT_APPROACH_CONFIG.maxAccuracyM ? (
                     <>

@@ -19,6 +19,7 @@ const LocalAuth: typeof import("expo-local-authentication") | null =
   (() => { try { return require("expo-local-authentication"); } catch { return null; } })();
 import { useAutoDetectSetting } from "@/hooks/useAutoDetectSetting";
 import { useVolumeKeyArticleSetting } from "@/hooks/useVolumeKeyArticleSetting";
+import { useTrackWeatherSetting } from "@/features/track-weather/setting";
 import { useStepLengthSetting } from "@/hooks/useStepLengthSetting";
 import { useCrashReporting } from "@/hooks/useCrashReporting";
 import { useProfile } from "@/hooks/useProfile";
@@ -119,6 +120,7 @@ export default function ProfilScreen() {
   const crashReporting = useCrashReporting();
   const winkelErkennung = useAutoDetectSetting();
   const volumeKeyArticle = useVolumeKeyArticleSetting();
+  const trackWeather = useTrackWeatherSetting();
 
   const showShortcutHelp = () => Alert.alert(t('profile.shortcutObject'), t('profile.shortcutHelp'));
 
@@ -558,6 +560,27 @@ export default function ProfilScreen() {
               disabled={!winkelErkennung.loaded}
               trackColor={{ false: C.cardAlt, true: C.accent }}
               thumbColor={C.white}
+            />
+          </View>
+
+          <View style={s.trenner} />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="leaf-outline" size={17} color={C.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>{t('profile.trackWeather')}</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                {t('profile.trackWeatherSub')}
+              </Text>
+            </View>
+            <Switch
+              value={trackWeather.enabled}
+              onValueChange={(v) => void trackWeather.setEnabled(v)}
+              disabled={!trackWeather.loaded}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+              accessibilityLabel={t('profile.trackWeather')}
             />
           </View>
 
