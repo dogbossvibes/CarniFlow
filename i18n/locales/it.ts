@@ -3342,7 +3342,6 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "plans.dayDone": "finito",
   "plans.lyingReached": "tempo raggiunto",
   "plans.layForName": "Posa la traccia per {name}",
-  "plans.mantrailLater": "Le tracce di mantrailing si potranno posare qui appena la consegna sarà nell’app.",
   "plans.toSession": "All’allenamento",
   "plans.dayEvaluation": "Valutazione del giorno",
   "plans.evalNotShared": "non condiviso",
@@ -3351,4 +3350,5 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "plans.finish": "Chiudi la giornata",
   "plans.finishText": "Il piano sarà segnato come concluso. Allenamento e tracce restano invariati.",
   "groups.notifyPlans": "Giornate (nuova, modificata, tocca a te)",
+  "plans.layTrailForName": "Posa il trail per {name}",
 };

@@ -45,7 +45,7 @@ it('Leger:in legt über den bestehenden Weg: Fährte zuteilen, Zeile verbinden, 
   await act(async () => { tree = renderer.create(<PlanDayCard plan={plan() as never} canPlan={false} onPlan={onPlan} />); });
   expect(texts()).toContain('plans.dayPlanned');
   await act(async () => { button('plans.layForName:{"name":"Bea"}').props.onPress(); });
-  expect(mockAssign).toHaveBeenCalledWith(S, '40000000-0000-4000-8000-0000000000b1', true);
+  expect(mockAssign).toHaveBeenCalledWith(S, '40000000-0000-4000-8000-0000000000b1', true, 'track');
   expect(mockLinkTrack).toHaveBeenCalledWith(P, '80000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001');
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/track/legen', params: { dogId: 'a0000000-0000-4000-8000-00000000000a',
     groupTrackId: '50000000-0000-4000-8000-000000000001', groupId: G, groupSessionId: S } });
@@ -86,4 +86,16 @@ it('Mitglied ohne Planungsrecht sieht keinen Start; Entwurf zeigt nichts', async
   act(() => tree.unmount());
   await act(async () => { tree = renderer.create(<PlanDayCard plan={plan({ status: 'draft', sessionId: null }) as never} canPlan onPlan={jest.fn()} />); });
   expect(tree.toJSON()).toBeNull();
+});
+
+it('Mantrailing-Zeile: Trail über die Gruppen-Übergabe, Aufzeichnung im Mantrailing-Bildschirm', async () => {
+  mockParticipants = [part(BEA, 'b0000000-0000-4000-8000-0000000000b1'), part(ANNA, 'a0000000-0000-4000-8000-00000000000a')];
+  mockAssign.mockResolvedValue({ trackId: '50000000-0000-4000-8000-000000000002' });
+  mockLinkTrack.mockResolvedValue(plan());
+  await act(async () => { tree = renderer.create(<PlanDayCard plan={plan({ entries: [entry({ trackKind: 'mantrail' })] }) as never} canPlan={false} onPlan={jest.fn()} />); });
+  await act(async () => { button('plans.layTrailForName:{"name":"Bea"}').props.onPress(); });
+  expect(mockAssign).toHaveBeenCalledWith(S, '40000000-0000-4000-8000-0000000000b1', true, 'mantrail');   // blind = Doppelblind
+  expect(mockLinkTrack).toHaveBeenCalledWith(P, '80000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000002');
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/mantrail/legen', params: { dogId: 'a0000000-0000-4000-8000-00000000000a',
+    groupTrackId: '50000000-0000-4000-8000-000000000002', groupId: G, groupSessionId: S } });
 });

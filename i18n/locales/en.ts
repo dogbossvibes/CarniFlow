@@ -3342,7 +3342,6 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "plans.dayDone": "done",
   "plans.lyingReached": "aging time reached",
   "plans.layForName": "Lay track for {name}",
-  "plans.mantrailLater": "Mantrailing trails can be laid here once mantrailing handover is in the app.",
   "plans.toSession": "To group training",
   "plans.dayEvaluation": "Day evaluation",
   "plans.evalNotShared": "not shared",
@@ -3351,4 +3350,5 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "plans.finish": "Finish day",
   "plans.finishText": "The plan is marked as done. The group training and all tracks stay unchanged.",
   "groups.notifyPlans": "Training days (new, changed, your turn)",
+  "plans.layTrailForName": "Lay trail for {name}",
 };

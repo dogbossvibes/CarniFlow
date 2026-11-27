@@ -3388,7 +3388,6 @@ export const deCH = {
   "plans.dayDone": "fertig",
   "plans.lyingReached": "Liegezeit erreicht",
   "plans.layForName": "Fährte legen für {name}",
-  "plans.mantrailLater": "Mantrailing-Trails lassen sich hier legen, sobald die Mantrailing-Übergabe in der App ist.",
   "plans.toSession": "Zum Gruppentraining",
   "plans.dayEvaluation": "Tagesauswertung",
   "plans.evalNotShared": "nicht geteilt",
@@ -3397,6 +3396,7 @@ export const deCH = {
   "plans.finish": "Tag abschliessen",
   "plans.finishText": "Der Plan wird als abgeschlossen markiert. Das Gruppentraining und alle Fährten bleiben unverändert.",
   "groups.notifyPlans": "Trainingstage (neu, geändert, du bist dran)",
+  "plans.layTrailForName": "Trail legen für {name}",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

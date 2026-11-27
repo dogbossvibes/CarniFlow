@@ -3363,7 +3363,6 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "plans.dayDone": "terminé",
   "plans.lyingReached": "temps de pose atteint",
   "plans.layForName": "Poser la piste pour {name}",
-  "plans.mantrailLater": "Les pistes de mantrailing pourront être posées ici dès que la transmission est dans l’app.",
   "plans.toSession": "Vers l’entraînement",
   "plans.dayEvaluation": "Bilan du jour",
   "plans.evalNotShared": "non partagé",
@@ -3372,4 +3371,5 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "plans.finish": "Clôturer la journée",
   "plans.finishText": "Le plan sera marqué terminé. L’entraînement et les pistes restent inchangés.",
   "groups.notifyPlans": "Journées (nouvelle, modifiée, à toi)",
+  "plans.layTrailForName": "Poser le trail pour {name}",
 };
