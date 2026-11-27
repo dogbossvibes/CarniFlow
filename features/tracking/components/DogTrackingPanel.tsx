@@ -31,6 +31,7 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
   const [savingColor, setSavingColor] = useState(false);
   const savingRef = useRef(false);
   const colorScope = useRef(`${userId}:${dogId}`);
+  // eslint-disable-next-line react-hooks/refs -- Bewusst im Render: asynchrone Farb-Speicherung prüft den aktuellen Hund (vorbestehend seit 1221904b).
   colorScope.current = `${userId}:${dogId}`;
   const colorAlive = useRef(true);
   useEffect(() => { colorAlive.current = true; return () => { colorAlive.current = false; }; }, []);

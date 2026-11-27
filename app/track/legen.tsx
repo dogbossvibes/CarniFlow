@@ -70,6 +70,7 @@ import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPicker
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { RainModeOverlay } from '@/features/tracking/components/RainModeOverlay';
 import { isRainyWeatherCode } from '@/features/tracking/utils/rainMode';
+import { TrackWeatherLine } from '@/features/track-weather/components';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 import { useActiveTrackOverlays } from '@/features/tracking/hooks/useActiveTrackOverlays';
 import { TrackReferenceOverlayControl } from '@/features/tracking/components/TrackReferenceOverlayControl';
@@ -1084,6 +1085,9 @@ export default function LegenScreen() {
                     {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : t('track.searchSatellites')}
                   </Text>
 
+                  {/* Fährtenwetter: nur Anzeige, beeinflusst die Aufnahme nicht */}
+                  <TrackWeatherLine condition={condition} />
+
                   {/* Hund */}
                   {dogs.length > 0 && (
                     <>
@@ -1227,7 +1231,7 @@ export default function LegenScreen() {
               </ScrollView>
             </View>
           )}
-          {phase === 'recording' && layGuide.active && !gsPicker && !winkelSheet && !pocketLock && !rainMode && (
+          {phase === 'recording' && layGuide.active && !activeSegment && !gsPicker && !winkelSheet && !pocketLock && !rainMode && (
             <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: mapMetricsHeight + 12 }}>
               <FirstTrackGuideCard guide={layGuide} steps={FIRST_LAY_GUIDE} counterKey="help.firstLayCounter" />
             </View>

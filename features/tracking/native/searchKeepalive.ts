@@ -5,8 +5,10 @@ import { Platform } from 'react-native';
 // ──────────────────────────────────────────────────────────────────────────
 // T-209: Android-Absuche bei ausgeschaltetem Bildschirm.
 //
-// Die Absuche liest ihre Positionen aus der normalen Positionsquelle
-// (Precision-Modul, Fallback expo-location). Ohne Vordergrund-Dienst drosselt
+// Die Absuche liest ihre Positionen aus der normalen Positionsquelle; auf
+// Android seit dem Feldfehler 26.11. von Anfang an expo-location (Fused), mit
+// dem Precision-Modul nur als Ausweichweg (positionSource,
+// androidUseFusedLocation). Ohne Vordergrund-Dienst drosselt
 // Android die Ortung einer App ohne sichtbares Fenster auf wenige Werte pro
 // Stunde: Bildschirm aus = keine Positionen, keine Sprachführung.
 //

@@ -10,7 +10,7 @@ import type { TranslationKey } from '@/i18n';
 // ──────────────────────────────────────────────────────────────────────────
 
 export type HomeLayoutMode   = 'grid' | 'list' | 'compact';
-export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs' | 'dog_backpack';
+export type HomeWidgetId      = 'week' | 'track_weather' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs' | 'dog_backpack';
 export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal' | 'dog_backpack';
 // Personalisierbarer Startseiten-FAB: eine der Aktionen ODER 'hidden' (Button
 // ausblenden — von älteren Configs akzeptiert; renderseitig wie fabVisible=false).
@@ -78,7 +78,7 @@ export interface HomeScreenConfig {
 }
 
 export const HOME_LAYOUT_MODES: HomeLayoutMode[]   = ['grid', 'list', 'compact'];
-export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'];
+export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'track_weather', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'];
 export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis', 'training_journal', 'dog_backpack'];
 export const MAX_QUICK_ACTIONS = 6;
 
@@ -155,6 +155,7 @@ export const QUICK_BUTTON_ACTIONS_META: Partial<Record<QuickActionId, { icon: st
 
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
   week:            { label: 'Wochenübersicht',  icon: 'calendar-outline', description: 'Trainingstage dieser Woche' },
+  track_weather:   { label: 'Fährtenwetter',    icon: 'leaf-outline',     description: 'Ampel und bestes Zeitfenster für heute' },
   smart_analysis:  { label: 'Smart Analyse',    icon: 'sparkles-outline', description: 'Coach & deterministische Hinweise' },
   quick_actions:   { label: 'Schnell starten',  icon: 'flash-outline',    description: 'Deine Schnellzugriffe' },
   recent_sessions: { label: 'Letzte Einheiten', icon: 'time-outline',     description: 'Zuletzt erfasste Einheiten' },
@@ -167,7 +168,7 @@ export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: stri
 export const DEFAULT_HOME_CONFIG: HomeScreenConfig = {
   layout:        'grid',
   quickActions:  ['add_dog', 'start_timer', 'track_gps', 'document_training', 'lay_track', 'start_obedience'],
-  widgetOrder:   ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'],
+  widgetOrder:   ['week', 'track_weather', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'],
   hiddenWidgets: [],
   widgetConfigs: [],
   fabActionId:   DEFAULT_FAB_ACTION,
@@ -237,7 +238,14 @@ export function sanitizeHomeScreenConfig(raw: unknown): HomeScreenConfig {
   const limitedQuickActions = quickActions.slice(0, MAX_QUICK_ACTIONS);
 
   const widgetOrder = dedupeValid<HomeWidgetId>(r.widgetOrder, ALL_HOME_WIDGETS);
-  for (const w of ALL_HOME_WIDGETS) if (!widgetOrder.includes(w)) widgetOrder.push(w);   // neue Widgets ergänzen
+  for (const w of ALL_HOME_WIDGETS) {
+    if (widgetOrder.includes(w)) continue;
+    // Fährtenwetter einmalig gleich nach «Woche» einsetzen (sichtbar, nicht ganz unten);
+    // danach gilt die eigene Reihenfolge der Nutzer:in.
+    const after = w === 'track_weather' ? widgetOrder.indexOf('week') : -1;
+    if (after >= 0) widgetOrder.splice(after + 1, 0, w);
+    else widgetOrder.push(w);   // neue Widgets ergänzen
+  }
 
   const hiddenWidgets = dedupeValid<HomeWidgetId>(r.hiddenWidgets, ALL_HOME_WIDGETS);
 

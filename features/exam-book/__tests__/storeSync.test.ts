@@ -23,6 +23,8 @@ const mockServer = {
   dogs: new Set<string>(),
   rows: [] as Row[],
   writes: [] as string[],
+  /** Läuft während des Uploads (z. B. Bearbeiten/Rückgängig auf dem Gerät). */
+  duringUpsert: null as null | (() => Promise<void>),
 };
 const mockMissing = { code: 'PGRST205', message: "Could not find the table 'public.dog_exam_results' in the schema cache" };
 function mockQuery(table: string) {
@@ -53,6 +55,8 @@ function mockQuery(table: string) {
       const stored = { ...row, updated_at: row.updated_at.replace('Z', '+00:00') };
       const i = mockServer.rows.findIndex(r => r.id === row.id);
       if (i >= 0) mockServer.rows[i] = stored; else mockServer.rows.push(stored);
+      const during = mockServer.duringUpsert; mockServer.duringUpsert = null;
+      if (during) await during();
       return { error: null };
     },
   };
@@ -65,8 +69,8 @@ jest.mock('@/lib/supabase', () => ({ supabase: {
 
 import type { ExamInput } from '../model';
 import {
-  acceptServerVersion, countOpenExamOperations, forgetDogExams, getExam, keepLocalVersion, listExamsForDog,
-  mergeRemoteExams, removeExam, restoreExam, saveExam,
+  acceptServerVersion, countOpenExamOperations, forgetDogExams, getExam, keepLocalVersion, listExamsForDog, listWaitingIds,
+  mergeRemoteExams, openExamOperations, removeExam, restoreExam, saveExam, WAIT_RETRY_FREE, WAIT_RETRY_MS,
 } from '../store';
 import { refreshExamBook, SERVER_NOT_READY, syncExamBook, WAITING_FOR_SERVER } from '../sync';
 
@@ -161,7 +165,8 @@ describe('Abgleich mit dem Server', () => {
   it('nicht erlaubt (z. B. Hund nicht auf dem Server): wartet', async () => {
     await saveExam('owner', input({ dog_id: 'nur-lokal' }));
     expect((await syncExamBook('owner')).waiting).toBe(1);
-    expect(local()[0]).toMatchObject({ state: 'pending', last_error: WAITING_FOR_SERVER });
+    expect(local()[0]).toMatchObject({ state: 'pending' });
+    expect(local()[0].last_error).toMatch(new RegExp(`^${WAITING_FOR_SERVER}:1:\\d+$`));
   });
 
   it('andere angemeldete Person: kein Upload', async () => {
@@ -232,6 +237,82 @@ describe('Abgleich mit dem Server', () => {
     expect((await getExam('owner', e.id))!.notes).toBe('Notiz');
     await mergeRemoteExams('owner', [{ ...server, notes: 'neuer', updated_at: '2099-01-01T00:00:00+00:00' }]);
     expect((await getExam('owner', e.id))!.notes).toBe('neuer');
+  });
+});
+
+describe('Review 2026-11-26: kein unechter Konflikt, nichts geht verloren', () => {
+  it('Bearbeiten während des Uploads: kein Konflikt, die neue Eingabe wird danach hochgeladen', async () => {
+    const e = await saveExam('owner', input({ notes: 'erste' }));
+    mockServer.duringUpsert = async () => { await saveExam('owner', input({ notes: 'zweite' }), e.id); };
+    await syncExamBook('owner');
+    expect(local()[0].state).toBe('pending');
+    const res = await syncExamBook('owner');
+    expect(res).toMatchObject({ synced: 1, conflicts: 0 });
+    expect(mockServer.rows[0].notes).toBe('zweite');
+    expect(local()[0].state).toBe('synced');
+  });
+
+  it('Entfernen und «Rückgängig» während des Uploads: kein Konflikt, Eintrag bleibt sichtbar', async () => {
+    const e = await saveExam('owner', input());
+    await syncExamBook('owner');
+    await removeExam('owner', e.id);
+    mockServer.duringUpsert = async () => { await restoreExam('owner', e.id); };
+    await syncExamBook('owner');
+    const res = await syncExamBook('owner');
+    expect(res).toMatchObject({ conflicts: 0, synced: 1 });
+    expect(mockServer.rows[0].deleted_at).toBeNull();
+    expect((await listExamsForDog('owner', 'dog-1')).map(x => x.id)).toEqual([e.id]);
+  });
+
+  it('zwei schnelle Speicherungen hintereinander: kein Konflikt', async () => {
+    const e = await saveExam('owner', input({ notes: 'a' }));
+    mockServer.duringUpsert = async () => { await saveExam('owner', input({ notes: 'b' }), e.id); await saveExam('owner', input({ notes: 'c' }), e.id); };
+    await syncExamBook('owner');
+    expect((await syncExamBook('owner')).conflicts).toBe(0);
+    expect(mockServer.rows[0].notes).toBe('c');
+  });
+
+  it('echte Änderung auf einem anderen Gerät bleibt ein Konflikt', async () => {
+    const e = await saveExam('owner', input());
+    mockServer.duringUpsert = async () => { await saveExam('owner', input({ notes: 'Handy' }), e.id); };
+    await syncExamBook('owner');
+    mockServer.rows[0] = { ...mockServer.rows[0], notes: 'Tablet', updated_at: '2099-01-01T00:00:00+00:00' };
+    expect((await syncExamBook('owner')).conflicts).toBe(1);
+    expect((await getExam('owner', e.id))!.notes).toBe('Handy');
+  });
+
+  it('frühere eigene Fassung (replaced_local) bleibt beim Bearbeiten und Nachladen erhalten', async () => {
+    const e = await saveExam('owner', input());
+    await syncExamBook('owner');
+    mockServer.rows[0] = { ...mockServer.rows[0], notes: 'vom Tablet', updated_at: '2099-01-01T00:00:00+00:00' };
+    await saveExam('owner', input({ notes: 'vom Handy' }), e.id);
+    await syncExamBook('owner');
+    await acceptServerVersion('owner', mockServer.rows[0]);
+    const kept = JSON.parse(local()[0].payload_json).replaced_local as string;
+    expect(kept).toContain('vom Handy');
+    await saveExam('owner', input({ notes: 'neu bearbeitet' }), e.id);
+    expect(JSON.parse(local()[0].payload_json).replaced_local).toBe(kept);
+    expect((await getExam('owner', e.id))!.replaced_local).toBe(kept);
+    await syncExamBook('owner');
+    expect(mockServer.rows[0].replaced_local).toBeUndefined();   // nie hochgeladen
+    mockServer.rows[0] = { ...mockServer.rows[0], notes: 'später', updated_at: '2099-06-01T00:00:00+00:00' };
+    await mergeRemoteExams('owner', mockServer.rows);
+    expect(JSON.parse(local()[0].payload_json)).toMatchObject({ notes: 'später', replaced_local: kept });
+  });
+
+  it('dauerhaft wartend: nach drei Versuchen nur noch alle 6 Stunden, Hinweis, Eintrag bleibt', async () => {
+    await saveExam('owner', input({ dog_id: 'nur-lokal' }));
+    for (let i = 0; i < WAIT_RETRY_FREE; i++) await syncExamBook('owner');
+    expect(mockServer.writes.filter(w => w.startsWith('upsert'))).toHaveLength(WAIT_RETRY_FREE);
+    expect(await listWaitingIds('owner', 'nur-lokal')).toHaveLength(1);
+    await syncExamBook('owner');
+    expect(mockServer.writes.filter(w => w.startsWith('upsert'))).toHaveLength(WAIT_RETRY_FREE);   // begrenzt
+    expect(await openExamOperations('owner', 200, Date.now() + WAIT_RETRY_MS)).toHaveLength(1);    // später wieder
+    expect(local()).toHaveLength(1);
+    // Hund ist jetzt auf dem Server, Eintrag bearbeitet: Zähler zurück, sofort hochgeladen.
+    mockServer.dogs.add('nur-lokal');
+    await saveExam('owner', input({ dog_id: 'nur-lokal', notes: 'neu' }), local()[0].id);
+    expect((await syncExamBook('owner')).synced).toBe(1);
   });
 });
 

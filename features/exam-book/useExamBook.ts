@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import type { ExamResult } from './model';
-import { examBookAvailable, listConflictIds, listExamsForDog, listPendingIds } from './store';
+import { examBookAvailable, listConflictIds, listExamsForDog, listPendingIds, listWaitingIds } from './store';
 import { refreshExamBook, syncExamBook } from './sync';
 
 // Lädt das Prüfungsbuch eines eigenen Hundes: zuerst sofort lokal (offline),
@@ -10,6 +10,7 @@ import { refreshExamBook, syncExamBook } from './sync';
 export function useExamBook(ownerId: string, dogId: string) {
   const [exams, setExams] = useState<ExamResult[]>([]);
   const [conflicts, setConflicts] = useState<Set<string>>(new Set());
+  const [waiting, setWaiting] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const alive = useRef(true);
@@ -17,15 +18,17 @@ export function useExamBook(ownerId: string, dogId: string) {
 
   const readLocal = useCallback(async () => {
     if (!ownerId || !dogId || !examBookAvailable()) { setExams([]); setConflicts(new Set()); setPending(new Set()); setLoading(false); return; }
-    const [list, conflictIds, pendingIds] = await Promise.all([
+    const [list, conflictIds, pendingIds, waitingIds] = await Promise.all([
       listExamsForDog(ownerId, dogId).catch(() => [] as ExamResult[]),
       listConflictIds(ownerId, dogId).catch(() => [] as string[]),
       listPendingIds(ownerId, dogId).catch(() => [] as string[]),
+      listWaitingIds(ownerId, dogId).catch(() => [] as string[]),
     ]);
     if (!alive.current) return;
     setExams(list);
     setConflicts(new Set(conflictIds));
     setPending(new Set(pendingIds));
+    setWaiting(new Set(waitingIds));
     setLoading(false);
   }, [ownerId, dogId]);
 
@@ -40,5 +43,5 @@ export function useExamBook(ownerId: string, dogId: string) {
 
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
-  return { exams, conflicts, pending, loading, reload, readLocal, available: examBookAvailable() };
+  return { exams, conflicts, pending, waiting, loading, reload, readLocal, available: examBookAvailable() };
 }

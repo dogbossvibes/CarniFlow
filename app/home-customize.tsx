@@ -71,6 +71,7 @@ const QUICK_ACTION_LABEL_KEY: Record<HomeQuickActionId, TranslationKey> = {
 
 const WIDGET_LABEL_KEY: Record<HomeWidgetId, TranslationKey> = {
   week: 'home.widgetWeek',
+  track_weather: 'home.widgetTrackWeather',
   smart_analysis: 'home.widgetSmartAnalysis',
   quick_actions: 'home.widgetQuickActions',
   recent_sessions: 'home.widgetRecentSessions',
@@ -80,6 +81,7 @@ const WIDGET_LABEL_KEY: Record<HomeWidgetId, TranslationKey> = {
 
 const WIDGET_DESC_KEY: Record<HomeWidgetId, TranslationKey> = {
   week: 'home.widgetWeekDesc',
+  track_weather: 'home.widgetTrackWeatherDesc',
   smart_analysis: 'home.widgetSmartAnalysisDesc',
   quick_actions: 'home.widgetQuickActionsDesc',
   recent_sessions: 'home.widgetRecentSessionsDesc',

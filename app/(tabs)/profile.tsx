@@ -12,12 +12,14 @@ import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
 import { useAppLockSetting } from "@/hooks/useAppLockSetting";
 import { getInstalledBuild, getInstalledVersion, getStoreUpdateStatus, subscribeStoreUpdateStatus } from "@/features/updates/storeVersion";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { formatStartDiagnosis, loadStartDiagnosis, type StartDiagnosis } from "@/lib/otaStartDiagnosis";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 // expo-local-authentication defensiv laden (nativ; ohne Modul kein Crash).
 const LocalAuth: typeof import("expo-local-authentication") | null =
   (() => { try { return require("expo-local-authentication"); } catch { return null; } })();
 import { useAutoDetectSetting } from "@/hooks/useAutoDetectSetting";
 import { useVolumeKeyArticleSetting } from "@/hooks/useVolumeKeyArticleSetting";
+import { useTrackWeatherSetting } from "@/features/track-weather/setting";
 import { useStepLengthSetting } from "@/hooks/useStepLengthSetting";
 import { useCrashReporting } from "@/hooks/useCrashReporting";
 import { useProfile } from "@/hooks/useProfile";
@@ -30,11 +32,12 @@ import { getMyInvitations } from "@/services/umfrageService";
 import type { TrainerUmfrage } from "@/types/umfrage";
 import { supabase, SUPABASE_BACKEND_ENV } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
+import { openStoreReviewPage } from "@/lib/storeReview";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
-import { useT, NATIVE_NAME } from "@/i18n";
+import { useT, NATIVE_NAME, getSpeechLocale } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
 import {
     Alert,
@@ -104,11 +107,20 @@ export default function ProfilScreen() {
   const { t: homeZoneText } = useTranslation(HOME_ZONE_NS);
   const storeUpdateStatus = useSyncExternalStore(subscribeStoreUpdateStatus, getStoreUpdateStatus, getStoreUpdateStatus);
   const spracheLabel = NATIVE_NAME[locale];
+  // Diagnose der OTA-Startprüfung (nur lokal, letzter Eintrag); beim Öffnen des Profils neu lesen.
+  const [startDiagnosis, setStartDiagnosis] = useState<StartDiagnosis | null>(null);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    void loadStartDiagnosis().then(d => { if (alive) setStartDiagnosis(d); });
+    return () => { alive = false; };
+  }, []));
+  const startDiagnosisText = startDiagnosis ? formatStartDiagnosis(startDiagnosis, t, getSpeechLocale(locale)) : null;
 
   const benachrichtigungen = useNotificationSetting(user?.id);
   const crashReporting = useCrashReporting();
   const winkelErkennung = useAutoDetectSetting();
   const volumeKeyArticle = useVolumeKeyArticleSetting();
+  const trackWeather = useTrackWeatherSetting();
 
   const showShortcutHelp = () => Alert.alert(t('profile.shortcutObject'), t('profile.shortcutHelp'));
 
@@ -552,6 +564,27 @@ export default function ProfilScreen() {
           </View>
 
           <View style={s.trenner} />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="leaf-outline" size={17} color={C.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>{t('profile.trackWeather')}</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                {t('profile.trackWeatherSub')}
+              </Text>
+            </View>
+            <Switch
+              value={trackWeather.enabled}
+              onValueChange={(v) => void trackWeather.setEnabled(v)}
+              disabled={!trackWeather.loaded}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+              accessibilityLabel={t('profile.trackWeather')}
+            />
+          </View>
+
+          <View style={s.trenner} />
           {Platform.OS === 'android' ? (
             <View style={s.zeile}>
               <View style={s.zeileIcon}>
@@ -761,6 +794,16 @@ export default function ProfilScreen() {
           />
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="star-outline"
+            label={t('profile.rateApp')}
+            onPress={() => {
+              void openStoreReviewPage().then((opened) => {
+                if (!opened) Alert.alert(t('profile.rateAppError'));
+              });
+            }}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="document-text-outline"
             label={t('profile.terms')}
             onPress={() => router.push('/terms')}
@@ -805,6 +848,12 @@ export default function ProfilScreen() {
             <Text style={s.versionDetail}>
               {t('updates.status')}: {t(storeUpdateStatus === 'available' ? 'updates.available' : 'updates.current')}
             </Text>
+          )}
+          {startDiagnosisText && (
+            <View testID="profile-start-check" style={s.startCheck}>
+              <Text style={s.versionDetail}>{startDiagnosisText.line}</Text>
+              {startDiagnosisText.detail && <Text style={s.startCheckDetail}>{startDiagnosisText.detail}</Text>}
+            </View>
           )}
         </View>
         {SUPABASE_BACKEND_ENV === 'staging' && (
@@ -1005,6 +1054,8 @@ const s = StyleSheet.create({
 
   versionBlock: { alignItems: 'center', gap: 4, marginTop: 20 },
   versionDetail: { textAlign: 'center', fontSize: 11, color: C.subtle },
+  startCheck: { marginTop: 6, paddingHorizontal: 12 },
+  startCheckDetail: { textAlign: 'center', fontSize: 10, color: C.subtle, opacity: 0.7, marginTop: 1 },
   version: {
     textAlign: "center",
     fontSize: 12,
