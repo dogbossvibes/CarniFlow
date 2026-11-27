@@ -85,6 +85,64 @@ export async function rememberOwnGroupTrack(userId: string, link: OwnGroupTrackL
   await AsyncStorage.setItem(ownKey(userId), JSON.stringify([...list, link].slice(-50)));
 }
 
+// ── Angefangene Gruppenfährte (Hinweis #156) ─────────────────────────────────
+// Beim Start der Aufnahme wird gemerkt, welche lokale Fährte zu welcher Gruppenfährte gehört.
+// Wird die Aufnahme unterbrochen und über den gewohnten Fährten-Weg fortgesetzt und gestoppt, fehlt
+// danach der Schritt «eintragen/übergeben»: der Gruppeneintrag bliebe sonst auf «wird gelegt».
+// Nur eine kleine Liste; die Fährte selbst wird dabei nicht verändert.
+export type LayingGroupTrack = PendingHandover;
+const layingKey = (userId: string) => `anyvo_group_track_laying_v1:${userId}`;
+
+export async function listLayingGroupTracks(userId: string): Promise<LayingGroupTrack[]> {
+  try {
+    const value = JSON.parse((await AsyncStorage.getItem(layingKey(userId))) ?? '[]');
+    return Array.isArray(value) ? value.filter(v => v && typeof v.trackId === 'string' && typeof v.localId === 'string'
+      && typeof v.groupId === 'string' && typeof v.sessionId === 'string') : [];
+  } catch { return []; }
+}
+export async function rememberLayingGroupTrack(userId: string, entry: LayingGroupTrack) {
+  const list = (await listLayingGroupTracks(userId)).filter(e => e.trackId !== entry.trackId);
+  await AsyncStorage.setItem(layingKey(userId), JSON.stringify([...list, entry].slice(-20)));
+}
+async function forgetLayingGroupTrack(userId: string, trackId: string) {
+  const list = await listLayingGroupTracks(userId);
+  if (list.some(e => e.trackId === trackId)) await AsyncStorage.setItem(layingKey(userId), JSON.stringify(list.filter(e => e.trackId !== trackId)));
+}
+
+/**
+ * Angefangene Gruppenfährten dieser Sitzung, die lokal inzwischen fertig gelegt sind, aber noch nicht
+ * eingetragen bzw. übergeben wurden (nur solche, die der Server noch als «wird gelegt» führt).
+ * Nur lesend. Eine schon selbst abgesuchte Fährte für eine andere Person wird nicht nachträglich übergeben.
+ */
+export async function findFinishedLayings(userId: string, sessionId: string, layingTrackIds: ReadonlySet<string>): Promise<LayingGroupTrack[]> {
+  const pending = new Set((await listPendingHandovers(userId)).map(e => e.trackId));
+  const candidates = (await listLayingGroupTracks(userId))
+    .filter(e => e.sessionId === sessionId && layingTrackIds.has(e.trackId) && !pending.has(e.trackId));
+  if (candidates.length === 0) return [];
+  const db = await getLocalDb();
+  const result: LayingGroupTrack[] = [];
+  for (const entry of candidates) {
+    const row = await db.getFirstAsync<{ status: string | null; payload_json: string | null }>(
+      'select status,payload_json from local_training_sessions where local_id=? and user_id=? and deleted_at is null', entry.localId, userId);
+    if (!row || row.status !== 'completed') continue;
+    if (!entry.own) {
+      let searched = false;
+      try { searched = !!JSON.parse(row.payload_json ?? '{}')?.run; } catch { searched = false; }
+      if (searched) continue;
+    }
+    result.push(entry);
+  }
+  return result;
+}
+
+/**
+ * Hund, unter dem eine Fährte für eine andere Person aufgezeichnet wird (#156): der erste ohne offene
+ * Fährte. Haben alle eine offene Fährte, der erste (bisheriges Verhalten, Dialog beim Legen). Rein.
+ */
+export function pickLayerDog(candidates: readonly string[], hasActiveTrack: (dogId: string) => boolean): string | undefined {
+  return candidates.find(id => !hasActiveTrack(id)) ?? candidates[0];
+}
+
 export type HandoverResult = 'sent' | 'queued' | 'dropped';
 /** Schickt die gelegte Fährte. Unklarer Ausgang (Netz) → in der Warteschlange lassen. */
 export async function submitHandover(service: GroupTrackService, userId: string, entry: PendingHandover): Promise<HandoverResult> {
@@ -98,10 +156,12 @@ export async function submitHandover(service: GroupTrackService, userId: string,
       || error.code === 'GROUP_MAINTENANCE_UNAVAILABLE' || error.code === 'GROUP_ACCOUNT_CHANGED')) return 'queued';
     // Endgültig (abgebrochen, verlassen, ungültig): nicht endlos wiederholen.
     await removePendingHandover(userId, entry.trackId);
+    await forgetLayingGroupTrack(userId, entry.trackId);
     if (error instanceof GroupApiError && (error.code === 'GROUP_REVOKED' || error.code === 'GROUP_UNAVAILABLE')) return 'dropped';
     throw error;
   }
   await removePendingHandover(userId, entry.trackId);
+  await forgetLayingGroupTrack(userId, entry.trackId);
   // Eigene Fährte: bleibt für den eigenen Hund offen (Liegezeit, Absuche wie gewohnt).
   if (!entry.own) await releaseLayerDog(dogId, entry.localId);
   return 'sent';
