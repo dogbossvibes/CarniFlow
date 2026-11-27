@@ -13,6 +13,7 @@ import { RecommendationCard } from '@/features/ai/components/RecommendationCard'
 import { TrainingBalanceCard } from '@/features/ai/components/TrainingBalanceCard';
 import { ScoreTrendCard } from '@/features/ai/components/ScoreTrendCard';
 import { EmptyCoachState } from '@/features/ai/components/EmptyCoachState';
+import { CoachWeekSection } from '@/features/ai/components/CoachWeekSection';
 import type { AiInsight, InsightCta, CoachRecommendation } from '@/features/ai/types/aiCoach';
 
 const SEV_RANK = { critical: 0, warning: 1, info: 2, success: 3 } as const;
@@ -59,6 +60,9 @@ export default function CoachScreen() {
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <CoachSummaryCard summary={summary.summary} isLoading={summary.isLoading} hasRun={summary.hasRun} onRefresh={summary.refresh} />
+
+        {/* Coach · Wochenvorschlag je Hund (Spec 05) */}
+        {isPro ? <View style={{ marginTop: 16 }}><CoachWeekSection /></View> : null}
 
         {isLoading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />

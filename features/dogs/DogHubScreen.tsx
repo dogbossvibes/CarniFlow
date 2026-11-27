@@ -75,7 +75,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, exams, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel }: { trackingPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; exams?: DogExamsProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, exams, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel, coachPanel }: { trackingPanel?: React.ReactNode; coachPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; exams?: DogExamsProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
   const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
@@ -418,6 +418,9 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                     goalTitle={vm.goal.title}
                     goalPct={vm.goal.overallPct}
                   />
+
+                  {/* Coach · Wochenvorschlag (Spec 05, nur eigene Hunde) */}
+                  {coachPanel}
 
                   {/* 7) Smart Analyse (deterministisch, Premium-Gate unverändert) */}
                   {!aiTipHidden && (
