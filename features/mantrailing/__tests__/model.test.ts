@@ -102,3 +102,17 @@ describe('Statistik', () => {
     expect(mantrailStats([])).toMatchObject({ trails: 0, foundRate: null, negativeCorrectRate: null, longestM: null });
   });
 });
+
+describe('Übergabe im Gruppentraining (PR B2)', () => {
+  it('gibt nur Angaben der Leger:in weiter, nie Ergebnis, Anzeige oder Doppelblind', () => {
+    const { sharedTrailDetails, parseSharedTrailDetails, emptyMantrailData } = jest.requireActual<typeof import('../model')>('../model');
+    const full = { ...emptyMantrailData(), scentArticle: 'gauze' as const, environment: 'city' as const, negative: true,
+      result: 'found' as const, indication: 'Hinsetzen', doubleBlind: true, revealedEarly: true, trailAgeMinutes: 90 };
+    const shared = sharedTrailDetails(full)!;
+    expect(Object.keys(shared).sort()).toEqual(['environment', 'negative', 'scentArticle', 'scentArticleLabel', 'scentContaminated', 'surface', 'version', 'windLay']);
+    expect(parseSharedTrailDetails(JSON.parse(JSON.stringify(shared)))).toEqual(shared);
+    expect(parseSharedTrailDetails({ version: 2, negative: true })).toBeNull();
+    expect(parseSharedTrailDetails({ version: 1, scentArticle: 'bomb', negative: 'yes' })).toMatchObject({ scentArticle: null, negative: false });
+    expect(sharedTrailDetails(null)).toBeNull();
+  });
+});

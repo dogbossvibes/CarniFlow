@@ -197,8 +197,9 @@ export default function MantrailRunScreen() {
   useEffect(() => {
     if (phase !== 'leaving') return;
     Alert.alert(t('mantrail.savedTitle'), t('mantrail.savedText'));
-    router.replace('/(tabs)/training' as never);
-  }, [phase, router, t]);
+    // Direkt zur Auswertung des eben gespeicherten Trails (PR C).
+    router.replace((id ? `/mantrail/${id}` : '/mantrail') as never);
+  }, [phase, router, t, id]);
 
   if (phase === 'loading') return <SafeAreaView style={st.safe}><ActivityIndicator style={{ marginTop: 80 }} color={ACCENT} /></SafeAreaView>;
   if (phase === 'missing' || !id || !dogId) {
@@ -297,9 +298,13 @@ export default function MantrailRunScreen() {
             ? (data.doubleBlind ? t('mantrail.trailerHiddenUntilEnd') : t('mantrail.trailerShown'))
             : t('mantrail.noTrailerTrack')}
         </Text>
-        {data.negative && <Text style={st.meta}>{t('mantrail.negativeActive')}</Text>}
-        <Toggle label={t('mantrail.doubleBlind')} hint={t('mantrail.doubleBlindHint')} value={data.doubleBlind}
-          onChange={v => setData(d => ({ ...d, doubleBlind: v }))} />
+        {/* Doppelblind: auch «Negativtrail» bleibt bis «Ende» verborgen. */}
+        {data.negative && !data.doubleBlind && <Text style={st.meta}>{t('mantrail.negativeActive')}</Text>}
+        {/* Übergebener Trail: Doppelblind legt die Gruppe fest (sonst liesse sich der Verlauf vorab aufdecken). */}
+        {data.trailSource !== 'transfer' && (
+          <Toggle label={t('mantrail.doubleBlind')} hint={t('mantrail.doubleBlindHint')} value={data.doubleBlind}
+            onChange={v => setData(d => ({ ...d, doubleBlind: v }))} />
+        )}
         <Text style={st.meta}>{s.ready ? (s.accuracy != null ? t('mantrail.gpsReady', { accuracy: Math.round(s.accuracy) }) : t('mantrail.gpsPreparing')) : t('mantrail.gpsPreparing')}</Text>
       </ScrollView>
       <View style={st.bottom}>
