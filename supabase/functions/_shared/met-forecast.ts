@@ -9,7 +9,8 @@ export const MET_FORECAST_URL = 'https://api.met.no/weatherapi/locationforecast/
 export const MET_USER_AGENT = 'ANYVO/1.0 (+https://www.anyvo.app)';
 /** Standort wird auf ~1 km gerundet, bevor er den Server verlässt. */
 export const COORD_DECIMALS = 2;
-export const MAX_HOURS = 24;
+/** Stündlicher Teil reicht bei MET rund 60 h; das deckt heute bis übermorgen. */
+export const MAX_HOURS = 72;
 export const MIN_CACHE_SECONDS = 15 * 60;
 export const MAX_CACHE_SECONDS = 2 * 60 * 60;
 

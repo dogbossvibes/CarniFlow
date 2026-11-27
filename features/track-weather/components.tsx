@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { C } from '@/constants/colors';
-import { LEVEL_RANK, observedGroundFromCondition, type Reason, type TrackWeatherLevel, type TrackWeatherRating } from './model';
-import { TRACK_WEATHER_NS, levelKey, nowKey, reasonKey } from './i18n';
+import { LEVEL_RANK, observedGroundFromCondition, type DayOutlook, type HourRating, type Reason, type TrackWeatherLevel, type TrackWeatherRating } from './model';
+import { TRACK_WEATHER_NS, dayKey, levelKey, nowKey, reasonKey } from './i18n';
 import { useTrackWeather } from './useTrackWeather';
 
 // Fährtenwetter — Anzeige. Nur Darstellung; Bewertung in model.ts.
@@ -45,9 +46,8 @@ function LevelPill({ level }: { level: TrackWeatherLevel }) {
   );
 }
 
-function HourBar({ rating }: { rating: TrackWeatherRating }) {
+function HourBar({ hours }: { hours: HourRating[] }) {
   const t = useWeatherT();
-  const hours = rating.hours;
   if (hours.length < 2) return null;
   const mid = hours[Math.floor(hours.length / 2)];
   return (
@@ -121,7 +121,7 @@ export function TrackWeatherCard({ onOpen, onHide }: { onOpen?: () => void; onHi
       {rating.reasons.length > 0 && (
         <Text style={s.body}>{rating.reasons.map(r => reasonText(t, r)).join(' · ')}</Text>
       )}
-      <HourBar rating={rating} />
+      <HourBar hours={rating.hours} />
       <View style={[s.window, { backgroundColor: w ? LEVEL_DIM[w.level] : 'rgba(255,255,255,0.05)' }]}>
         <Ionicons name="time-outline" size={15} color={w ? LEVEL_COLOR[w.level] : C.trackTextSec} />
         <Text style={[s.windowTxt, { color: w ? LEVEL_COLOR[w.level] : C.trackTextSec }]}>
@@ -130,11 +130,48 @@ export function TrackWeatherCard({ onOpen, onHide }: { onOpen?: () => void; onHi
             : t('noWindow')}
         </Text>
       </View>
+      <DayList days={rating.days} />
       <View style={s.row}>
         <Text style={s.muted}>{view.fromCache ? t('asOf', { time: formatClock(view.fetchedAtMs) }) : t('hint')}</Text>
         <Text style={s.muted}>{t('source')}</Text>
       </View>
     </Pressable>
+  );
+}
+
+/** Heute, morgen, übermorgen – je Ampel; Tipp zeigt Fenster, Grund und Stunden. */
+function DayList({ days }: { days: DayOutlook[] }) {
+  const t = useWeatherT();
+  const [open, setOpen] = useState<number | null>(null);
+  if (days.length === 0) return null;
+  return (
+    <View accessibilityLabel={t('daysLabel')}>
+      {days.map(d => {
+        const isOpen = open === d.offset;
+        const w = d.bestWindow;
+        const windowText = w ? t('dayWindow', { from: formatClock(w.startMs), to: formatClock(w.endMs) }) : t('dayNoWindow');
+        return (
+          <View key={d.offset} style={s.day}>
+            <Pressable
+              accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityHint={t('dayExpand')}
+              accessibilityLabel={t('dayA11y', { day: t(dayKey(d.offset)), level: t(levelKey(d.level)), window: windowText })}
+              onPress={() => setOpen(isOpen ? null : d.offset)} style={s.dayRow} hitSlop={4}
+            >
+              <Text style={[s.dayName]}>{t(dayKey(d.offset))}</Text>
+              <LevelPill level={d.level} />
+              <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={C.trackTextSec} />
+            </Pressable>
+            {isOpen && (
+              <View style={s.dayBody}>
+                <Text style={[s.windowTxt, { color: w ? LEVEL_COLOR[w.level] : C.trackTextSec }]}>{windowText}</Text>
+                {d.reasons.length > 0 && <Text style={s.body}>{d.reasons.map(r => reasonText(t, r)).join(' · ')}</Text>}
+                <HourBar hours={d.hours} />
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -197,6 +234,10 @@ const s = StyleSheet.create({
   barLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 },
   window: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
   windowTxt: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  day: { borderTopWidth: 1, borderTopColor: C.trackBorder },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+  dayName: { flex: 1, color: C.trackText, fontSize: 14, fontWeight: '600' },
+  dayBody: { gap: 4, paddingBottom: 10 },
   actions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   btn: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 40, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: C.trackBorder },
   btnPrimary: { borderColor: 'rgba(0,255,204,0.45)' },

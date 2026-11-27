@@ -61,6 +61,21 @@ export interface TrackWeatherRating {
   /** Bewertete nächste Stunden (für den Stundenbalken), ab der laufenden Stunde. */
   hours: HourRating[];
   current: WeatherHour;
+  /** Heute, morgen, übermorgen – nur Tage, deren Tageslicht die Vorhersage ganz abdeckt. */
+  days: DayOutlook[];
+}
+
+export interface DayOutlook {
+  /** 0 = heute, 1 = morgen, 2 = übermorgen. */
+  offset: number;
+  /** Lokaler Tagesbeginn (00:00 Ortszeit) als UTC-ms. */
+  dayStartMs: number;
+  level: TrackWeatherLevel;
+  bestWindow: TrackWeatherWindow | null;
+  /** Gründe zur besten Stunde des Tages (bei «schwierig»: was selbst dann stört). */
+  reasons: Reason[];
+  /** Bewertete Tagesstunden (bei heute ab jetzt). */
+  hours: HourRating[];
 }
 
 /**
@@ -230,8 +245,8 @@ export function recentRain(hours: WeatherHour[], hourMs: number): number | null 
  * zusammenhängende Tagesstunden erreichen; davon das früheste, so lang wie die
  * Stufe hält.
  */
-export function findBestWindow(rated: HourRating[], currentHourMs: number): TrackWeatherWindow | null {
-  const span = rated.filter(r => r.timeMs >= currentHourMs && r.timeMs < currentHourMs + WINDOW_LOOKAHEAD_HOURS * HOUR_MS);
+export function findBestWindow(rated: HourRating[], currentHourMs: number, lookaheadHours = WINDOW_LOOKAHEAD_HOURS): TrackWeatherWindow | null {
+  const span = rated.filter(r => r.timeMs >= currentHourMs && r.timeMs < currentHourMs + lookaheadHours * HOUR_MS);
   const runFor = (maxRank: number): { a: number; b: number } | null => {
     let a = -1;
     for (let i = 0; i <= span.length; i++) {
@@ -275,7 +290,7 @@ export function rateTrackingWeather(
   const future = sorted.filter(h => h.timeMs >= currentHourMs);
   const current = future[0];
   if (!current || current.timeMs > currentHourMs + HOUR_MS) return null; // keine Daten für jetzt
-  const rated = future.slice(0, 24).map(h => {
+  const rated = future.slice(0, DAYS_AHEAD * 24 + 24).map(h => {
     const localHour = new Date(h.timeMs + timeZoneOffsetMin * 60_000).getUTCHours();
     const observed = ground && h.timeMs < currentHourMs + OBSERVED_GROUND_HOURS * HOUR_MS ? ground : null;
     return rateHour(h, { recentRainMm: recentRain(sorted, h.timeMs), localHour, daylight: isDaylightHour(h.timeMs, coords.lat, coords.lng), ground: observed });
@@ -287,7 +302,40 @@ export function rateTrackingWeather(
     bestWindow: findBestWindow(rated, current.timeMs),
     hours: rated.slice(0, WINDOW_LOOKAHEAD_HOURS),
     current,
+    days: outlookDays(rated, currentHourMs, coords, timeZoneOffsetMin),
   };
+}
+
+export const DAYS_AHEAD = 3;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Tagesübersicht aus bereits bewerteten Stunden. Ein Tag erscheint nur, wenn
+ * jede (verbleibende) Tageslichtstunde bekannt ist – sonst wäre «bestes Fenster»
+ * geraten. Stufe des Tages = Stufe seines besten Fensters.
+ */
+export function outlookDays(
+  rated: HourRating[], currentHourMs: number, coords: { lat: number; lng: number }, timeZoneOffsetMin: number,
+): DayOutlook[] {
+  const tz = timeZoneOffsetMin * 60_000;
+  const todayStart = Math.floor((currentHourMs + tz) / DAY_MS) * DAY_MS - tz;
+  const byTime = new Map(rated.map(r => [r.timeMs, r]));
+  const out: DayOutlook[] = [];
+  for (let offset = 0; offset < DAYS_AHEAD; offset++) {
+    const dayStartMs = todayStart + offset * DAY_MS;
+    const from = Math.max(dayStartMs, currentHourMs);
+    const expected: number[] = [];
+    for (let t = from; t < dayStartMs + DAY_MS; t += HOUR_MS) if (isDaylightHour(t, coords.lat, coords.lng)) expected.push(t);
+    if (expected.length < MIN_WINDOW_HOURS) continue;
+    if (!expected.every(t => byTime.has(t))) continue;
+    const hours = expected.map(t => byTime.get(t) as HourRating);
+    const bestWindow = findBestWindow(hours, hours[0].timeMs, 24);
+    const best = hours.reduce((a, b) => (b.points < a.points ? b : a));
+    const level = bestWindow?.level ?? best.level;
+    const reasonHour = bestWindow ? (byTime.get(bestWindow.startMs) ?? best) : best;
+    out.push({ offset, dayStartMs, level, bestWindow: bestWindow ? { ...bestWindow, startsNow: bestWindow.startMs === currentHourMs } : null, reasons: pickReasons(reasonHour), hours });
+  }
+  return out;
 }
 
 /** Lokaler Verlauf: frühere Stunden (≤ 24 h) behalten, neue Vorhersage hat Vorrang. */
@@ -296,5 +344,5 @@ export function mergeHourHistory(previous: WeatherHour[], fresh: WeatherHour[], 
   const byTime = new Map<number, WeatherHour>();
   for (const h of previous) if (h.timeMs >= keepFrom && Number.isFinite(h.timeMs)) byTime.set(h.timeMs, h);
   for (const h of fresh) if (Number.isFinite(h.timeMs)) byTime.set(h.timeMs, h);
-  return [...byTime.values()].sort((a, b) => a.timeMs - b.timeMs).slice(-60);
+  return [...byTime.values()].sort((a, b) => a.timeMs - b.timeMs).slice(-120);
 }
