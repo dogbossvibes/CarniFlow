@@ -30,6 +30,18 @@ afterAll(() => {
 // Tab nochmals antippen → nach oben scrollen: der Hook braucht einen echten
 // Tab-Navigator. In Screen-Tests (expo-router ist dort meist teilweise gemockt)
 // genügt eine leere Ref; das Verhalten selbst liefert expo-router.
+// Bewertungsabfrage: in Screen-Tests keinen verzögerten Ablauf starten, der
+// nach Testende weiterläuft. Die echte Logik prüft lib/__tests__/reviewPrompt.test.ts
+// (dort jest.unmock).
+jest.mock('@/lib/reviewPrompt', () => ({
+  noteFirstLaunch: jest.fn(async () => {}),
+  onTrainingSaved: jest.fn(async () => false),
+  cancelPendingReviewPrompt: jest.fn(),
+  isTrackingBusy: jest.fn(() => true),
+  requestNativeReview: jest.fn(async () => 'unavailable'),
+  reviewKeyForUser: (userId) => `anyvo_review_prompt_v1:${userId}`,
+}));
+
 jest.mock('@/hooks/useTabScrollToTop', () => ({
   useTabScrollToTop: () => require('react').useRef(null),
 }));

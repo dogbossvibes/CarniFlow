@@ -8,6 +8,7 @@ import { transferErrorKey } from '@/features/tracking-transfer/i18n';
 import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
 import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { useSession } from '@/hooks/useSession';
+import { cancelPendingReviewPrompt } from '@/lib/reviewPrompt';
 import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
 import { TrackObjectCorrections } from '@/features/tracking/components/TrackObjectCorrections';
 import { INDICATION_LABEL_KEYS, readRunIndication } from '@/features/tracking/dogTrackSettings/model';
@@ -96,6 +97,8 @@ const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['in
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  // Auswertung verlassen, bevor die Bewertungsabfrage fällig ist → nicht mehr fragen.
+  useEffect(() => cancelPendingReviewPrompt, []);
   const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
   const { session: authenticatedSession } = useSession();
   const insets = useSafeAreaInsets();

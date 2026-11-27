@@ -41,6 +41,11 @@ export interface ExamResult {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /**
+   * Nur lokal: frühere eigene Fassung, die bei «Version vom anderen Gerät» ersetzt wurde
+   * (JSON-Text). Wird nie hochgeladen, geht aber beim Bearbeiten nicht verloren.
+   */
+  replaced_local?: string | null;
 }
 
 /** Eingabe aus dem Formular (ohne Kennungen und Zeitstempel). */
@@ -172,6 +177,7 @@ export function buildExam(
     created_at: previous?.created_at ?? nowIso,
     updated_at: nowIso,
     deleted_at: previous?.deleted_at ?? null,
+    ...(previous?.replaced_local ? { replaced_local: previous.replaced_local } : {}),
   };
 }
 
@@ -201,8 +207,12 @@ export function parseExam(raw: unknown): ExamResult | null {
     created_at: str('created_at') ?? str('updated_at') ?? new Date(0).toISOString(),
     updated_at: str('updated_at') ?? str('created_at') ?? new Date(0).toISOString(),
     deleted_at: str('deleted_at'),
+    ...(typeof r.replaced_local === 'string' && r.replaced_local ? { replaced_local: r.replaced_local.slice(0, REPLACED_LOCAL_MAX) } : {}),
   };
 }
+
+/** Obergrenze der aufbewahrten früheren Fassung (Zeichen). */
+export const REPLACED_LOCAL_MAX = 20000;
 
 function safeJson(text: string): unknown {
   try { return JSON.parse(text); } catch { return null; }

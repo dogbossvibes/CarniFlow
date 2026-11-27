@@ -36,13 +36,44 @@ export interface StartState {
   downloadProgress?: number;            // 0..1, nur während des Ladens
 }
 
+/** Welche Schutzbedingung gegriffen hat (Diagnose, keine personenbezogenen Daten). */
+export type ProtectReason = 'background' | 'location_task' | 'laying_searching' | 'pending_buffer' | 'timeout' | 'error';
+
+/** Ergebnis der Schutzprüfung: `null` = frei. `detail` ist ein kurzer technischer Code ohne IDs. */
+export interface Protection { reason: ProtectReason; detail?: string }
+
+/** Grund der Startentscheidung (Diagnose im Profil). */
+export type StartCheckReason =
+  | 'disabled'          // Updates aus, Dev-Build oder Notfallstart
+  | 'restarted'         // JS wurde in diesem Start schon neu geladen
+  | 'protected'         // Aufnahme-Schutz vor dem Zuschauen (siehe `protection`)
+  | 'check_timeout'     // nach CHECK_TIMEOUT_MS noch unklar, ob eine OTA kommt
+  | 'no_update'         // Start-Phase vorbei, nichts geladen
+  | 'fetch_timeout'     // Laden dauert länger als FETCH_TIMEOUT_MS
+  | 'fetch_failed'      // Laden begonnen, Start-Phase endet ohne geladene OTA
+  | 'reloaded'          // OTA geladen, Neustart angefordert
+  | 'pending_hint'      // OTA geladen, Neustart gesperrt (siehe `protection`)
+  | 'error';            // unerwarteter Fehler
+
+export interface StartCheckResult {
+  outcome: StartCheckOutcome;
+  reason: StartCheckReason;
+  protection?: Protection;
+  elapsedMs: number;                                  // Dauer bis zur Entscheidung
+}
+
+/** Was nach einem Timeout weiter beobachtet wurde (nur Diagnose, ändert nichts am Ablauf). */
+export interface LateInfo { phase: 'ready' | 'none'; afterMs: number }
+
 export interface StartCheckDeps {
   enabled: boolean;                                   // Updates aktiv, kein Dev-Build, kein Notfallstart
-  isProtected: () => Promise<boolean>;                // laufende/unterbrochene Aufnahme?
+  isProtected: () => Promise<Protection | null>;      // laufende/unterbrochene Aufnahme?
   getState: () => StartState;
   subscribe: (listener: (state: StartState) => void) => () => void;
   onFetching?: () => void;                            // UI: «ANYVO wird aktualisiert …» zeigen
   onProgress?: (progress: number) => void;            // UI: Fortschritt 0..1
+  onLate?: (info: LateInfo) => void;                  // Diagnose: Ausgang nach einem Timeout
+  now?: () => number;
   checkTimeoutMs?: number;
   fetchTimeoutMs?: number;
 }
@@ -56,10 +87,10 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMEOUT> 
   });
 }
 
-/** Schutzprüfung mit Zeitgrenze: hängt sie, gilt die App als geschützt (kein Neustart). */
-async function protectedNow(deps: StartCheckDeps): Promise<boolean> {
+/** Schutzprüfung mit Zeitgrenze: hängt sie (oder wirft sie), gilt die App als geschützt (kein Neustart). */
+async function protectedNow(deps: StartCheckDeps): Promise<Protection | null> {
   const r = await withTimeout(deps.isProtected(), deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS);
-  return r === TIMEOUT ? true : r;
+  return r === TIMEOUT ? { reason: 'timeout' } : r;
 }
 
 export type StartPhase = 'unknown' | 'loading' | 'ready' | 'none';
@@ -100,8 +131,8 @@ function waitForPhase(
 }
 
 /** Nach einem Timeout weiter zuschauen: wird die OTA später fertig, nur den Hinweis zeigen. */
-function watchLate(deps: StartCheckDeps, late?: (outcome: 'pending') => void) {
-  if (!late) return;
+function watchLate(deps: StartCheckDeps, started: number, late?: (outcome: 'pending') => void) {
+  if (!late && !deps.onLate) return;
   let closed = false;
   let unsubscribe: () => void = () => {};
   const look = (s: StartState) => {
@@ -110,7 +141,8 @@ function watchLate(deps: StartCheckDeps, late?: (outcome: 'pending') => void) {
     if (p !== 'ready' && p !== 'none') return;
     closed = true;
     unsubscribe();
-    if (p === 'ready') late('pending');
+    try { deps.onLate?.({ phase: p, afterMs: (deps.now ?? Date.now)() - started }); } catch { /* nur Diagnose */ }
+    if (p === 'ready') late?.('pending');
   };
   const off = deps.subscribe(look);
   unsubscribe = off;
@@ -126,15 +158,28 @@ export async function runStartCheck(
   deps: StartCheckDeps,
   late?: (outcome: 'pending') => void,
 ): Promise<StartCheckOutcome> {
-  if (!deps.enabled) return 'continue';
+  return (await runStartCheckDetailed(deps, late)).outcome;
+}
+
+/** Wie `runStartCheck`, liefert zusätzlich den Grund (Diagnose). Ablauf identisch. */
+export async function runStartCheckDetailed(
+  deps: StartCheckDeps,
+  late?: (outcome: 'pending') => void,
+): Promise<StartCheckResult> {
+  const now = deps.now ?? Date.now;
+  const started = now();
+  const result = (outcome: StartCheckOutcome, reason: StartCheckReason, protection?: Protection): StartCheckResult =>
+    ({ outcome, reason, ...(protection ? { protection } : {}), elapsedMs: Math.max(0, now() - started) });
+  if (!deps.enabled) return result('continue', 'disabled');
   try {
     // Nach einem Neustart in derselben Sitzung nie nochmals neu laden (keine Schleife).
-    if (deps.getState().restartCount > 0) return 'continue';
-    if (await protectedNow(deps)) return 'continue';
+    if (deps.getState().restartCount > 0) return result('continue', 'restarted');
+    const before = await protectedNow(deps);
+    if (before) return result('continue', 'protected', before);
 
     const first = await waitForPhase(deps, p => p !== 'unknown', deps.checkTimeoutMs ?? CHECK_TIMEOUT_MS);
-    if (first === TIMEOUT) { watchLate(deps, late); return 'continue'; }
-    if (first === 'none') return 'continue';
+    if (first === TIMEOUT) { watchLate(deps, started, late); return result('continue', 'check_timeout'); }
+    if (first === 'none') return result('continue', 'no_update');
 
     let phase: StartPhase = first;
     if (phase === 'loading') {
@@ -144,15 +189,16 @@ export async function runStartCheck(
         s => { if (typeof s.downloadProgress === 'number') deps.onProgress?.(Math.min(1, Math.max(0, s.downloadProgress))); },
       );
       // Laden läuft weiter; ist es später fertig, nur Hinweis zeigen (kein Neustart mitten in der Nutzung).
-      if (loaded === TIMEOUT) { watchLate(deps, late); return 'continue'; }
+      if (loaded === TIMEOUT) { watchLate(deps, started, late); return result('continue', 'fetch_timeout'); }
       phase = loaded;
     }
-    if (phase !== 'ready') return 'continue';
+    if (phase !== 'ready') return result('continue', 'fetch_failed');
 
     // Direkt vor dem Neustart nochmals prüfen: könnte inzwischen eine Aufnahme begonnen haben?
-    if (await protectedNow(deps)) return 'pending';
-    return 'reload';
+    const after = await protectedNow(deps);
+    if (after) return result('pending', 'pending_hint', after);
+    return result('reload', 'reloaded');
   } catch {
-    return 'continue';
+    return result('continue', 'error');
   }
 }

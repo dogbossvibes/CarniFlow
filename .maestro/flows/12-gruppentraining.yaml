@@ -10,7 +10,8 @@ appId: com.anyvo.app
 - runFlow: ../common/dismiss-help.yaml
 - assertVisible: "Gruppentraining"
 - assertVisible: "DEINE GRUPPEN"
-- assertVisible: "Empfangene Fährten-Datei öffnen"
+- assertVisible: "Verleitung in der Gruppe anfragen"
+- assertVisible: "Datei teilen oder öffnen"
 - tapOn: "Mit Code beitreten"
 - assertVisible: "Gruppe beitreten"
 - assertVisible: "Einladungscode"

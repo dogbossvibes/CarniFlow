@@ -104,6 +104,23 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
     expect(out.widgetOrder.length).toBe(ALL_HOME_WIDGETS.length);
   });
 
+  it('Fährtenwetter: bestehende Configs bekommen es sichtbar gleich nach «Woche»', () => {
+    const legacy = {
+      ...DEFAULT_HOME_CONFIG,
+      widgetOrder: ['recent_sessions', 'week', 'smart_analysis', 'quick_actions', 'dogs', 'dog_backpack'],
+      hiddenWidgets: ['dogs'],
+    };
+    const out = sanitizeHomeScreenConfig(legacy);
+    expect(out.widgetOrder).toEqual(['recent_sessions', 'week', 'track_weather', 'smart_analysis', 'quick_actions', 'dogs', 'dog_backpack']);
+    expect(out.hiddenWidgets).toEqual(['dogs']);
+    expect(visibleWidgets(out)).toContain('track_weather');
+    // eigene spätere Reihenfolge bleibt
+    const moved = sanitizeHomeScreenConfig({ ...out, widgetOrder: ['dogs', ...out.widgetOrder.filter(w => w !== 'dogs' && w !== 'track_weather'), 'track_weather'] });
+    expect(moved.widgetOrder[moved.widgetOrder.length - 1]).toBe('track_weather');
+    // ausgeblendet bleibt ausgeblendet
+    expect(visibleWidgets(sanitizeHomeScreenConfig({ ...out, hiddenWidgets: ['track_weather'] }))).not.toContain('track_weather');
+  });
+
   // 6) alle 3 Layouts gültig
   it('6) alle Layout-Modi werden akzeptiert', () => {
     for (const m of HOME_LAYOUT_MODES) {

@@ -1,5 +1,7 @@
 import { pinQaTrackingModes, loadQaPreferences } from './qaPreferences';
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
+import { isExternalMode } from '@/lib/trackRecorder';
 import { startPositionStream, type PositionStreamExtras, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
@@ -8,8 +10,11 @@ import { beginPositionDiagnostics, recordPositionDiagnostics, recordGnssDiagnost
 
 // Zentrale Positionsquelle für die Fährtenaufnahme.
 //
-// Reihenfolge: natives Precision-Modul (via positionStream) → bei fehlendem Modul
-// ODER Fehler automatisch expo-location. Liefert ein einheitliches Sample inkl.
+// Reihenfolge: QA-Schalter LEGACY → reines expo-location. Android-Absuche
+// (`androidUseFusedLocation`, Feldfehler 26.11.) → expo-location (Fused), bei
+// Startfehler weiter nativ. Sonst natives Precision-Modul (via positionStream,
+// externes BLE-GPS hat dort Vorrang) → bei fehlendem Modul ODER Fehler
+// automatisch expo-location. Liefert ein einheitliches Sample inkl.
 // Debug-Metadaten (source/provider) und einen statischen Info-Block.
 //
 // Bewusst schlank: kapselt nur die Quelle, ändert KEINE Filter-/Schwellenlogik.
@@ -108,6 +113,8 @@ async function startLegacyExpoLocation(
   return () => sub.remove();
 }
 
+export const ANDROID_FUSED_PROVIDER = 'expo-location-android';
+
 // Startet die Positionsquelle. Gibt eine stop-Funktion + statische Info zurück.
 export async function startPositionSource(
   onSample: (s: PositionSourceSample) => void,
@@ -162,6 +169,22 @@ async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => 
       stopped = true;
       endPositionDiagnostics(diagnosticId);
       throw error;
+    }
+  }
+
+  // 0b) Android-Absuche (Feldfehler 26.11.): von Anfang an die normale Android-Ortung
+  //     (expo-location, Fused) — derselbe Anbieter, der beim Legen auf Android die
+  //     Aufnahme trägt (Hintergrund-Task in useTrackRecorder). Die native Engine nutzt
+  //     auf Android nur GPS_PROVIDER ohne Fused/lastKnown und lieferte in der Absuche
+  //     keinen Fix. Externes BLE-GPS bleibt Vorrang. Schlägt der Start fehl, weiter
+  //     mit der nativen Quelle unten.
+  if (extras.androidUseFusedLocation === true && Platform.OS === 'android' && !isExternalMode()) {
+    try {
+      const stop = await startLegacyExpoLocation(emit, opts, ANDROID_FUSED_PROVIDER);
+      info.source = 'expo'; info.provider = ANDROID_FUSED_PROVIDER;
+      return finishHandle(stop, info);
+    } catch (error) {
+      console.warn('[positionSource] Android: expo-location-Start fehlgeschlagen — native Quelle.', error);
     }
   }
 

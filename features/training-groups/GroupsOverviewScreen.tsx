@@ -136,10 +136,18 @@ export default function GroupsOverviewScreen() {
             <AnyvoButton label={t('groups.joinWithCode')} icon="enter-outline" variant="secondary"
               onPress={() => router.push('/groups/join' as never)} />
 
-            {/* Empfangene Fährten-Datei öffnen (vorher Karte «Fährten gemeinsam» in der Fährten-Übersicht). */}
-            <AnyvoButton label={t('groups.openTrackFile')} icon="document-outline" variant="secondary"
-              onPress={() => router.push('/track/share' as never)} />
-            <Text style={cs.hint}>{t('groups.openTrackFileHint')}</Text>
+            {/* #144: Verleitung in der Gruppe und Datei-Austausch (vorher Karte «Fährten gemeinsam»
+                in der Fährten-Übersicht). Beide Bildschirme und ihre Aufgaben bleiben unverändert. */}
+            <AnyvoCard>
+              <Text style={cs.section}>{t('groups.distractionsAndFiles')}</Text>
+              <View style={{ gap: 8 }}>
+                <AnyvoButton label={t('groups.requestGroupDistraction')} icon="shuffle-outline" variant="secondary"
+                  onPress={() => router.push('/track/group-tasks' as never)} />
+                <AnyvoButton label={t('groups.openTrackFile')} icon="document-outline" variant="secondary"
+                  onPress={() => router.push('/track/share' as never)} />
+              </View>
+              <Text style={[cs.hint, { marginTop: 8 }]}>{t('groups.openTrackFileHint')}</Text>
+            </AnyvoCard>
 
             <AnyvoCard>
               {!creating ? (
