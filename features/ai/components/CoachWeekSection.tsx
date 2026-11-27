@@ -5,7 +5,7 @@ import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { useCoachWeek } from '@/features/ai/hooks/useCoachWeek';
-import { CoachWeekCard } from '@/features/ai/components/CoachWeekCard';
+import { CoachWeekCard, suggestionEventTexts } from '@/features/ai/components/CoachWeekCard';
 
 // Coach PR B: Wochenvorschlag im Coach-Bildschirm (nur Premium, wie der Bildschirm selbst).
 // Hund wählen (nur eigene Hunde), darunter die Woche. Hier lässt sich der Coach im
@@ -39,6 +39,9 @@ export function CoachWeekSection() {
         isPro
         isLoading={c.isLoading}
         disabledCount={c.prefs.disabledRules[dog.id]?.length ?? 0}
+        planned={c.planned}
+        busy={c.busy}
+        onTakeOver={list => c.takeOver(list.map(sg => ({ suggestion: sg, ...suggestionEventTexts(sg, t) })))}
         onDismiss={key => { void c.dismiss(key); }}
         onDisableRule={rule => { void c.setRule(rule, false); }}
         onEnableAll={() => { void c.enableAllRules(); }}

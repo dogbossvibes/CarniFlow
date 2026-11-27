@@ -3356,6 +3356,13 @@ export const deCH = {
   "coach.discipline.mantrailing": "Mantrailing",
   "coach.discipline.obedience": "Obedience",
   "coach.discipline.other": "Training",
+  "coach.week.toCalendar": "In Kalender",
+  "coach.week.inCalendar": "Im Kalender",
+  "coach.week.takeAll": "Ganze Woche übernehmen",
+  "coach.week.takeDone": "Eingetragen: {n} Termin(e). Du kannst sie im Kalender bearbeiten.",
+  "coach.week.takeFailed": "{n} Termin(e) konnten nicht eingetragen werden. Versuch es nochmals.",
+  "coach.week.takeNone": "Schon im Kalender, nichts Neues eingetragen.",
+  "coach.week.eventNote": "Vom Coach vorgeschlagen.",
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

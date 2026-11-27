@@ -8,7 +8,7 @@ import type { TranslationKey } from '@/i18n/de-CH';
 import type { CoachRuleId, CoachSuggestion, CoachWeek } from '@/features/ai/coachWeek';
 
 // Coach PR B: Wochenvorschlag je Hund (Mockup freigegeben 2026-11-27).
-// Nur Anzeige und «Nicht passend»; «In Kalender» folgt mit PR C.
+// PR C: «In Kalender» / «Ganze Woche übernehmen» legen normale eigene Termine an.
 
 const intlTag = (locale: string) => (locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH');
 const asDate = (iso: string) => new Date(`${iso}T12:00:00`);
@@ -26,9 +26,22 @@ export function suggestionParams(sg: CoachSuggestion, t: (k: TranslationKey, p?:
   return out.join(' · ');
 }
 
+/** Texte für den Termin: Titel «Sparte · Schwerpunkt», Notiz mit Eckdaten und Begründung. */
+export function suggestionEventTexts(sg: CoachSuggestion, t: (k: TranslationKey, p?: Record<string, string | number>) => string): { title: string; notes: string } {
+  const title = `${t(`coach.discipline.${sg.discipline}` as TranslationKey)} · ${t(`coach.focus.${sg.focus}` as TranslationKey)}`;
+  const params = suggestionParams(sg, t);
+  const why = `${t('coach.week.why')} ${sg.reasons.map(r => t(r.key as TranslationKey, r.params)).join(' ')}`;
+  return { title, notes: [params, why, t('coach.week.eventNote')].filter(Boolean).join('\n') };
+}
+
 export function CoachWeekCard({
   week, isPro, isLoading, disabledCount, onDismiss, onDisableRule, onEnableAll, onHideInProfile, onUpgrade,
+  planned = [], busy = false, onTakeOver,
 }: {
+  planned?: readonly string[];
+  busy?: boolean;
+  /** Liefert, wie viele Termine angelegt, übersprungen oder fehlgeschlagen sind. */
+  onTakeOver?: (suggestions: CoachSuggestion[]) => Promise<{ created: number; skipped: number; failed: number }>;
   week: CoachWeek | null;
   isPro: boolean;
   isLoading?: boolean;
@@ -41,6 +54,13 @@ export function CoachWeekCard({
 }) {
   const { t, locale } = useT();
   const [menu, setMenu] = useState(false);
+  const [result, setResult] = useState<{ created: number; skipped: number; failed: number } | null>(null);
+  const plannedSet = new Set(planned);
+  const open = (week?.suggestions ?? []).filter(sg => !plannedSet.has(sg.key));
+  const take = async (list: CoachSuggestion[]) => {
+    if (!onTakeOver || busy || list.length === 0) return;
+    setResult(await onTakeOver(list));
+  };
   const tag = intlTag(locale);
   const range = week ? `${asDate(week.weekStart).toLocaleDateString(tag, { day: 'numeric', month: 'numeric' })}–${asDate(week.weekEnd).toLocaleDateString(tag, { day: 'numeric', month: 'numeric' })}` : '';
   const rules = [...new Set((week?.suggestions ?? []).map(sg => sg.rule))];
@@ -93,13 +113,36 @@ export function CoachWeekCard({
               <Text style={s.itemTitle}>{suggestionTitle(sg, t, locale)}</Text>
               {params ? <Text style={s.params}>{params}</Text> : null}
               <Text style={s.why}>{t('coach.week.why')} {sg.reasons.map(reasonText).join(' ')}</Text>
-              <TouchableOpacity onPress={() => onDismiss(sg.key)} style={s.dismiss} accessibilityRole="button" testID={`coach-dismiss-${sg.rule}-${sg.discipline}`}>
-                <Text style={s.dismissTxt}>{t('coach.week.dismiss')}</Text>
-              </TouchableOpacity>
+              <View style={s.actions}>
+                {plannedSet.has(sg.key) ? (
+                  <View style={s.planned} testID={`coach-planned-${sg.rule}-${sg.discipline}`}>
+                    <Ionicons name="checkmark-circle" size={15} color={C.trackPrimary} />
+                    <Text style={s.plannedTxt}>{t('coach.week.inCalendar')}</Text>
+                  </View>
+                ) : onTakeOver ? (
+                  <TouchableOpacity onPress={() => { void take([sg]); }} disabled={busy} style={[s.take, busy && s.dim]} accessibilityRole="button" accessibilityState={{ disabled: busy }} testID={`coach-take-${sg.rule}-${sg.discipline}`}>
+                    <Text style={s.takeTxt}>{t('coach.week.toCalendar')}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {plannedSet.has(sg.key) ? null : (
+                  <TouchableOpacity onPress={() => onDismiss(sg.key)} style={s.dismiss} accessibilityRole="button" testID={`coach-dismiss-${sg.rule}-${sg.discipline}`}>
+                    <Text style={s.dismissTxt}>{t('coach.week.dismiss')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           );
         })
       )}
+
+      {onTakeOver && isPro && open.length >= 2 ? (
+        <AnyvoButton label={t('coach.week.takeAll')} icon="calendar" onPress={() => { void take(open); }} loading={busy} disabled={busy} />
+      ) : null}
+      {result ? (
+        <Text style={[s.result, result.failed > 0 && s.resultErr]} testID="coach-take-result" accessibilityLiveRegion="polite">
+          {result.failed > 0 ? t('coach.week.takeFailed', { n: result.failed }) : result.created > 0 ? t('coach.week.takeDone', { n: result.created }) : t('coach.week.takeNone')}
+        </Text>
+      ) : null}
 
       {week?.notes.map(n => <Text key={n.key} style={s.note}>{reasonText(n)}</Text>)}
 
@@ -129,7 +172,15 @@ const s = StyleSheet.create({
   itemTitle: { fontSize: 14, color: C.trackText, fontWeight: '800' },
   params:    { fontSize: 13, color: C.trackTextSec, fontWeight: '600' },
   why:       { fontSize: 13, color: C.trackTextSec, fontWeight: '500', lineHeight: 18 },
-  dismiss:   { alignSelf: 'flex-start', marginTop: 4, borderRadius: 10, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 10, paddingVertical: 6 },
+  actions:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  take:      { borderRadius: 10, backgroundColor: C.trackPrimary, paddingHorizontal: 12, paddingVertical: 6 },
+  takeTxt:   { fontSize: 12.5, color: '#04110F', fontWeight: '800' },
+  dim:       { opacity: 0.5 },
+  planned:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
+  plannedTxt:{ fontSize: 12.5, color: C.trackPrimary, fontWeight: '700' },
+  result:    { fontSize: 12.5, color: C.trackPrimary, fontWeight: '700' },
+  resultErr: { color: C.trackDanger },
+  dismiss:   { alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 10, paddingVertical: 6 },
   dismissTxt:{ fontSize: 12.5, color: C.trackTextSec, fontWeight: '700' },
   note:      { fontSize: 12.5, color: C.trackTextSec, fontWeight: '600' },
   preview:   { borderRadius: 14, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, padding: 12, gap: 8 },
