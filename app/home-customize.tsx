@@ -75,6 +75,7 @@ const WIDGET_LABEL_KEY: Record<HomeWidgetId, TranslationKey> = {
   smart_analysis: 'home.widgetSmartAnalysis',
   quick_actions: 'home.widgetQuickActions',
   recent_sessions: 'home.widgetRecentSessions',
+  badges: 'home.widgetBadges',
   dogs: 'home.widgetDogs',
   dog_backpack: 'home.widgetDogBackpack',
 };
@@ -85,6 +86,7 @@ const WIDGET_DESC_KEY: Record<HomeWidgetId, TranslationKey> = {
   smart_analysis: 'home.widgetSmartAnalysisDesc',
   quick_actions: 'home.widgetQuickActionsDesc',
   recent_sessions: 'home.widgetRecentSessionsDesc',
+  badges: 'home.widgetBadgesDesc',
   dogs: 'home.widgetDogsDesc',
   dog_backpack: 'home.widgetDogBackpackDesc',
 };
