@@ -1074,7 +1074,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "home.widgetDogBackpack": "Backpack",
   "home.widgetDogBackpackDesc": "Backpack di un cane",
   "home.widgetTrackWeather": "Meteo allenamento",
-  "home.widgetTrackWeatherDesc": "Semaforo per l’allenamento, per i cani da pista anche per la pista",
+  "home.widgetTrackWeatherDesc": "Semaforo per l’allenamento, secondo la disciplina anche per pista e mantrailing",
   "fab.title": "Pulsante rapido",
   "fab.selectTitle": "Scegli azione rapida",
   "fab.visible": "Mostra pulsante",

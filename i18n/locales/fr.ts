@@ -947,7 +947,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "home.widgetDogBackpack": "Backpack",
   "home.widgetDogBackpackDesc": "Backpack d'un chien",
   "home.widgetTrackWeather": "Météo entraînement",
-  "home.widgetTrackWeatherDesc": "Feu tricolore pour l’entraînement, et pour le pistage si ton chien piste",
+  "home.widgetTrackWeatherDesc": "Feu tricolore pour l’entraînement, et selon la discipline pour le pistage et le mantrailing",
   "fab.title": "Bouton rapide",
   "fab.selectTitle": "Choisir une action rapide",
   "fab.visible": "Afficher le bouton",

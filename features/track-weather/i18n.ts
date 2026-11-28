@@ -2,6 +2,18 @@ import { registerGroupResources } from '@/features/training-groups/registerResou
 import type { ReasonKey, TrackWeatherLevel } from './model';
 
 const de = {
+  mantrailSection: 'Fürs Mantrailing',
+  mantrailMore: 'Mantrailing-Stunden und Tage',
+  'reason.mWindStrong': 'Starker Wind: {wind} km/h, Geruch wird verweht',
+  'reason.mWindDrift': 'Wind {wind} km/h: Geruch liegt versetzt',
+  'reason.mWarm': 'Warm: {temp} °C, Geruch verfliegt schneller',
+  'reason.mCool': 'Kühl: {temp} °C, Geruch hält länger',
+  'reason.mHotAsphalt': 'Warmer Asphalt in der Sonne',
+  'reason.mHeavyRain': 'Starker Regen: {mm} mm pro Stunde, wäscht den Geruch aus',
+  'reason.mDrizzle': 'Leichter Regen hält den Geruch',
+  'reason.mDryAir': 'Trockene Luft: {rh} %',
+  'reason.mHumid': 'Feuchte Luft',
+  'reason.mThermal': 'Mittagssonne: Geruch steigt auf',
   trainingTitle: 'Trainingswetter heute',
   trackSection: 'Für die Fährte',
   trackMore: 'Fährtenstunden und Tage',
@@ -68,6 +80,18 @@ type Dict = typeof de;
 
 const gsw: Dict = {
   ...de,
+  mantrailSection: 'Fürs Mantrailing',
+  mantrailMore: 'Mantrailing-Stunde und Täg',
+  'reason.mWindStrong': 'Starche Wind: {wind} km/h, de Geruch wird verweiht',
+  'reason.mWindDrift': 'Wind {wind} km/h: de Geruch liit versetzt',
+  'reason.mWarm': 'Warm: {temp} °C, de Geruch verfliegt schnäller',
+  'reason.mCool': 'Chüel: {temp} °C, de Geruch hebt länger',
+  'reason.mHotAsphalt': 'Warme Asphalt i de Sunne',
+  'reason.mHeavyRain': 'Starche Räge: {mm} mm pro Stund, wäscht de Geruch us',
+  'reason.mDrizzle': 'Liechte Räge hebt de Geruch',
+  'reason.mDryAir': 'Trocheni Luft: {rh} %',
+  'reason.mHumid': 'Füechti Luft',
+  'reason.mThermal': 'Mittagssunne: de Geruch stiigt uf',
   trainingTitle: 'Trainingswetter hüt',
   trackSection: 'Für d Fährte',
   trackMore: 'Fährtestunde und Täg',
@@ -115,6 +139,18 @@ const gsw: Dict = {
 };
 
 const en: Dict = {
+  mantrailSection: 'For mantrailing',
+  mantrailMore: 'Mantrailing hours and days',
+  'reason.mWindStrong': 'Strong wind: {wind} km/h, scent gets blown away',
+  'reason.mWindDrift': 'Wind {wind} km/h: scent lies offset',
+  'reason.mWarm': 'Warm: {temp} °C, scent fades faster',
+  'reason.mCool': 'Cool: {temp} °C, scent lasts longer',
+  'reason.mHotAsphalt': 'Warm asphalt in the sun',
+  'reason.mHeavyRain': 'Heavy rain: {mm} mm per hour, washes scent away',
+  'reason.mDrizzle': 'Light rain holds the scent',
+  'reason.mDryAir': 'Dry air: {rh} %',
+  'reason.mHumid': 'Humid air',
+  'reason.mThermal': 'Midday sun: scent rises',
   trainingTitle: 'Training weather today',
   trackSection: 'For tracking',
   trackMore: 'Tracking hours and days',
@@ -179,6 +215,18 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  mantrailSection: 'Pour le mantrailing',
+  mantrailMore: 'Heures et jours de mantrailing',
+  'reason.mWindStrong': 'Vent fort : {wind} km/h, l’odeur est emportée',
+  'reason.mWindDrift': 'Vent {wind} km/h : l’odeur est décalée',
+  'reason.mWarm': 'Chaud : {temp} °C, l’odeur s’évapore plus vite',
+  'reason.mCool': 'Frais : {temp} °C, l’odeur tient plus longtemps',
+  'reason.mHotAsphalt': 'Asphalte chaud au soleil',
+  'reason.mHeavyRain': 'Forte pluie : {mm} mm par heure, lave l’odeur',
+  'reason.mDrizzle': 'Pluie légère, l’odeur tient',
+  'reason.mDryAir': 'Air sec : {rh} %',
+  'reason.mHumid': 'Air humide',
+  'reason.mThermal': 'Soleil de midi : l’odeur monte',
   trainingTitle: 'Météo entraînement du jour',
   trackSection: 'Pour le pistage',
   trackMore: 'Heures et jours de pistage',
@@ -243,6 +291,18 @@ const fr: Dict = {
 };
 
 const it: Dict = {
+  mantrailSection: 'Per il mantrailing',
+  mantrailMore: 'Ore e giorni per il mantrailing',
+  'reason.mWindStrong': 'Vento forte: {wind} km/h, l’odore viene disperso',
+  'reason.mWindDrift': 'Vento {wind} km/h: l’odore è spostato',
+  'reason.mWarm': 'Caldo: {temp} °C, l’odore svanisce prima',
+  'reason.mCool': 'Fresco: {temp} °C, l’odore dura di più',
+  'reason.mHotAsphalt': 'Asfalto caldo al sole',
+  'reason.mHeavyRain': 'Pioggia forte: {mm} mm all’ora, lava via l’odore',
+  'reason.mDrizzle': 'Pioggia leggera, l’odore tiene',
+  'reason.mDryAir': 'Aria secca: {rh} %',
+  'reason.mHumid': 'Aria umida',
+  'reason.mThermal': 'Sole di mezzogiorno: l’odore sale',
   trainingTitle: 'Meteo allenamento di oggi',
   trackSection: 'Per la pista',
   trackMore: 'Ore e giorni per la pista',
