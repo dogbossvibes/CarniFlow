@@ -31,7 +31,10 @@ export type ReasonKey =
   | 'calm' | 'wetGround' | 'humid' | 'mild'
   // Trainingswetter (trainingModel.ts)
   | 'tThunder' | 'tStorm' | 'tHeat' | 'tWarm' | 'tHotPaws' | 'tCold'
-  | 'tHeavyRain' | 'tRain' | 'tWind' | 'tGusts' | 'tSun' | 'tMild' | 'tDry';
+  | 'tHeavyRain' | 'tRain' | 'tWind' | 'tGusts' | 'tSun' | 'tMild' | 'tDry'
+  // Mantrailing (trainingModel.ts)
+  | 'mWindStrong' | 'mWindDrift' | 'mWarm' | 'mCool' | 'mHotAsphalt' | 'mHeavyRain' | 'mDrizzle'
+  | 'mDryAir' | 'mHumid' | 'mThermal';
 
 export interface Reason {
   key: ReasonKey;
@@ -107,7 +110,7 @@ export const MIN_WINDOW_HOURS = 2;
 const HARD = 10;
 
 /** Gründe, die für die Fährte bzw. das Training sprechen. */
-export const HELPFUL_REASONS: ReadonlySet<ReasonKey> = new Set<ReasonKey>(['calm', 'wetGround', 'humid', 'mild', 'tMild', 'tDry']);
+export const HELPFUL_REASONS: ReadonlySet<ReasonKey> = new Set<ReasonKey>(['calm', 'wetGround', 'humid', 'mild', 'tMild', 'tDry', 'mWindDrift', 'mCool', 'mDrizzle', 'mHumid']);
 
 export const LEVEL_RANK: Record<TrackWeatherLevel, number> = { good: 0, medium: 1, hard: 2 };
 

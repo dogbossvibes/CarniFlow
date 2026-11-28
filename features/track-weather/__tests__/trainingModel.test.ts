@@ -1,6 +1,6 @@
-import { rateTrainingHour, rateTrainingWeather } from '../trainingModel';
-import { doesTracking } from '../trackingDogs';
-import type { WeatherHour } from '../model';
+import { rateMantrailHour, rateMantrailWeather, rateTrainingHour, rateTrainingWeather } from '../trainingModel';
+import { doesMantrailing, doesTracking } from '../trackingDogs';
+import { rateHour, type WeatherHour } from '../model';
 
 const H = 3_600_000;
 const base: WeatherHour = {
@@ -68,5 +68,45 @@ describe('Fährten-Teil nur bei Fährtenhunden', () => {
     expect(doesTracking([], [{ source: 'session', session_date: '2026-11-20', exercises: [{ discipline: 'Fährte' }] }], now)).toBe(true);
     expect(doesTracking([], [{ source: 'track', session_date: '2026-05-01' }], now)).toBe(false);
     expect(doesTracking([], [{ source: 'session', session_date: 'kaputt' }], now)).toBe(false);
+  });
+});
+
+describe('Mantrailing: eigene Regeln', () => {
+  const ctx = { localHour: 9, daylight: true };
+  const mk = (h: Partial<WeatherHour>, c = ctx) => rateMantrailHour({ ...base, ...h }, c);
+  it('mittlerer Wind ist normal, nicht schwierig (anders als Fährte)', () => {
+    const r = mk({ windSpeed: 18 });
+    expect(r.level).toBe('good');
+    expect(r.reasons.map(x => x.key)).toContain('mWindDrift');
+    expect(rateHour({ ...base, windSpeed: 25 }, { recentRainMm: null, localHour: 9, daylight: true }).level).not.toBe('good');
+    expect(mk({ windSpeed: 35 }).reasons.map(x => x.key)).toContain('mWindStrong');
+  });
+  it('leichter Regen und feuchte Luft helfen, starker Regen wäscht aus', () => {
+    expect(mk({ precipitation: 0.5, humidity: 85 }).reasons.map(x => x.key)).toEqual(expect.arrayContaining(['mDrizzle', 'mHumid']));
+    expect(mk({ precipitation: 6 }).reasons.map(x => x.key)).toContain('mHeavyRain');
+  });
+  it('Mittagssonne und warmer Asphalt erschweren, Morgen ist besser', () => {
+    const noon = mk({ temperature: 23, cloudCover: 10 }, { localHour: 13, daylight: true });
+    expect(noon.reasons.map(x => x.key)).toEqual(expect.arrayContaining(['mWarm', 'mHotAsphalt', 'mThermal']));
+    expect(noon.level).toBe('medium');
+    expect(mk({ temperature: 12, cloudCover: 10 }, { localHour: 8, daylight: true }).level).toBe('good');
+  });
+  it('Hitze und Gewitter bleiben hart', () => {
+    expect(mk({ temperature: 30 }).level).toBe('hard');
+    expect(mk({ thunderProbability: 50 }).level).toBe('hard');
+  });
+  it('Gesamtbewertung liefert Stunden und Tage', () => {
+    const now = Date.UTC(2026, 3, 15, 6, 10);
+    const hours = Array.from({ length: 72 }, (_, i) => ({ ...base, timeMs: Date.UTC(2026, 3, 15, 6) + i * H }));
+    const r = rateMantrailWeather(hours, now, { lat: 46.95, lng: 7.44 }, 120);
+    expect(r?.hours).toHaveLength(12);
+    expect(r?.days.length).toBe(3);
+  });
+  it('Mantrailing-Hund erkennen', () => {
+    const now = Date.UTC(2026, 10, 28);
+    expect(doesMantrailing([{ discipline: 'Mantrailing', titles: null }], [], now)).toBe(true);
+    expect(doesMantrailing([], [{ source: 'session', session_date: '2026-11-20', exercises: [{ discipline: 'Mantrailing' }] }], now)).toBe(true);
+    expect(doesMantrailing([{ discipline: 'IGP', titles: ['FH 2'] }], [], now)).toBe(false);
+    expect(doesTracking([{ discipline: 'Mantrailing', titles: null }], [], now)).toBe(false);
   });
 });
