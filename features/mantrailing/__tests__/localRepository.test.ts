@@ -17,7 +17,7 @@ jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
 
 import { createLocalMantrailSession, getLocalMantrailDetails, setLocalMantrailDetails } from '../localRepository';
 import { emptyMantrailData } from '../model';
-import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
+import { finalizeLocalTrackRun, finalizeLocalTrainingSession, getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
 
 const row = (id: string) => mockDb.prepare('select * from local_training_sessions where local_id=?').get(id) as any;
 
@@ -75,5 +75,47 @@ describe('Mantrailing lokal', () => {
   it('ungültige Angaben werden nicht geschrieben', async () => {
     await createLocalMantrailSession({ local_id: 'm-1', user_id: 'owner', dog_id: 'dog-1' });
     expect(await setLocalMantrailDetails('m-1', { version: 2 } as never)).toBe(false);
+  });
+});
+
+describe('Mantrailing: Angaben überstehen Lege-Ende und Ergebnis (PR B1)', () => {
+  const layEnd = { endedAt: '2026-11-25T10:20:00.000Z', durationSeconds: 600, distanceMeters: 850, segments: [] as unknown[], status: 'completed' };
+
+  it('Lege-Ende ersetzt die Lay-Summary, behält aber payload_json.mantrail', async () => {
+    await createLocalMantrailSession({ local_id: 'm-1', user_id: 'owner', dog_id: 'dog-1', status: 'active' },
+      { ...emptyMantrailData(), scentArticle: 'sock', doubleBlind: true });
+    await finalizeLocalTrainingSession('m-1', layEnd);
+    const payload = JSON.parse(row('m-1').payload_json);
+    expect(payload.distanceMeters).toBe(850);
+    expect(payload.mantrail).toMatchObject({ scentArticle: 'sock', doubleBlind: true });
+    expect(row('m-1')).toMatchObject({ status: 'completed', ended_at: layEnd.endedAt });
+  });
+
+  it('IGP-Fährte: Lege-Ende schreibt exakt dieselbe Summary wie vorher (kein mantrail-Schlüssel)', async () => {
+    await finalizeLocalTrainingSession('igp-1', layEnd);
+    expect(row('igp-1').payload_json).toBe(JSON.stringify({
+      distanceMeters: 850, articlesTotal: null, cornersTotal: null, gpsQualityAverage: null, segments: [],
+    }));
+  });
+
+  it('Abbruch-Marker und Mantrail-Angaben bleiben beide erhalten', async () => {
+    await createLocalMantrailSession({ local_id: 'm-1', user_id: 'owner', dog_id: 'dog-1', status: 'active' }, emptyMantrailData());
+    mockDb.exec(`update local_training_sessions set payload_json=json_set(payload_json,'$.trackLifecycleStatus','cancelled','$.trackLifecycleUpdatedAt','t') where local_id='m-1'`);
+    await finalizeLocalTrainingSession('m-1', layEnd);
+    const payload = JSON.parse(row('m-1').payload_json);
+    expect(payload.trackLifecycleStatus).toBe('cancelled');
+    expect(payload.mantrail.version).toBe(1);
+    expect(payload.distanceMeters).toBe(850);
+  });
+
+  it('Ergebnis der Hundearbeit (run) ergänzt nur, Angaben bleiben', async () => {
+    await createLocalMantrailSession({ local_id: 'm-1', user_id: 'owner', dog_id: 'dog-1', status: 'active' }, emptyMantrailData());
+    await finalizeLocalTrainingSession('m-1', layEnd);
+    await finalizeLocalTrackRun('m-1', { run_id: 'r-1', duration_s: 300 });
+    expect(await setLocalMantrailDetails('m-1', { ...emptyMantrailData(), result: 'found' })).toBe(true);
+    const payload = JSON.parse(row('m-1').payload_json);
+    expect(payload.run).toMatchObject({ run_id: 'r-1' });
+    expect(payload.distanceMeters).toBe(850);
+    expect(payload.mantrail.result).toBe('found');
   });
 });

@@ -37,4 +37,11 @@ describe('buildLocalTrackSessionInput — vollständige NOT-NULL-Metadaten, kein
     expect(out.latitude).toBeNull();
     expect(out.weather_condition).toBeNull();
   });
+
+  it('Mantrailing (Spec 02): nur Typ, Kategorie und Titel ändern sich; ohne kind bleibt alles IGP', () => {
+    const igp = buildLocalTrackSessionInput(base);
+    const m = buildLocalTrackSessionInput({ ...base, kind: 'mantrail' });
+    expect(m).toEqual({ ...igp, type: 'mantrail', category: 'Mantrailing', title: 'Mantrailing' });
+    expect(buildLocalTrackSessionInput({ ...base, kind: undefined })).toEqual(igp);
+  });
 });

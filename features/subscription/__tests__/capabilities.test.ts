@@ -69,7 +69,7 @@ describe('FOUNDER_ACTIVE ≡ ACTIVE (keine Sonder-Feature-Matrix)', () => {
 
 describe('NEWBIE-Quotas (reine Entscheidung)', () => {
   it('Limits: 1 Hund, 2 Trainings/Monat, 1 Fährte/Monat', () => {
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1, mantrail: 1 });   // Mantrailing: eigenes Kontingent (Spec 02)
   });
   it('Hund: 1. erlaubt, 2. blockiert', () => {
     expect(quotaAllowsNew(false, 'dog', 0)).toBe(true);

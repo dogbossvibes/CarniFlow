@@ -17,7 +17,7 @@ export function handleQuotaBlock(
   const code = (error as { code?: string } | null | undefined)?.code;
 
   if (code === 'quota_exceeded') {
-    const body = kind === 'track' ? t('premium.newbieTrackLimit') : t('premium.newbieTrainingLimit');
+    const body = kind === 'track' ? t('premium.newbieTrackLimit') : kind === 'mantrail' ? t('premium.newbieMantrailLimit') : t('premium.newbieTrainingLimit');
     Alert.alert(t('premium.newbieLimitTitle'), body, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('premium.upgradeActive'), onPress: onUpgrade },

@@ -28,6 +28,7 @@ let mockLocal: Record<string, { localId: string; dogId: string; blind: boolean; 
 let mockParams: Record<string, string> = {};
 let mockZone = false;
 const mockPush = jest.fn(), mockReplace = jest.fn();
+let mockMantrailTracks = false;
 const mockAssign = jest.fn(async (..._a: unknown[]): Promise<{ trackId: string }> => ({ trackId: 'new-track' }));
 const mockFetch = jest.fn(async (_id: string): Promise<unknown> => { throw new Error('offline'); });
 const mockImport = jest.fn(async () => null);
@@ -42,7 +43,7 @@ const mockServices = {
   },
   tracks: { fetch: (id: string) => mockFetch(id), assign: (...a: unknown[]) => mockAssign(...a), cancel: (id: string) => mockCancel(id),
     searchStart: (id: string) => mockSearchStart(id), searched: (id: string) => mockSearched(id),
-    list: async () => ({ tracks: mockTracks, serverNowMs: 760_000, ownTracks: mockOwnTracks }) },
+    list: async () => ({ tracks: mockTracks, serverNowMs: 760_000, ownTracks: mockOwnTracks, mantrailTracks: mockMantrailTracks }) },
 };
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
@@ -94,6 +95,7 @@ afterEach(() => {
   act(() => tree?.unmount()); jest.clearAllMocks(); jest.restoreAllMocks();
   mockParticipants = ALL; mockTracks = []; mockOwnTracks = true; mockLocal = {}; mockParams = {}; mockZone = false;
   mockAssign.mockImplementation(async () => ({ trackId: 'new-track' }));
+  mockMantrailTracks = false;
   mockFetch.mockImplementation(async () => { throw new Error('offline'); });
   mockSubmitHandover.mockImplementation(async () => 'sent');
 });
@@ -125,7 +127,7 @@ describe('Auswahl «Für wen legst du?»', () => {
     act(() => { radios(tree)[1].props.onPress(); });
     expect(switches(tree)).toHaveLength(0);
     await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
-    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-me2', false);
+    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-me2', false, 'track');
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/track/legen',
       params: { dogId: 'dog-z', groupTrackId: 'new-track', groupId: GROUP, groupSessionId: SESSION, groupOwn: '1' } });
@@ -136,9 +138,27 @@ describe('Auswahl «Für wen legst du?»', () => {
     act(() => { radios(tree)[2].props.onPress(); });
     act(() => { switches(tree)[0].props.onValueChange(true); });
     await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
-    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-b1', true);
+    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-b1', true, 'track');
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/track/legen',
       params: { dogId: 'dog-a', groupTrackId: 'new-track', groupId: GROUP, groupSessionId: SESSION } });
+  });
+});
+
+describe('Mantrailing im Gruppentraining (Spec 02, PR B2)', () => {
+  it('Server mit Trails: Schalter «Mantrailing-Trail» legt einen Trail im eigenen Bildschirm', async () => {
+    mockMantrailTracks = true;
+    tree = await openPicker();
+    act(() => { radios(tree)[2].props.onPress(); });
+    const trail = tree.root.findAll(n => n.props.testID === 'group-assign-mantrail')[0];
+    act(() => { trail.props.onValueChange(true); });
+    await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
+    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-b1', false, 'mantrail');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/mantrail/legen',
+      params: { dogId: 'dog-a', groupTrackId: 'new-track', groupId: GROUP, groupSessionId: SESSION } });
+  });
+  it('Server ohne Trail-Migration: kein Schalter, Fährte wie bisher', async () => {
+    tree = await openPicker();
+    expect(tree.root.findAll(n => n.props.testID === 'group-assign-mantrail')).toHaveLength(0);
   });
 });
 
@@ -184,7 +204,7 @@ describe('#156 Hund mit offener Fährte bei «Für andere»', () => {
     act(() => { radios(tree)[0].props.onPress(); });
     await act(async () => { button(tree, 'groups.layStart').props.onPress(); });
     expect(alert).not.toHaveBeenCalled();
-    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-me', false);
+    expect(mockAssign).toHaveBeenCalledWith(SESSION, 'p-me', false, 'track');
   });
 });
 

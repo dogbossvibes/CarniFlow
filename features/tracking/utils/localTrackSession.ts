@@ -23,16 +23,19 @@ export function buildLocalTrackSessionInput(args: {
   dogId:     string | null;   // NOT NULL remote → muss geführt werden
   startedAt: string;          // ISO
   meta?:     LocalTrackSessionMeta;
+  /** Mantrailing (Spec 02): eigener Sitzungstyp. Fehlt er, bleibt alles wie bisher (IGP-Fährte). */
+  kind?:     'mantrail';
 }): NewLocalTrainingSession {
   const m = args.meta ?? {};
+  const mantrail = args.kind === 'mantrail';
   return {
     local_id:           args.localId,
     user_id:            args.ownerId,
     dog_id:             args.dogId,
-    category:           'IGP',       // Fährte ist IGP-Disziplin (Remote-CHECK)
-    type:               'track',
+    category:           mantrail ? 'Mantrailing' : 'IGP',       // Fährte ist IGP-Disziplin (Remote-CHECK)
+    type:               mantrail ? 'mantrail' : 'track',
     status:             'active',
-    title:              'Fährte',
+    title:              mantrail ? 'Mantrailing' : 'Fährte',
     started_at:         args.startedAt,
     surface_types:      m.surfaceTypes ?? null,
     terrain_conditions: m.terrainConditions ?? null,

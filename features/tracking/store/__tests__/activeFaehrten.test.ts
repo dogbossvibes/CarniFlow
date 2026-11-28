@@ -320,3 +320,21 @@ describe('Start-Taste Legen: isResumeOfActiveFaehrte (keine Fortsetzen-Schleife)
     expect(src).toMatch(/if \(requestedSessionId && !resumed\) \{\s*beganRef\.current = false;\s*resumeFailedRef\.current = true;/);
   });
 });
+
+describe('Mantrailing (Spec 02): Art in der Registry', () => {
+  it('IGP-Einträge bekommen nie ein kind-Feld (byte-gleich wie bisher)', () => {
+    const map = upsertEntry({}, 'max', { status: 'laying', sessionId: 'S1' });
+    expect('kind' in map.max).toBe(false);
+    expect(reopenTarget(map.max)).toBe('/track/legen?dogId=max&id=S1');
+  });
+  it('kind bleibt über spätere Updates erhalten und öffnet die eigenen Bildschirme', () => {
+    let map = upsertEntry({}, 'max', { status: 'laying', sessionId: 'M1', kind: 'mantrail' });
+    expect(reopenTarget(map.max)).toBe('/mantrail/legen?dogId=max&id=M1');
+    map = upsertEntry(map, 'max', { status: 'resting', layStartedAt: 5 });
+    expect(map.max.kind).toBe('mantrail');
+    expect(reopenTarget(map.max)).toBe('/mantrail/run?dogId=max&id=M1');
+    map = upsertEntry(map, 'max', { status: 'searching', searchStartedAt: 9 });
+    expect(reopenTarget(map.max)).toBe('/mantrail/run?dogId=max&id=M1');
+    expect(upsertEntry(map, 'max', { status: 'completed' }).max).toBeUndefined();
+  });
+});

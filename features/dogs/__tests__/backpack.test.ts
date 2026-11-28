@@ -79,7 +79,7 @@ describe('NEWBIE Backpack limit pro Hund', () => {
     expect(BASE_CAPABILITIES).toContain('dogs.backpack');
     expect(PREMIUM_CAPABILITIES).not.toContain('dogs.backpack');
     expect(NEWBIE_COMMAND_LIMIT).toBe(5);
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1, mantrail: 1 });   // Mantrailing: eigenes Kontingent (Spec 02)
   });
 });
 

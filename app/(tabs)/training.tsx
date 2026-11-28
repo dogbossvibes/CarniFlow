@@ -7,6 +7,9 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { ContinueTrainingSection } from '@/components/training/ContinueTrainingSection';
+import { useProfile } from '@/hooks/useProfile';
+import { DEFAULT_SPARTEN } from '@/constants/sparten';
+import { MANTRAIL_CATEGORY } from '@/features/mantrailing/model';
 
 
 // Training-Hub: fokussiert auf Timer + Fährten-Tool (+ nachträglich
@@ -16,6 +19,8 @@ export default function TrainingScreen() {
   const router = useRouter();
   const scrollRef = useTabScrollToTop();
   const { t } = useT();
+  const { profile } = useProfile();
+  const mantrailingOn = (profile?.aktive_sparten ?? DEFAULT_SPARTEN).includes(MANTRAIL_CATEGORY);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -80,6 +85,20 @@ export default function TrainingScreen() {
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
+
+        {/* Mantrailing mit GPS (Spec 02) – nur, wenn die Sparte im Profil eingeschaltet ist. */}
+        {mantrailingOn && (
+          <AnimatedPressable accessibilityRole="button" accessibilityLabel={t('mantrail.entryTitle')} style={[s.faehrteCard, { marginTop: 12 }]} scale={0.98} onPress={() => router.push('/mantrail' as never)}>
+            <View style={[s.actionIcon, { backgroundColor: '#38BDF81A' }]}>
+              <Ionicons name="search" size={28} color="#38BDF8" />
+            </View>
+            <View style={s.flex}>
+              <Text style={s.docTitel}>{t('mantrail.entryTitle')}</Text>
+              <Text style={s.docSub}>{t('mantrail.entrySub')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </AnimatedPressable>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>

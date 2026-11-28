@@ -186,14 +186,15 @@ export function planToCapabilities(plan: SubscriptionPlan): { pro_member: boolea
 // ── NEWBIE-Quotas (kostenloses Tier) ─────────────────────────
 // Serverautoritativ erzwungen (RPC claim_newbie_quota, siehe
 // SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql); der Client spiegelt die Limits nur für UX.
-export type QuotaKind = 'dog' | 'training' | 'track';
+export type QuotaKind = 'dog' | 'training' | 'track' | 'mantrail';
 
 // Max. NEUE Objekte im Zählzeitraum: Hund = 1 (all-time), Training = 2 pro
 // Kalendermonat (UTC), Fährte = 1 pro Kalendermonat (UTC) — konsistent zur
 // serverseitigen public.newbie_quota_limit() (siehe
 // supabase/migrations/20260925090000_newbie_track_quota_one.sql). Premium
 // (ACTIVE/FOUNDER/TRAINER) = unbegrenzt (quotaLimit() gibt Infinity zurück).
-export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 1 };
+// Mantrailing (Spec 02, Entscheid 2026-11-24): eigenes Kontingent 1 Trail/Monat, zusätzlich zur Fährte.
+export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 1, mantrail: 1 };
 
 export function quotaLimit(isPro: boolean, kind: QuotaKind): number {
   return isPro ? Infinity : NEWBIE_QUOTA[kind];
