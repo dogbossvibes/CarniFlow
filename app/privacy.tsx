@@ -46,7 +46,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '7. Speicherdauer & lokale Daten',
-    body:  'Deine Daten werden gespeichert, solange dein Konto aktiv ist. Für die Offline-Nutzung legt die App eine lokale Kopie (u. a. Trainings-/Streckendaten) verschlüsselt auf deinem Gerät ab; Fotos/Videos/Sprachnotizen liegen vor dem Hochladen kurz lokal vor. Beim Löschen eines Hundes oder des Kontos werden die zugehörigen Daten entfernt.',
+    body:  'Deine Daten werden gespeichert, solange dein Konto aktiv ist. Für die Offline-Nutzung legt die App eine lokale Kopie (u. a. Trainings-/Streckendaten) im geschützten App-Speicher deines Geräts ab; Fotos/Videos/Sprachnotizen liegen vor dem Hochladen kurz lokal vor. Beim Löschen eines Hundes oder des Kontos werden die zugehörigen Daten entfernt.',
   },
   {
     title: '8. Deine Rechte',
