@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { rateTrackingWeather, type ObservedGround, type TrackWeatherRating } from './model';
+import { rateTrainingWeather, type TrainingWeatherRating } from './trainingModel';
 import { STALE_AFTER_MS, loadTrackWeather, requestTrackWeatherPermission, type TrackWeatherLoad } from './service';
 import { useTrackWeatherSetting } from './setting';
 
@@ -10,7 +11,7 @@ export type TrackWeatherView =
   | { kind: 'noPermission' }
   | { kind: 'unavailable' }
   | { kind: 'stale'; fetchedAtMs: number }
-  | { kind: 'ready'; rating: TrackWeatherRating; fetchedAtMs: number; fromCache: boolean };
+  | { kind: 'ready'; rating: TrackWeatherRating; training: TrainingWeatherRating | null; fetchedAtMs: number; fromCache: boolean };
 
 /** Reine Ableitung der Anzeige aus dem Abrufergebnis (testbar). */
 export function deriveTrackWeatherView(
@@ -22,7 +23,8 @@ export function deriveTrackWeatherView(
   if (nowMs - cache.fetchedAtMs > STALE_AFTER_MS) return { kind: 'stale', fetchedAtMs: cache.fetchedAtMs };
   const rating = rateTrackingWeather(cache.hours, nowMs, cache, tzOffsetMin, ground);
   if (!rating) return { kind: 'stale', fetchedAtMs: cache.fetchedAtMs };
-  return { kind: 'ready', rating, fetchedAtMs: cache.fetchedAtMs, fromCache: load.status === 'ok' && load.fromCache };
+  const training = rateTrainingWeather(cache.hours, nowMs, cache, tzOffsetMin);
+  return { kind: 'ready', rating, training, fetchedAtMs: cache.fetchedAtMs, fromCache: load.status === 'ok' && load.fromCache };
 }
 
 /** @param ground Beschaffenheit vor Ort (nur Lege-Screen); sonst Schätzung aus dem Regenverlauf. */

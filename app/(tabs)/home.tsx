@@ -17,6 +17,7 @@ import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, setHomeScreenConfig, setWidgetVisible, type HomeWidgetId } from "@/stores/homeScreenConfig";
 import { TrackWeatherCard } from "@/features/track-weather/components";
+import { doesTracking } from "@/features/track-weather/trackingDogs";
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
 import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
@@ -87,6 +88,7 @@ export default function HomeScreen() {
   const { profile: homeProfile, loading: profileLoading } = useProfile();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
+  const [mountedAtMs] = useState(() => Date.now());
   const { onDelete: deleteItem, toast } = useFeedDelete();
   const config = useHomeScreenConfig(user?.id);
 
@@ -136,6 +138,8 @@ export default function HomeScreen() {
   const letzteHunde = dogs.slice(0, 3);
   // Vereinheitlichte Zeitleiste (alt + neu) als Aktivitätsbasis.
   const serie = berechneSerie(feed);
+  // Fährten-Teil im Trainingswetter nur, wenn ein Hund Fährte macht.
+  const showTrackWeather = doesTracking(dogs, feed, mountedAtMs);
 
   // Widget-Renderer: bildet eine Widget-ID auf die bestehende Komponente ab.
   // Zentrale Zuordnung statt duplizierter Switch-Blöcke; nur Darstellung.
@@ -151,6 +155,7 @@ export default function HomeScreen() {
         return (
           <TrackWeatherCard
             key={id}
+            showTrack={showTrackWeather}
             onOpen={() => router.push("/track")}
             onHide={() => setHomeScreenConfig(setWidgetVisible(config, "track_weather", false))}
           />
