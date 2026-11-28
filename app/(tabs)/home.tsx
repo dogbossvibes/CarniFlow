@@ -18,6 +18,7 @@ import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, setHomeScreenConfig, setWidgetVisible, type HomeWidgetId } from "@/stores/homeScreenConfig";
 import { TrackWeatherCard } from "@/features/track-weather/components";
 import { doesTracking } from "@/features/track-weather/trackingDogs";
+import { HomeBadgesWidget } from "@/features/badges/HomeBadgesWidget";
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
 import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
@@ -32,7 +33,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useTabScrollToTop } from "@/hooks/useTabScrollToTop";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -140,6 +141,7 @@ export default function HomeScreen() {
   const serie = berechneSerie(feed);
   // Fährten-Teil im Trainingswetter nur, wenn ein Hund Fährte macht.
   const showTrackWeather = doesTracking(dogs, feed, mountedAtMs);
+  const dogIds = useMemo(() => dogs.map((d) => d.id), [dogs]);
 
   // Widget-Renderer: bildet eine Widget-ID auf die bestehende Komponente ab.
   // Zentrale Zuordnung statt duplizierter Switch-Blöcke; nur Darstellung.
@@ -194,6 +196,15 @@ export default function HomeScreen() {
               </SwipeableTrainingItem>
             ))}
           </View>
+        );
+      case "badges":
+        return (
+          <HomeBadgesWidget
+            key={id}
+            feed={feed}
+            dogIds={dogIds}
+            onOpen={() => router.push("/erfolge" as never)}
+          />
         );
       case "dogs":
         return (
