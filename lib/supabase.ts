@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
+import { createSecureAuthStorage } from '@/lib/secureAuthStorage';
+import { loadNativeAuthCipher, loadNativeSecretStore } from '@/lib/authStorageNative';
 
 const EXPECTED_PROJECT_REFS = {
   production: 'axkkhyqrjrtbkumaulta',
@@ -53,9 +55,21 @@ export const SUPABASE_ANON_KEY = key;
 export const SUPABASE_BACKEND_ENV: BackendEnvironment = validatedBackendEnvironment;
 export const SUPABASE_PROJECT_REF = projectRef;
 
+// Anmeldesitzung verschlüsselt (Schlüssel im System-Schlüsselbund), mit
+// einmaliger Übernahme der bisherigen Klartext-Sitzung ohne Abmelden.
+// Ohne natives SecureStore-Modul (ältere Builds) unverändert AsyncStorage.
+const authStorage = Platform.OS !== 'web'
+  ? createSecureAuthStorage({
+      store:   AsyncStorage,
+      secrets: loadNativeSecretStore(),
+      cipher:  loadNativeAuthCipher(),
+      onError: (stage) => { if (__DEV__) console.warn(`[authStorage] ${stage} fehlgeschlagen`); },
+    })
+  : undefined;
+
 export const supabase = createClient(url, key, {
   auth: {
-    storage:            Platform.OS !== 'web' ? AsyncStorage : undefined,
+    storage:            authStorage,
     autoRefreshToken:   true,
     persistSession:     true,
     detectSessionInUrl: false,

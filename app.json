@@ -158,6 +158,14 @@
           }
         }
       ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false,
+          "faceIDPermission": "Anyvo verwendet Face ID, um den Zugriff auf deine persönlichen Hunde- und Trainingsdaten zu schützen."
+        }
+      ],
+      "./plugins/withAnyvoAndroidBackupRules",
       "./plugins/withAnyvoManifestCleanup",
       "./plugins/withAnyvoGoogleSignIn",
       "expo-localization"
