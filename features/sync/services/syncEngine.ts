@@ -10,6 +10,7 @@ import {
   getPendingSyncOperations, markSyncProcessing, markSyncCompleted, markSyncFailed,
   retryFailedOperations, markSyncConflict, syncQueueCounts, clearCompleted,
 } from '@/features/sync/repositories/syncQueueRepository';
+import { reassignDogForSessions, retryFailedQueueItem, type ReassignResult } from '@/features/sync/repositories/failedSyncRepository';
 import {
   getLocalTrainingSessionById, setTrainingRemoteId, updateTrainingSyncStatus,
 } from '@/features/training/repositories/localTrainingRepository';
@@ -243,3 +244,19 @@ export async function retryFailedSyncForSession(localId: string): Promise<boolea
   return true;
 }
 export async function updateSyncCounts() { await refreshCounts(); }
+
+// Sync-Center (28.11.2026): Fährten mit fehlendem Hund einem bestehenden Hund
+// zuordnen und sofort hochladen. Ändert lokal nur dog_id (+ abhängige Verweise) und
+// setzt die betroffenen Queue-Einträge failed → pending; danach normaler Sync.
+export async function assignDogAndSync(localIds: readonly string[], dogId: string, ownerId: string): Promise<ReassignResult> {
+  const result = await reassignDogForSessions(localIds, dogId, ownerId);
+  await refreshCounts().catch(() => {});
+  if (result.reassigned.length > 0) await syncNow();
+  return result;
+}
+
+// Genau einen fehlgeschlagenen Eintrag erneut versuchen (übrige bleiben, wie sie sind).
+export async function retryFailedItem(queueId: string): Promise<void> {
+  await retryFailedQueueItem(queueId);
+  await syncNow();
+}
