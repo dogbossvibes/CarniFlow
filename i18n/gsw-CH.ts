@@ -1063,6 +1063,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'home.widgetQuickActionsDesc': 'Dini Schnällzugriff',
   'home.widgetRecentSessions': 'Letschti Einheite',
   'home.widgetRecentSessionsDesc': 'Zletscht erfassti Einheite',
+  'home.widgetBadges': 'Abzeiche',
+  'home.widgetBadgesDesc': 'Erfolg mit Stufe I–III und dis nächschte Ziel',
   'home.widgetDogs': 'Mini Hünd',
   'home.widgetDogsDesc': 'Überblick vo dine Hünd',
   'home.widgetDogBackpack': 'Backpack',

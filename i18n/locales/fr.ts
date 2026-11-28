@@ -1472,6 +1472,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "home.widgetQuickActionsDesc": "Tes accès rapides",
   "home.widgetRecentSessions": "Dernières séances",
   "home.widgetRecentSessionsDesc": "Dernières séances enregistrées",
+  "home.widgetBadges": "Badges",
+  "home.widgetBadgesDesc": "Succès avec niveaux I–III et ton prochain objectif",
   "home.widgetDogs": "Mes chiens",
   "home.widgetDogsDesc": "Vue d’ensemble de tes chiens",
   "calendar.timeline": "CHRONOLOGIE SMART TRAINING",

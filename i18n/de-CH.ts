@@ -1085,6 +1085,8 @@ export const deCH = {
   'home.widgetQuickActionsDesc': 'Deine Schnellzugriffe',
   'home.widgetRecentSessions': 'Letzte Einheiten',
   'home.widgetRecentSessionsDesc': 'Zuletzt erfasste Einheiten',
+  'home.widgetBadges': 'Abzeichen',
+  'home.widgetBadgesDesc': 'Erfolge mit Stufen I–III und dein nächstes Ziel',
   'home.widgetDogs': 'Meine Hunde',
   'home.widgetDogsDesc': 'Übersicht deiner Hunde',
   'home.widgetDogBackpack': 'Backpack',

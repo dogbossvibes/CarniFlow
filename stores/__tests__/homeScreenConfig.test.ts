@@ -111,7 +111,7 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
       hiddenWidgets: ['dogs'],
     };
     const out = sanitizeHomeScreenConfig(legacy);
-    expect(out.widgetOrder).toEqual(['recent_sessions', 'week', 'track_weather', 'smart_analysis', 'quick_actions', 'dogs', 'dog_backpack']);
+    expect(out.widgetOrder).toEqual(['recent_sessions', 'badges', 'week', 'track_weather', 'smart_analysis', 'quick_actions', 'dogs', 'dog_backpack']);
     expect(out.hiddenWidgets).toEqual(['dogs']);
     expect(visibleWidgets(out)).toContain('track_weather');
     // eigene spätere Reihenfolge bleibt

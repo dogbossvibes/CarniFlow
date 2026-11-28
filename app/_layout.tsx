@@ -115,6 +115,7 @@ export default function RootLayout() {
         <Stack.Screen name="mantrail/index" />
         <Stack.Screen name="mantrail/[id]" />
         <Stack.Screen name="sync" />
+        <Stack.Screen name="erfolge" />
         {/* ANYVO CONNECT — Stack-Routen. Die Route-Dateien laden ihren Screen nur
             bei aktivem Feature-Flag (sonst Redirect); reine Registrierung ist
             boot-neutral und verursacht keine CONNECT-Abfrage. */}
