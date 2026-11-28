@@ -1068,7 +1068,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'home.widgetDogBackpack': 'Backpack',
   'home.widgetDogBackpackDesc': 'Backpack vo eme Hund',
   'home.widgetTrackWeather': 'Trainingswetter',
-  'home.widgetTrackWeatherDesc': 'Ampel fürs Training, bi Fährtehünd au für d Fährte',
+  'home.widgetTrackWeatherDesc': 'Ampel fürs Training, je nach Sparte au für Fährte und Mantrailing',
   'fab.title': 'Schnällbutton',
   'fab.selectTitle': 'Schnällaktion uswähle',
   'fab.visible': 'Button aazeige',
