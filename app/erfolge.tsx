@@ -70,7 +70,7 @@ export default function ErfolgeScreen() {
         ) : (
           <>
             {!hasActivity && <Text style={s.muted}>{t('empty')}</Text>}
-            <BadgeOverview summary={summary} />
+            <BadgeOverview summary={summary} fresh={fresh} />
             <BadgeGroups summary={summary} freshIds={freshIds} />
             <Text style={s.footer}>{t('footer')}</Text>
           </>
@@ -84,13 +84,13 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
   backBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, color: C.white, fontWeight: '800' },
-  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48, gap: 18 },
+  title: { fontSize: 30, color: C.white, fontWeight: '800', letterSpacing: -0.6 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48, gap: 22 },
   chips: { gap: 8 },
   chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.card, justifyContent: 'center' },
-  chipActive: { borderColor: C.accent, backgroundColor: C.accentDim },
+  chipActive: { borderColor: C.white, backgroundColor: C.white },
   chipTxt: { color: C.white, fontSize: 13, fontWeight: '600' },
-  chipTxtActive: { color: C.accent, fontWeight: '700' },
+  chipTxtActive: { color: C.bg, fontWeight: '700' },
   loading: { alignItems: 'center', gap: 10, paddingVertical: 40 },
   muted: { fontSize: 13, color: C.textMuted },
   footer: { fontSize: 12, lineHeight: 17, color: C.textMuted },
