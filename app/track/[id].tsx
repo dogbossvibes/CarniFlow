@@ -50,6 +50,8 @@ import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@
 import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
 import { TrackEvaluationLayout } from '@/features/tracking/components/TrackEvaluationLayout';
+import { TrackRunInsightsCard } from '@/features/tracking/components/TrackRunInsightsCard';
+import { buildRunInsights } from '@/features/tracking/insights/runInsights';
 import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -426,6 +428,17 @@ export default function TrackAuswertungScreen() {
   const condTags = [surface, ...terrain].filter(Boolean);
   const hasConditions = condStats.length > 0 || condTags.length > 0;
 
+  // Laufauswertung (Winkel/Bögen, Fundquote, Tempo, Höhe, Tipps): rein lesend aus den
+  // gespeicherten Daten, ändert weder manuelle Bewertung noch Analyse oder Geometrie.
+  const runInsights = analytics ? buildRunInsights({
+    analytics,
+    layPoints: (data.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay')
+      .map((p: any) => ({ latitude: p.latitude, longitude: p.longitude, altitude: p.altitude ?? null, breakBefore: !!p.breakBefore })),
+    runPoints: map?.run ?? [],
+    objectsFound: typeof aFound === 'number' ? aFound : null,
+    objectsTotal: aTotal,
+  }) : null;
+
   const highlights: { icon: IconName; value: string; label: string }[] = [
     { icon: 'flag',          value: `${aFound}/${aTotal}`, label: reviewed ? t('track.review.exportLabel') : 'Gegenstände' },
     // corners_total = Anzahl der beim LEGEN gespeicherten Winkel-Marker (alle
@@ -465,6 +478,12 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+
+          {/* Laufauswertung gut sichtbar direkt unter dem Hero; ohne Analyse (ältere Fährten,
+              offene Absuche) entfällt sie, die bisherigen Hinweise unten bleiben. */}
+          {runInsights && !recoveryCardVisible && (
+            <TrackRunInsightsCard insights={runInsights} />
+          )}
 
           {[...(map?.lay ?? []), ...(map?.run ?? [])].some(p => p.breakBefore) && (
             <View style={s.card}><Text style={{ color: C.trackTextMut }}>{t('track.continuityNotice')}</Text></View>
