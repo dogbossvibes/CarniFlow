@@ -1,5 +1,20 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #319 (iOS 60 und Android 53/54) – 2026-11-28
+
+**Erledigt:** OTAs #289, #296, #308, #316 und #319 auf iOS 60 und Android 53/54. Production: iOS `47848b07`,
+Android `624df9c2`. Vier Production-Migrationen für Mantrailing und Vereinsmodus ausgeführt.
+PR #321 (Release-Vorbereitung, Doku) gemergt.
+
+**Offen:**
+- **Gerätetests** der Karten #289, #296, #308, #316, #319; erst danach «Veröffentlicht».
+- **Issue #7 (P0 Abo):** lesende Diagnose laut `docs/release/RELEASE_VORBEREITUNG_2026-11-28.md`.
+- **Nächste Charge** Mantrailing + Vereinsmodus + Trainingswetter (#318, #320): Kandidaten, Prüfungen,
+  Review, dann Gerätetest «Vorher» und Freigabe der Nutzerin.
+- **Coach:** Gerätetest vor der OTA.
+- **Nativer Build** (#196, #200, #290 Teil 2): Version und Freigabe offen.
+
+
 ## Stand nach OTA #269 und #274 (iOS 60 und Android 53/54) – 2026-11-24
 
 **Erledigt:** Production-Migration `release_newbie_quota` und OTA #269 «NEWBIE-Rückgabe» (PR #260, #266).
