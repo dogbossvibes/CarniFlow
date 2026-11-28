@@ -145,6 +145,7 @@ interface TrackingState {
   setSearchPoints: (pts: TrackPointSample[]) => void;  // Recovery: Suchspur exakt setzen (SQLite autoritativ)
   startSearchSession: (runId: string | null, startedAtMs: number) => void;  // frische Absuche: Status/Metadaten setzen (P2)
   setSearchRunId: (runId: string | null) => void;  // runId nachreichen (startTrackRun ist async)
+  setSearchStartedAt: (startedAtMs: number) => void;  // Recovery: abgeleitete Startzeit sichern (Timer-Fortsetzung)
   setSearchHandlerDistanceM: (v: SearchHandlerDistanceM) => void;  // 5/10-m-Auswahl (vor Absuche)
   setSessionStatus: (status: SessionStatus) => void;
   clearSearchSession: () => void;                  // Suchversuch verworfen: Such-Felder zurück, Fährte wieder 'resting' (Lay-Daten bleiben)
@@ -321,6 +322,8 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     persistNow(get);
   },
   setSearchRunId: (runId) => { set({ searchRunId: runId }); persistNow(get); },
+  // Nur Metadaten: Punkte/Run-State bleiben unberührt.
+  setSearchStartedAt: (startedAtMs) => { set({ searchStartedAt: startedAtMs }); persistNow(get); },
   setSearchHandlerDistanceM: (v) => { set({ searchHandlerDistanceM: v }); persistNow(get); },
   setSessionStatus: (status) => { set({ sessionStatus: status }); persistNow(get); },
   // „Absuche verwerfen": NUR den Suchversuch zurücknehmen — gelegte Punkte/Marker/
@@ -471,6 +474,14 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     layUpdatedAt:     p.layUpdatedAt ?? p.layFinishedAt ?? null,
     sessionStatus:    p.status ?? 'resting',
     searchHandlerDistanceM: p.searchHandlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M,   // Recovery: 5-m-Fallback
+    // Absuche-Metadaten mitnehmen: Sonst hielte der Store 'searching' ohne Startzeit/
+    // Suchpunkte, und der nächste Snapshot überschriebe den Puffer mit null/leer
+    // (Suchdauer begann nach Neustart wieder bei 00:00).
+    searchTrackPoints: p.searchPoints ?? [],
+    searchRunId:       p.runId ?? null,
+    searchStartedAt:   p.searchStartedAt ?? null,
+    searchUpdatedAt:   p.searchUpdatedAt ?? null,
+    searchRunState:    sanitizeSearchRunState(p.searchRun),
   }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),

@@ -65,7 +65,7 @@ import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/uti
 import { nextObjectDistance, searchDistanceReadout } from '@/features/tracking/utils/distanceScale';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 
-import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
+import { decideRecovery, dedupeSearchPoints, pathDistanceM, resolveSearchStartedAt } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
 import { getSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
 import { discardSearchAttempt } from '@/features/tracking/services/trackRecoveryService';
@@ -639,7 +639,20 @@ export default function TrackRunScreen() {
     endEventRef.current = null;
     // Auch eine Recovery ohne gespeicherte Punkte ist nur teilweise beobachtet.
     endEventObservationRef.current = 'partial';
-    searchStartMsRef.current = pending.searchStartedAt ?? Date.now();
+    // Suchdauer läuft ab dem gespeicherten Start weiter (nicht 00:00). Fehlt die
+    // Startzeit im Puffer (Altformat), aus Registry/Suchpunkten ableiten und sichern.
+    const reg = dogId ? useActiveFaehrten.getState().get(dogId) : null;
+    const startedAtMs = resolveSearchStartedAt({
+      pendingStartedAt: pending.searchStartedAt,
+      registryStartedAt: reg && reg.status === 'searching' && reg.sessionId === (pending.sessionId ?? null) ? reg.searchStartedAt : null,
+      pointTimesMs: saved.map(p => p.t),
+      now: Date.now(),
+    });
+    if (useTrackingStore.getState().searchStartedAt !== startedAtMs) useTrackingStore.getState().setSearchStartedAt(startedAtMs);
+    if (dogId && reg && reg.sessionId === (pending.sessionId ?? null) && reg.searchStartedAt == null) {
+      useActiveFaehrten.getState().upsert(dogId, { searchStartedAt: startedAtMs });
+    }
+    searchStartMsRef.current = startedAtMs;
     startedRef.current = true;   // verhindert den frischen Start-Effect
     setRecovery(null);
     hapticSuccess();
@@ -652,7 +665,6 @@ export default function TrackRunScreen() {
     prevOffTrackRef.current = runState.offTrackState;
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
     announcedDwellRef.current = new Set(runState.autoDwellObjectIds);   // T-206: schon angesagte Funde
-    const startedAtMs = pending.searchStartedAt ?? Date.now();
     s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
       pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState },
     { diagnosticAttemptKey: runIdRef.current ?? undefined });
