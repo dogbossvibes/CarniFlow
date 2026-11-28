@@ -9,7 +9,9 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { projectTrackTransferSource } from '@/features/tracking-transfer/source';
 import { parseTrackTransferReference, TRANSFER_LIMITS, type TrackTransferReference } from '@/features/tracking-transfer/reference';
 import { GroupApiError } from '@/features/tracking-exchange/groups/groupRpc';
-import { isOwnGroupTrack, type GroupTrack, type GroupTrackService } from '@/features/tracking-exchange/groups/trackService';
+import { isOwnGroupTrack, type GroupTrack, type GroupTrackKind, type GroupTrackService } from '@/features/tracking-exchange/groups/trackService';
+import { emptyMantrailData, MANTRAIL_CATEGORY, MANTRAIL_SESSION_TYPE, MANTRAIL_TITLE, sharedTrailDetails, type SharedTrailDetails } from '@/features/mantrailing/model';
+import { getLocalMantrailDetails } from '@/features/mantrailing/localRepository';
 
 // Stufe 2b Gruppentraining: lokale Seite der Fährtenübergabe.
 // Leger:in: die mit dem gewohnten Recorder gelegte Fährte wird als Paket (Format der
@@ -36,7 +38,7 @@ export async function readLaidReference(userId: string, localId: string): Promis
   const markers = await db.getAllAsync<LocalTrackMarker>(
     'select * from local_track_markers where session_local_id=? order by created_at asc, rowid asc limit ?', localId, TRANSFER_LIMITS.markers + 1);
   if (points.length > TRANSFER_LIMITS.points || markers.length > TRANSFER_LIMITS.markers) throw new GroupApiError('GROUP_LIMIT');
-  return { reference: projectTrackTransferSource(session, points, markers), dogId: session.dog_id };
+  return { reference: projectTrackTransferSource(session, points, markers, { allowMantrail: true }), dogId: session.dog_id };
 }
 
 /** own = eigene Fährte (Issue #150): die Fläche wird eingetragen, die Fährte bleibt die eigene, offene Fährte des Hundes. */
@@ -149,8 +151,10 @@ export async function submitHandover(service: GroupTrackService, userId: string,
   if (entry.own) await rememberOwnGroupTrack(userId, { trackId: entry.trackId, localId: entry.localId, sessionId: entry.sessionId, createdAtMs: entry.createdAtMs });
   await addPendingHandover(userId, entry);
   const { reference, dogId } = await readLaidReference(userId, entry.localId);
+  // Mantrailing: Angaben der Leger:in mitgeben (null bei IGP-Fährten → Anfrage wie bisher).
+  const mantrail = sharedTrailDetails(await getLocalMantrailDetails(entry.localId).catch(() => null));
   try {
-    await service.submit(entry.trackId, reference);
+    await service.submit(entry.trackId, reference, mantrail);
   } catch (error) {
     if (error instanceof GroupApiError && (error.code === 'GROUP_CONNECTION' || error.code === 'GROUP_INVALID_RESPONSE'
       || error.code === 'GROUP_MAINTENANCE_UNAVAILABLE' || error.code === 'GROUP_ACCOUNT_CHANGED')) return 'queued';
@@ -176,18 +180,19 @@ export async function flushPendingHandovers(service: GroupTrackService, userId: 
 
 // ── Hundeführer:in ──────────────────────────────────────────────────────────
 
-export interface ImportedGroupTrack { localId: string; dogId: string; blind: boolean; searched: boolean }
+export interface ImportedGroupTrack { localId: string; dogId: string; blind: boolean; searched: boolean; kind?: 'mantrail' }
 
 export async function findImportedGroupTrack(userId: string, trackId: string): Promise<ImportedGroupTrack | null> {
   const db = await getLocalDb();
-  const row = await db.getFirstAsync<{ local_id: string; dog_id: string; payload_json: string | null }>(
-    `select local_id,dog_id,payload_json from local_training_sessions where user_id=? and deleted_at is null
+  const row = await db.getFirstAsync<{ local_id: string; dog_id: string; type: string | null; payload_json: string | null }>(
+    `select local_id,dog_id,type,payload_json from local_training_sessions where user_id=? and deleted_at is null
      and json_extract(case when json_valid(payload_json) then payload_json else '{}' end, '$.${GROUP_TRACK_KEY}.trackId')=? limit 1`, userId, trackId);
   if (!row) return null;
   const marker = readGroupTrackMarker(row.payload_json);
   let searched = false;
   try { searched = !!JSON.parse(row.payload_json ?? '{}')?.run; } catch { searched = false; }
-  return { localId: row.local_id, dogId: row.dog_id, blind: marker?.blind ?? false, searched };
+  return { localId: row.local_id, dogId: row.dog_id, blind: marker?.blind ?? false, searched,
+    ...(row.type === MANTRAIL_SESSION_TYPE ? { kind: 'mantrail' as const } : {}) };
 }
 
 /** Eigene Gruppenfährte: die lokal gelegte Fährte dieses Geräts (auf anderen Geräten: null). Nur lesend. */
@@ -195,12 +200,13 @@ export async function findOwnGroupTrack(userId: string, trackId: string): Promis
   const link = (await listOwnGroupTracks(userId)).find(e => e.trackId === trackId);
   if (!link) return null;
   const db = await getLocalDb();
-  const row = await db.getFirstAsync<{ local_id: string; dog_id: string | null; payload_json: string | null }>(
-    'select local_id,dog_id,payload_json from local_training_sessions where local_id=? and user_id=? and deleted_at is null', link.localId, userId);
+  const row = await db.getFirstAsync<{ local_id: string; dog_id: string | null; type: string | null; payload_json: string | null }>(
+    'select local_id,dog_id,type,payload_json from local_training_sessions where local_id=? and user_id=? and deleted_at is null', link.localId, userId);
   if (!row || !row.dog_id) return null;
   let searched = false;
   try { searched = !!JSON.parse(row.payload_json ?? '{}')?.run; } catch { searched = false; }
-  return { localId: row.local_id, dogId: row.dog_id, blind: false, searched };
+  return { localId: row.local_id, dogId: row.dog_id, blind: false, searched,
+    ...(row.type === MANTRAIL_SESSION_TYPE ? { kind: 'mantrail' as const } : {}) };
 }
 
 /** Lokale Fährte zu einer Gruppenfährte, bei der ich Hundeführer:in bin. */
@@ -209,13 +215,14 @@ export function findLocalGroupTrack(userId: string, track: Pick<GroupTrack, 'tra
 }
 
 type SQLValue = string | number | null;
+const stripVersion = (d: SharedTrailDetails | null | undefined) => { if (!d) return {}; const { version: _v, ...rest } = d; return rest; };
 function insert(table: string, row: Record<string, SQLValue>) {
   const keys = Object.keys(row);
   return { sql: `insert into ${table} (${keys.join(',')}) values (${keys.map(() => '?').join(',')})`, params: keys.map(k => row[k]) };
 }
 
 /** Wie der Import der Fährten-Übergabe, aber als eigene Fährte ohne Quittung. Rein, testbar. */
-export function createGroupTrackImportPlan(input: { userId: string; dogId: string; sessionId: string; trackId: string; blind: boolean; nowMs: number },
+export function createGroupTrackImportPlan(input: { userId: string; dogId: string; sessionId: string; trackId: string; blind: boolean; nowMs: number; kind?: GroupTrackKind; mantrail?: SharedTrailDetails | null },
   referenceValue: unknown) {
   const reference = parseTrackTransferReference(referenceValue);
   const createdAt = new Date(input.nowMs).toISOString();
@@ -236,10 +243,14 @@ export function createGroupTrackImportPlan(input: { userId: string; dogId: strin
     layContinuity: { version: 1, breakBeforeTimestamps: reference.points.filter(p => p.breakBefore).map(p => new Date(p.t).toISOString()) },
     ...(geometry ? { manualAngleGeometry: geometry } : {}),
     [GROUP_TRACK_KEY]: marker,
+    // Mantrailing (Spec 02): übergebener Trail; Doppelblind folgt der Blind-Einstellung der Gruppe.
+    // Angaben der Leger:in übernehmen; «Negativtrail» zeigt der Bildschirm bei Doppelblind erst nach «Ende».
+    ...(input.kind === 'mantrail' ? { mantrail: { ...emptyMantrailData(), ...stripVersion(input.mantrail), trailSource: 'transfer', doubleBlind: input.blind } } : {}),
   };
+  const mantrail = input.kind === 'mantrail';
   const parent = insert('local_training_sessions', {
     local_id: input.sessionId, remote_id: null, user_id: input.userId, dog_id: input.dogId,
-    category: 'IGP', type: 'track', status: 'completed', title: null, notes: null, score: null, visibility: 'private',
+    category: mantrail ? MANTRAIL_CATEGORY : 'IGP', type: mantrail ? MANTRAIL_SESSION_TYPE : 'track', status: 'completed', title: mantrail ? MANTRAIL_TITLE : null, notes: null, score: null, visibility: 'private',
     started_at: new Date(reference.startedAtMs).toISOString(), ended_at: new Date(reference.finishedAtMs).toISOString(),
     duration_seconds: reference.durationSeconds, location_name: null, latitude: reference.points[0].lat, longitude: reference.points[0].lng,
     temperature: null, weather_condition: null, wind_speed: null, humidity: null, surface_types: null, terrain_conditions: null,
@@ -266,13 +277,14 @@ export function createGroupTrackImportPlan(input: { userId: string; dogId: strin
 }
 
 /** Legt die Fährte einmalig für den eigenen Hund an. Bestehende (auch schon abgesuchte) Kopie bleibt unverändert. */
-export async function importGroupTrack(userId: string, track: GroupTrack, reference: TrackTransferReference): Promise<ImportedGroupTrack> {
+export async function importGroupTrack(userId: string, track: GroupTrack, reference: TrackTransferReference, mantrail?: SharedTrailDetails | null): Promise<ImportedGroupTrack> {
   // Eigene Fährte nie importieren: sie liegt schon als normale Fährte auf dem Gerät, das sie gelegt hat.
   if (track.handlerUserId !== userId || isOwnGroupTrack(track)) throw new GroupApiError('GROUP_UNAVAILABLE');
   const existing = await findImportedGroupTrack(userId, track.trackId);
   if (existing) return existing;
   const sessionId = Crypto.randomUUID();
-  const plan = createGroupTrackImportPlan({ userId, dogId: track.dogId, sessionId, trackId: track.trackId, blind: track.blind, nowMs: Date.now() }, reference);
+  const plan = createGroupTrackImportPlan({ userId, dogId: track.dogId, sessionId, trackId: track.trackId, blind: track.blind, nowMs: Date.now(),
+    ...(track.kind === 'mantrail' ? { kind: 'mantrail' as const, mantrail: mantrail ?? null } : {}) }, reference);
   const db = await getLocalDb();
   let result: ImportedGroupTrack | null = null;
   await db.withExclusiveTransactionAsync(async tx => {
@@ -281,7 +293,7 @@ export async function importGroupTrack(userId: string, track: GroupTrack, refere
        and json_extract(case when json_valid(payload_json) then payload_json else '{}' end, '$.${GROUP_TRACK_KEY}.trackId')=? limit 1`, userId, track.trackId);
     if (again) return;
     for (const statement of plan.statements) await tx.runAsync(statement.sql, ...statement.params);
-    result = { localId: sessionId, dogId: track.dogId, blind: track.blind, searched: false };
+    result = { localId: sessionId, dogId: track.dogId, blind: track.blind, searched: false, ...(track.kind === 'mantrail' ? { kind: 'mantrail' as const } : {}) };
   });
   return result ?? (await findImportedGroupTrack(userId, track.trackId))!;
 }

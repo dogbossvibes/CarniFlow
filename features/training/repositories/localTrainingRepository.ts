@@ -18,6 +18,13 @@ const PRESERVE_LIFECYCLE_SQL =
   `'$.${TRACK_LIFECYCLE_SOURCE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_SOURCE_KEY}')) ` +
   `else json_set(?, '$.${TRACK_LIFECYCLE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}'), ` +
   `'$.${TRACK_LIFECYCLE_UPDATED_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_UPDATED_KEY}')) end else ? end`;
+// Mantrailing (Spec 02): Angaben unter payload_json.mantrail überstehen das Lege-Finalize
+// (vor dem Start erfasst: Geruchsträger, Umgebung, Wind). IGP-Fährten haben diesen Schlüssel
+// nie → für sie bleibt das Ergebnis exakt PRESERVE_LIFECYCLE_SQL (dieselben drei Platzhalter, je Zweig einmal).
+const PRESERVE_MANTRAIL_SQL =
+  `case when json_valid(payload_json) and json_type(payload_json, '$.mantrail') = 'object' ` +
+  `then json_set(${PRESERVE_LIFECYCLE_SQL}, '$.mantrail', json(json_extract(payload_json, '$.mantrail'))) ` +
+  `else ${PRESERVE_LIFECYCLE_SQL} end`;
 
 // Lokales Repository für Trainingseinheiten/Fährten-Sessions (SQLite = primäre Quelle).
 
@@ -126,8 +133,8 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   // UPDATE-Anweisung (kein Lese-/Schreibfenster). Sonst bleibt alles wie bisher: die
   // Lay-Summary wird vollständig gesetzt.
   await db.runAsync(
-    `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=${PRESERVE_LIFECYCLE_SQL}, updated_at=? where local_id=?`,
-    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, payload, payload, nowIso(), localId,
+    `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=${PRESERVE_MANTRAIL_SQL}, updated_at=? where local_id=?`,
+    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, payload, payload, payload, payload, payload, nowIso(), localId,
   );
 }
 

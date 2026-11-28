@@ -19,6 +19,10 @@ import { formatDuration, isOwnGroupTrack, lyingMs, type GroupTrack } from '@/fea
 import type { TrackTransferReference } from '@/features/tracking-transfer/reference';
 import { groupErrorCode, groupErrorText, useGroupServices } from './groupHub';
 import { findLocalGroupTrack, importGroupTrack, syncImportedBlind, type ImportedGroupTrack } from './groupTrackLocal';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { readMantrailDetails } from '@/features/mantrailing/draft';
+import { setLocalMantrailDetails } from '@/features/mantrailing/localRepository';
+import { emptyMantrailData } from '@/features/mantrailing/model';
 
 /** Eine Fährte im Gruppentraining aus Sicht von Hundeführer:in (Absuchen) oder Leger:in (Ansehen). */
 export default function GroupTrackScreen() {
@@ -58,7 +62,7 @@ export default function GroupTrackScreen() {
         try {
           const fetched = await tracks.fetch(trackId);
           ref = fetched.reference;
-          if (current.handlerUserId === userId && !local && !ownTrack) local = await importGroupTrack(userId, fetched.track, fetched.reference);
+          if (current.handlerUserId === userId && !local && !ownTrack) local = await importGroupTrack(userId, fetched.track, fetched.reference, fetched.mantrail);
         } catch (e) { if (!local) throw e; }
       }
       // Absuche lokal abgeschlossen → Status nachreichen.
@@ -103,6 +107,16 @@ export default function GroupTrackScreen() {
       if (!own) await syncImportedBlind(imported.localId, track.trackId, track.blind);
       // Status «wird abgesucht» und Liegezeit-Stopp auf dem Server; ohne Netz später nachgereicht.
       if (track.status === 'lying') await tracks.searchStart(track.trackId).catch(() => null);
+      // Mantrailing (Spec 02): eigener Bildschirm «Hund arbeitet»; Blind der Gruppe = Doppelblind.
+      if (imported.kind === 'mantrail') {
+        const details = (await readMantrailDetails(imported.localId)) ?? { ...emptyMantrailData(), trailSource: 'transfer' as const };
+        await setLocalMantrailDetails(imported.localId, { ...details, doubleBlind: track.blind });
+        const entry = useActiveFaehrten.getState().get(imported.dogId);
+        if (entry && entry.sessionId !== imported.localId) { Alert.alert(t('groups.search'), t('groups.searchFailed')); return; }
+        if (!entry) useActiveFaehrten.getState().upsert(imported.dogId, { status: 'resting', sessionId: imported.localId, kind: 'mantrail', layStartedAt: track.laidAtMs });
+        router.push(`/mantrail/run?id=${imported.localId}&dogId=${imported.dogId}` as never);
+        return;
+      }
       const decision = await applyTrackRecovery({ sessionId: imported.localId, dogId: imported.dogId, hasRemoteSearchRun: false,
         ...(auth?.user.id ? { userId: auth.user.id } : {}) });
       if (decision.ok) router.push(decision.target as never);
@@ -164,7 +178,8 @@ export default function GroupTrackScreen() {
             <AnyvoButton label={t('groups.search')} icon="play" loading={busy === 'search'} onPress={() => { void search(); }} />
           ) : null}
           {imported && (track?.status === 'searched' || imported.searched) ? (
-            <AnyvoButton label={t('groups.openResult')} variant="secondary" onPress={() => router.push(`/track/${imported.localId}` as never)} />
+            <AnyvoButton label={t('groups.openResult')} variant="secondary"
+              onPress={() => router.push((imported.kind === 'mantrail' ? `/mantrail/${imported.localId}` : `/track/${imported.localId}`) as never)} />
           ) : null}
           {!handler && track ? <Text style={[cs.hint, { textAlign: 'center' }]}>{t('groups.layerView')}</Text> : null}
           <AnyvoButton label={t('groups.toTraining')} variant="ghost"

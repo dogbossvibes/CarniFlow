@@ -47,7 +47,7 @@ describe('NEWBIE-Nutzung (Quota-Status)', () => {
     expect(src).not.toContain('membership.trainingAvailable');   // war fix „1 Training verfügbar"
   });
   it('der Client-Spiegel stimmt mit dem serverautoritativen Modell überein: 1 / 2 / 1', () => {
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1, mantrail: 1 });   // Mantrailing: eigenes Kontingent (Spec 02)
   });
 });
 
@@ -74,7 +74,7 @@ describe('Dein Plan → Deine Vorteile (NEWBIE)', () => {
   it('Training 2/Monat und Fährte 1/Monat bleiben', () => {
     expect(newbie).toContain('membership.benefit.twoTrainings');
     expect(newbie).toContain('membership.benefit.oneTrack');
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1, mantrail: 1 });   // Mantrailing: eigenes Kontingent (Spec 02)
   });
   it.each(Object.keys(FULL))('%s nennt 2 Backpack-Einträge pro Hund nur für NEWBIE', name => {
     expect(FULL[name]['membership.benefit.backpackNewbie']).toMatch(/2/);

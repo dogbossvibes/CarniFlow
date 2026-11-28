@@ -37,6 +37,8 @@ export interface ActiveFaehrte {
   gpsAccuracy:     number | null;        // m: letzte GPS-Genauigkeit (nur vorhandene Daten)
   weather:         FaehrteWeather | null;// Snapshot beim Legen
   updatedAt:       number;               // ms: letzte Aktualisierung (Sortierung/Reconcile)
+  /** Mantrailing (Spec 02). Fehlt bei IGP-Fährten (alle bisherigen Einträge) → Verhalten unverändert. */
+  kind?:           'mantrail';
 }
 
 export type ActiveFaehrtenMap = Record<string, ActiveFaehrte>;
@@ -139,6 +141,8 @@ export function upsertEntry(map: ActiveFaehrtenMap, dogId: string, patch: Partia
     weather:         patch.weather         ?? prev?.weather         ?? null,
     updatedAt:       patch.updatedAt        ?? Date.now(),
   };
+  // Art bleibt für die ganze offene Sitzung gleich; IGP-Einträge bekommen kein Feld (byte-gleich wie bisher).
+  if ((patch.kind ?? prev?.kind) === 'mantrail') next.kind = 'mantrail';
   return { ...map, [dogId]: next };
 }
 
@@ -195,6 +199,8 @@ export function faehrteElapsedSeconds(e: ActiveFaehrte, now: number): number {
 // dogId, damit der Zielscreen den richtigen Hund rehydrieren kann.
 export function reopenTarget(e: ActiveFaehrte): string {
   const q = (extra: string) => `dogId=${e.dogId}${e.sessionId ? `&id=${e.sessionId}` : ''}${extra}`;
+  // Mantrailing hat eigene Bildschirme; nie in den IGP-Fährtenablauf öffnen.
+  if (e.kind === 'mantrail') return e.status === 'laying' ? `/mantrail/legen?${q('')}` : `/mantrail/run?${q('')}`;
   switch (e.status) {
     case 'searching': return `/track/run?${q('')}`;
     case 'resting':

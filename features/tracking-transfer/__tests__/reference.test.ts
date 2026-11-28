@@ -174,3 +174,12 @@ it('#146 Folge: eine übernommene, fremd gelegte Gruppenfährte ist keine Quelle
   f.session.payload_json = JSON.stringify({ ...JSON.parse(f.session.payload_json!), groupTrack: { version: 1, trackId: '50000000-0000-4000-8000-000000000001', blind: false } });
   expect(() => projectTrackTransferSource(f.session, f.points, f.markers)).toThrow('SOURCE_UNAVAILABLE');
 });
+
+it('Mantrailing (Spec 02): direkte Übergabe nimmt nur IGP-Fährten, die Gruppen-Übergabe auch einen Trail', () => {
+  const f = fixture(); f.session.type = 'mantrail';
+  expect(() => projectTrackTransferSource(f.session, f.points, f.markers)).toThrow('SOURCE_UNAVAILABLE');
+  const g = fixture();
+  expect(projectTrackTransferSource(f.session, f.points, f.markers, { allowMantrail: true })).toEqual(projectTrackTransferSource(g.session, g.points, g.markers));
+  const other = fixture(); other.session.type = 'privat';
+  expect(() => projectTrackTransferSource(other.session, other.points, other.markers, { allowMantrail: true })).toThrow('SOURCE_UNAVAILABLE');
+});

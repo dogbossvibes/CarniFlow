@@ -101,11 +101,13 @@ export function PlanDayCard({ plan, canPlan, onPlan }: { plan: TrainingPlanDetai
     const tr = services.tracks;
     if (!tr || !plans || !sessionId || !row.handlerParticipation) return;
     const own = row.entry.handlerUserId === userId;
-    const track = await tr.assign(sessionId, row.handlerParticipation.participationId, own ? false : row.entry.blind);
+    // Mantrailing-Zeile: Trail über die Gruppen-Übergabe (Spec 02, PR B2); «blind» = Doppelblind.
+    const kind = row.entry.trackKind === 'mantrail' ? 'mantrail' as const : 'track' as const;
+    const track = await tr.assign(sessionId, row.handlerParticipation.participationId, own ? false : row.entry.blind, kind);
     onPlan(await plans.linkTrack(plan.planId, row.entry.entryId, track.trackId));
     // Bestehender Weg: Aufzeichnung, danach Übergabe an die Hundeführer:in.
     const layerDog = own ? row.handlerParticipation.dogId : myParticipations[0].dogId;
-    router.push({ pathname: '/track/legen',
+    router.push({ pathname: kind === 'mantrail' ? '/mantrail/legen' : '/track/legen',
       params: { dogId: layerDog, groupTrackId: track.trackId, groupId: plan.groupId, groupSessionId: sessionId, ...(own ? { groupOwn: '1' } : {}) } } as never);
   });
   const finishDay = () => Alert.alert(t('plans.finish'), t('plans.finishText'), [
@@ -168,11 +170,8 @@ export function PlanDayCard({ plan, canPlan, onPlan }: { plan: TrainingPlanDetai
                   <Text style={cs.rowSub}>{row.entry.layerUserId ? t('plans.layedBy', { name: row.entry.layerName ?? t('plans.formerMember') }) : t('plans.layerOpen')}</Text>
                 </View>
               </View>
-              {/* Mantrailing-Trails legt man, sobald die Mantrailing-Übergabe (#294) auf main ist. */}
-              {plan.status === 'started' && row.entry.trackKind === 'mantrail' && canLayFor(row, userId, myParticipations)
-                ? <Text style={cs.hint}>{t('plans.mantrailLater')}</Text> : null}
-              {plan.status === 'started' && row.entry.trackKind !== 'mantrail' && canLayFor(row, userId, myParticipations) ? (
-                <AnyvoButton label={t('plans.layForName', { name: row.entry.handlerName ?? t('plans.formerMember') })} icon="walk-outline" variant="secondary"
+              {plan.status === 'started' && canLayFor(row, userId, myParticipations) ? (
+                <AnyvoButton label={t(row.entry.trackKind === 'mantrail' ? 'plans.layTrailForName' : 'plans.layForName', { name: row.entry.handlerName ?? t('plans.formerMember') })} icon="walk-outline" variant="secondary"
                   loading={busy === `lay-${row.entry.entryId}`} disabled={!!busy} onPress={() => void layFor(row)} />
               ) : null}
             </View>

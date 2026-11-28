@@ -48,9 +48,12 @@ function projectSegment(v: unknown, dogId: string, sessionId: string) {
 }
 
 /** Only the completed laid reference is projected; never send this local SQL snapshot itself. */
-export function projectTrackTransferSource(session: LocalTrainingSession, points: LocalTrackPoint[], markers: LocalTrackMarker[]) {
+export function projectTrackTransferSource(session: LocalTrainingSession, points: LocalTrackPoint[], markers: LocalTrackMarker[],
+  /** Mantrailing (Spec 02): nur die Gruppen-Übergabe erlaubt einen gelegten Trail. Standard: nur IGP-Fährten. */
+  options: { allowMantrail?: boolean } = {}) {
   const payload = json(session.payload_json);
-  if (session.type !== 'track' || session.status !== 'completed' || session.deleted_at || !session.dog_id
+  const typeAllowed = session.type === 'track' || (options.allowMantrail === true && session.type === 'mantrail');
+  if (!typeAllowed || session.status !== 'completed' || session.deleted_at || !session.dog_id
     || payload.trackLifecycleStatus || payload.trackTransferReceipt
     // Übernommene Gruppenfährte (fremd gelegt): die Linie einer anderen Leger:in wird nicht weitergegeben.
     || isForeignLaidGroupTrack(payload)) throw new TransferSourceError('SOURCE_UNAVAILABLE');

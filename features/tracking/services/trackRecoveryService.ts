@@ -234,6 +234,13 @@ export async function completeTrackWithoutApp(sessionId: string | null | undefin
 }
 
 /** Sessions der Puffer mit dauerhaftem lokalem Lifecycle-Abschluss (Abbruch / ohne App). */
+async function mantrailSessionIds(ids: readonly (string | null)[]): Promise<Set<string>> {
+  const own = ids.filter((id): id is string => !!id);
+  if (own.length === 0) return new Set();
+  const rows = await Promise.all(own.map(id => getLocalTrainingSessionById(id).catch(() => null)));
+  return new Set(own.filter((_, i) => rows[i]?.type === 'mantrail'));
+}
+
 async function closedSessionIds(pendings: readonly PendingTrack[]): Promise<Set<string>> {
   const ids = pendings.map(p => p.sessionId).filter((id): id is string => !!id);
   const rows = await Promise.all(ids.map(id => getLocalTrainingSessionById(id).catch(() => null)));
@@ -256,7 +263,11 @@ export async function healActiveFaehrtenFromPending(currentUserDogIds: readonly 
       .filter((p): p is PendingTrack => !!p);
     const closed = await closedSessionIds(pendings);
     const patches = selfHealPatches(useActiveFaehrten.getState().byDog, pendings, Date.now(), currentUserDogIds, closed);
-    for (const { dogId, patch } of patches) useActiveFaehrten.getState().upsert(dogId, patch);
+    // Mantrailing (Spec 02): ein liegender Trail wird mit seiner Art registriert, damit er
+    // nie im IGP-Ablauf (Liegezeit/Absuche) geöffnet wird.
+    const mantrails = await mantrailSessionIds(patches.map(p => p.patch.sessionId ?? null));
+    for (const { dogId, patch } of patches) useActiveFaehrten.getState().upsert(dogId,
+      patch.sessionId && mantrails.has(patch.sessionId) ? { ...patch, kind: 'mantrail' } : patch);
     return patches.length;
   } catch (e) {
     console.warn('[trackRecovery] self-heal', e);

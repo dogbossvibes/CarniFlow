@@ -585,6 +585,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Punkte/Marker referenzieren ab sofort die stabile local_id — nie eine Remote-ID.
   const beginRecording = useCallback(async (input: {
     localId: string; ownerId: string | null | undefined; dogId?: string | null; meta?: LocalTrackSessionMeta;
+    /** Mantrailing (Spec 02): nur der Sitzungstyp ändert sich; Aufnahme, Hintergrund und Speicherung bleiben identisch. */
+    sessionKind?: 'mantrail';
     onSessionStarted?: () => void;
     resume?: { pending: PendingTrack; startedAt: string };
   }): Promise<{ error: string | null }> => {
@@ -666,6 +668,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     void recordBackgroundLayEvent(input.localId, 'foregroundPermission', 1, foregroundPermissionRef.current ?? 'unknown').catch(() => {});
     localSessionInputRef.current = buildLocalTrackSessionInput({
       localId: input.localId, ownerId: input.ownerId, dogId, startedAt: input.resume?.startedAt ?? nowIso(), meta: input.meta,
+      ...(input.sessionKind === 'mantrail' ? { kind: 'mantrail' as const } : {}),
     });
     // Start-Lock scharf: Stabilisierungsphase beginnt jetzt (kein Warmup-Drift als Strecke).
     startLockRef.current = true;
