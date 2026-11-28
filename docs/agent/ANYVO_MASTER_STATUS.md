@@ -1,5 +1,50 @@
 # ANYVO Master Status
 
+## Stand nach OTA #319 (iOS 60 und Android 53/54) – 2026-11-28
+
+Werte aus der Wrapper-Nachkontrolle und `eas update:list` vom 28.11.2026. Einzelheiten stehen auf den
+Release-Karten. Alle Karten seit #289 stehen auf «Live – Nachkontrolle offen»; Gerätetest offen.
+
+**Production**
+- **iOS 60** (Runtime `1.0.8-sdk58-v1`): Commit `47848b072033e731dc8ae70649f65bbd04e8e7a1`,
+  Update Group `f1329013-b4cc-4b3e-9ce6-8ace5088d91a`, Branch `release/ios60-gruppe-20261128` (lokal).
+- **Android 53/54** (Runtime `1.0.8-sdk58-android-v1`): Commit `624df9c21f84a9f8a9ca1ed1ca21ca52d0517ecf`,
+  Update Group `1bedb821-0866-4fa9-a72b-5b0cbddad450`, Branch `release/android53-gruppe-20261128` (lokal).
+- Die nächste OTA muss `47848b07` (iOS) bzw. `624df9c2` (Android) enthalten.
+- iOS 57 (SDK 54) bekommt keine OTAs mehr (Entscheid der Nutzerin).
+
+**OTA-Chargen seit #274** (je beide Plattformen, Cherry-Picks auf den aktiven Production-Stand)
+
+| Karte | Datum | Inhalt | iOS 60 | Android 53/54 |
+|---|---|---|---|---|
+| #289 | 25.11. | Fährten-Einstellungen je Hund, PDF-Details, Android-Nachzug | `861e9c58` | `cafc8b3a` |
+| #296 | 26.11. | Prüfungsbuch, geführte erste Fährte, Verleitung im Gruppentraining | `48ab838b` | `5f565210` |
+| #308 | 27.11. | Absuche GPS: Android Fused-Ortung, ungefährer Standort (PR #299) | `151e376f` | `f9a67304` |
+| #316 | 27.11. | Sprachsteuerung, Fährtenwetter, MET-Wetter, App bewerten (Profil), OTA-Startdiagnose | `809155fb` | `524407c6` |
+| #319 | 28.11. | Gruppentraining (PR #307, #310), Fährtenwetter 3 Tage (PR #317) | `47848b07` | `624df9c2` |
+
+Hinweis #319: Die 3 Tage erscheinen erst, wenn die Edge Function `track-weather` auf Production 72 h liefert
+(nicht nachgeprüft). Bereits hängende «wird gelegt»-Einträge werden nicht automatisch repariert.
+
+**Production-Migrationen am 28.11.2026** (Freigabe der Nutzerin, per SQL ausgeführt, nicht in
+`schema_migrations` eingetragen): `20261125180000_newbie_mantrail_quota`, `20261125200000_training_group_mantrail`,
+`20261126120000_training_group_plans`, `20261127120000_training_group_plan_notify`.
+`20261125090000_dog_exam_book` war bereits vorhanden.
+
+**Offene Blocker**
+- **Issue #7 (P0 Abo):** Bezahltes ACTIVE-Abo wird auf iOS und Android nicht freigeschaltet. Kein Fix gebaut.
+  Diagnose und nächste lesende Schritte (Edge-Function-Log `subscription_authority_failure`, Secrets,
+  Deploy-Stand von PR #29) in `docs/release/RELEASE_VORBEREITUNG_2026-11-28.md` (PR #321).
+
+**Auf main, nicht ausgeliefert**
+- Mantrailing PR #287, #291 (mit #294, #300, #309), Vereinsmodus PR #302, #304, #305 (mit #306),
+  Trainingswetter PR #318 und #320: Kandidaten in Vorbereitung, Testweg «Vorher» (Gerätetest vor der OTA).
+- Coach PR #312, #314, #315: Gerätetest vor einer OTA.
+- Nur per nativem Build: PR #196 (Google-Login), PR #200 (Android-Start-Logo), PR #290 Teil 2
+  (Bewertungs-Abfrage). buildNumber/versionCode und Version entscheidet die Nutzerin; versionCode muss über
+  dem Play-Stand (Build 53/54) liegen.
+
+
 ## Stand nach OTA #269 und #274 (iOS 60 und Android 53/54) – 2026-11-24
 
 Frisch aus EAS gelesen am 24.11.2026. Einzelheiten auf den Release-Karten #269 und #274 (beide «Live –
