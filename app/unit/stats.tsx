@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,8 +6,13 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { ScoreRing } from '@/components/analytics/ScoreRing';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
-import { useTrackStats } from '@/hooks/useTrackStats';
+import { useDogs } from '@/hooks/useDogs';
+import { useActiveDog } from '@/hooks/useActiveDog';
 import { computeUnitStats, type WeekBucket, type DisciplineStat, type CalendarDay } from '@/services/trainingUnitStats';
+import {
+  filterFeedForStats, hasEntriesWithoutDog, resolveStatsFilter, showStatsDogChips, trackTotals,
+  type StatsDogChoice,
+} from '@/services/statsDogFilter';
 import { useT } from '@/i18n';
 
 function formatDur(sec: number): string {
@@ -58,12 +63,22 @@ function ActivityCalendar({ calendar }: { calendar: CalendarDay[] }) {
 export default function StatsScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { feed, loading, refresh } = useTrainingFeed();
-  const { meters: trackMeters, count: trackCount, refresh: refreshTrack } = useTrackStats();
+  const { feed, loading: feedLoading, refresh } = useTrainingFeed();
+  const { dogs, loading: dogsLoading } = useDogs();
+  const { activeDogId, setActiveDog } = useActiveDog(dogs);
+  // null = dem aktiven Hund folgen; 'all' / 'none' gelten nur auf diesem Bildschirm.
+  const [choice, setChoice] = useState<StatsDogChoice>(null);
 
-  useFocusEffect(useCallback(() => { refresh(); refreshTrack(); }, [refresh, refreshTrack]));
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
-  const stats = computeUnitStats(feed);
+  const withoutDog = useMemo(() => hasEntriesWithoutDog(feed), [feed]);
+  const filter = resolveStatsFilter(choice, activeDogId, dogs.length, withoutDog);
+  const showChips = showStatsDogChips(dogs.length, withoutDog);
+  const filtered = useMemo(() => filterFeedForStats(feed, filter), [feed, filter]);
+  const loading = feedLoading || (dogsLoading && dogs.length === 0);
+
+  const stats = computeUnitStats(filtered);
+  const { meters: trackMeters, count: trackCount } = trackTotals(filtered);
   const maxDisc = Math.max(1, ...stats.byDiscipline.map(d => d.count));
 
   return (
@@ -79,13 +94,56 @@ export default function StatsScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        {!loading && showChips && (
+          <View style={s.chipRow} accessibilityRole="tablist" accessibilityLabel={t('training.statsFor')}>
+            {dogs.map(d => {
+              const on = typeof filter === 'object' && filter.dogId === d.id;
+              return (
+                <TouchableOpacity
+                  key={d.id}
+                  style={[s.chip, on && s.chipOn]}
+                  onPress={() => { setChoice(null); setActiveDog(d.id); }}
+                  activeOpacity={0.75}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={d.name}
+                >
+                  <Text style={[s.chipTxt, on && s.chipTxtOn]} numberOfLines={1}>{d.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[s.chip, filter === 'all' && s.chipOn]}
+              onPress={() => setChoice('all')}
+              activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: filter === 'all' }}
+              accessibilityLabel={t('training.statsAllDogs')}
+            >
+              <Text style={[s.chipTxt, filter === 'all' && s.chipTxtOn]}>{t('training.statsAllDogs')}</Text>
+            </TouchableOpacity>
+            {withoutDog && (
+              <TouchableOpacity
+                style={[s.chip, filter === 'none' && s.chipOn]}
+                onPress={() => setChoice('none')}
+                activeOpacity={0.75}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: filter === 'none' }}
+                accessibilityLabel={t('training.statsNoDog')}
+              >
+                <Text style={[s.chipTxt, filter === 'none' && s.chipTxtOn]}>{t('training.statsNoDog')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {loading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 40 }} />
         ) : stats.total === 0 ? (
           <View style={s.empty}>
             <Ionicons name="stats-chart-outline" size={32} color={C.subtle} />
             <Text style={s.emptyTitle}>{t('training.noData')}</Text>
-            <Text style={s.emptyTxt}>{t('training.noDataSub')}</Text>
+            <Text style={s.emptyTxt}>{feed.length > 0 ? t('training.noDataForSelection') : t('training.noDataSub')}</Text>
           </View>
         ) : (
           <>
@@ -177,6 +235,12 @@ const s = StyleSheet.create({
   backBtn:{ width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   eyebrow:{ fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
   title:  { fontSize: 22, color: C.white, fontWeight: '900', letterSpacing: -0.4 },
+
+  chipRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 4 },
+  chip:      { maxWidth: 160, minHeight: 36, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border },
+  chipOn:    { borderColor: `${C.accent}80`, backgroundColor: C.accentDim },
+  chipTxt:   { fontSize: 13, color: C.muted, fontWeight: '600' },
+  chipTxtOn: { color: C.accent },
 
   scroll:  { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 4 },
