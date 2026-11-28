@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { HOME_ZONE_NS } from "@/features/home-zone/i18n";
+import { OFFLINE_MAPS_NS } from "@/features/offline-maps/i18n";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
@@ -105,6 +106,7 @@ export default function ProfilScreen() {
 
   const { t, locale } = useT();
   const { t: homeZoneText } = useTranslation(HOME_ZONE_NS);
+  const { t: offlineMapsText } = useTranslation(OFFLINE_MAPS_NS);
   const storeUpdateStatus = useSyncExternalStore(subscribeStoreUpdateStatus, getStoreUpdateStatus, getStoreUpdateStatus);
   const spracheLabel = NATIVE_NAME[locale];
   // Diagnose der OTA-Startprüfung (nur lokal, letzter Eintrag); beim Öffnen des Profils neu lesen.
@@ -813,6 +815,12 @@ export default function ProfilScreen() {
             icon="home-outline"
             label={homeZoneText('profileRow')}
             onPress={() => router.push('/home-zone' as never)}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="map-outline"
+            label={offlineMapsText('profileRow')}
+            onPress={() => router.push('/offline-maps' as never)}
           />
           <View style={s.trenner} />
           <EinstellungZeile
