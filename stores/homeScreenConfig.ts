@@ -155,7 +155,7 @@ export const QUICK_BUTTON_ACTIONS_META: Partial<Record<QuickActionId, { icon: st
 
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
   week:            { label: 'Wochenübersicht',  icon: 'calendar-outline', description: 'Trainingstage dieser Woche' },
-  track_weather:   { label: 'Trainingswetter',  icon: 'partly-sunny-outline', description: 'Ampel fürs Training, bei Fährtenhunden auch für die Fährte' },
+  track_weather:   { label: 'Trainingswetter',  icon: 'partly-sunny-outline', description: 'Ampel fürs Training, je nach Sparte auch für Fährte und Mantrailing' },
   smart_analysis:  { label: 'Smart Analyse',    icon: 'sparkles-outline', description: 'Coach & deterministische Hinweise' },
   quick_actions:   { label: 'Schnell starten',  icon: 'flash-outline',    description: 'Deine Schnellzugriffe' },
   recent_sessions: { label: 'Letzte Einheiten', icon: 'time-outline',     description: 'Zuletzt erfasste Einheiten' },
