@@ -68,9 +68,12 @@ function HourBar({ hours }: { hours: HourRating[] }) {
 
 /**
  * Karte auf dem Startbildschirm: oben das Trainingswetter (für jedes Training),
- * darunter die Fährten-Unterkarte – nur wenn `showTrack` (ein Hund macht Fährte).
+ * darunter je eine Unterkarte für Fährte bzw. Mantrailing – nur wenn ein Hund die
+ * Sparte macht (`showTrack`, `showMantrail`). Beide haben eigene Regeln.
  */
-export function TrackWeatherCard({ onOpen, onHide, showTrack = true }: { onOpen?: () => void; onHide?: () => void; showTrack?: boolean }) {
+export function TrackWeatherCard({ onOpen, onOpenMantrail, onHide, showTrack = true, showMantrail = false }: {
+  onOpen?: () => void; onOpenMantrail?: () => void; onHide?: () => void; showTrack?: boolean; showMantrail?: boolean;
+}) {
   const t = useWeatherT();
   const { view, requestPermission } = useTrackWeather();
   if (view.kind === 'off') return null;
@@ -117,7 +120,7 @@ export function TrackWeatherCard({ onOpen, onHide, showTrack = true }: { onOpen?
     );
   }
 
-  const { rating, training } = view;
+  const { rating, training, mantrail } = view;
   const temp = training.current.temperature;
   const later = betterLaterWindow(training);
   const summary = [
@@ -132,7 +135,8 @@ export function TrackWeatherCard({ onOpen, onHide, showTrack = true }: { onOpen?
       {header(<LevelPill level={training.level} />)}
       {summary.length > 0 && <Text style={s.body}>{summary}</Text>}
       {nextDays.length > 0 && <Text style={s.muted}>{nextDays}</Text>}
-      {showTrack && <TrackSection rating={rating} onOpen={onOpen} />}
+      {showTrack && <SportSection kind="track" rating={rating} onOpen={onOpen} />}
+      {showMantrail && mantrail && <SportSection kind="mantrail" rating={mantrail} onOpen={onOpenMantrail} />}
       <View style={s.row}>
         <Text style={s.muted}>{view.fromCache ? t('asOf', { time: formatClock(view.fetchedAtMs) }) : t('hint')}</Text>
         <Text style={s.muted}>{t('source')}</Text>
@@ -141,8 +145,15 @@ export function TrackWeatherCard({ onOpen, onHide, showTrack = true }: { onOpen?
   );
 }
 
-/** Fährten-Unterkarte: eigene Ampel, bestes Fenster; aufklappbar Stunden und Tage. */
-function TrackSection({ rating, onOpen }: { rating: TrackWeatherRating; onOpen?: () => void }) {
+type SportRating = Pick<TrackWeatherRating, 'level' | 'reasons' | 'bestWindow' | 'hours' | 'days'>;
+const SPORT = {
+  track: { title: 'trackSection', more: 'trackMore', icon: 'leaf-outline' },
+  mantrail: { title: 'mantrailSection', more: 'mantrailMore', icon: 'walk-outline' },
+} as const;
+
+/** Unterkarte Fährte/Mantrailing: eigene Ampel, bestes Fenster; aufklappbar Stunden und Tage. */
+function SportSection({ kind, rating, onOpen }: { kind: keyof typeof SPORT; rating: SportRating; onOpen?: () => void }) {
+  const sport = SPORT[kind];
   const t = useWeatherT();
   const [open, setOpen] = useState(false);
   const w = rating.bestWindow;
@@ -154,8 +165,8 @@ function TrackSection({ rating, onOpen }: { rating: TrackWeatherRating; onOpen?:
       <Pressable accessibilityRole={onOpen ? 'button' : 'text'} onPress={onOpen} disabled={!onOpen} style={s.subHead}>
         <View style={s.row}>
           <View style={s.titleRow}>
-            <Ionicons name="leaf-outline" size={15} color={C.trackTextSec} />
-            <Text style={s.subTitle}>{t('trackSection')}</Text>
+            <Ionicons name={sport.icon} size={15} color={C.trackTextSec} />
+            <Text style={s.subTitle}>{t(sport.title)}</Text>
           </View>
           <LevelPill level={rating.level} />
         </View>
@@ -170,10 +181,10 @@ function TrackSection({ rating, onOpen }: { rating: TrackWeatherRating; onOpen?:
         </View>
       </Pressable>
       <Pressable
-        accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${t('trackMore')}. ${daysSummary}`}
+        accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${t(sport.more)}. ${daysSummary}`}
         onPress={() => setOpen(!open)} style={s.dayRow} hitSlop={4}
       >
-        <Text style={[s.muted, { flex: 1 }]} numberOfLines={2}>{daysSummary || t('trackMore')}</Text>
+        <Text style={[s.muted, { flex: 1 }]} numberOfLines={2}>{daysSummary || t(sport.more)}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={C.trackTextSec} />
       </Pressable>
       {open && (

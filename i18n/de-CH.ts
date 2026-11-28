@@ -1092,7 +1092,7 @@ export const deCH = {
   'home.widgetDogBackpack': 'Backpack',
   'home.widgetDogBackpackDesc': 'Backpack eines Hundes',
   'home.widgetTrackWeather': 'Trainingswetter',
-  'home.widgetTrackWeatherDesc': 'Ampel fürs Training, bei Fährtenhunden auch für die Fährte',
+  'home.widgetTrackWeatherDesc': 'Ampel fürs Training, je nach Sparte auch für Fährte und Mantrailing',
   'fab.title': 'Schnellbutton',
   'fab.selectTitle': 'Schnellaktion auswählen',
   'fab.visible': 'Button anzeigen',

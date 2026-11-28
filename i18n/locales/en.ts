@@ -1046,7 +1046,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "home.widgetDogBackpack": "Backpack",
   "home.widgetDogBackpackDesc": "Backpack as dogss",
   "home.widgetTrackWeather": "Training weather",
-  "home.widgetTrackWeatherDesc": "Traffic light for training, for tracking dogs also for tracking",
+  "home.widgetTrackWeatherDesc": "Traffic light for training, and for tracking or mantrailing by discipline",
   "fab.title": "quick button",
   "fab.selectTitle": "Choose quick action",
   "fab.visible": "button show",
