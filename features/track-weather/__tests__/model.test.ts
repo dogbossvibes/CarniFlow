@@ -182,3 +182,47 @@ describe('Beschaffenheit vor Ort (Lege-Screen)', () => {
     expect(rateTrackingWeather(hours, at(9), BERN, TZ)!.level).toBe('good');
   });
 });
+
+describe('Nächste Tage', () => {
+  // Bern, 15.–17. April, Tageslicht ~06:40–20:10 Ortszeit
+  const series = (fromLocal: number, count: number, over: (localHour: number) => Partial<WeatherHour> = () => ({})) =>
+    Array.from({ length: count }, (_, i) => hour(at(fromLocal + i), over((fromLocal + i) % 24)));
+
+  it('heute, morgen, übermorgen, wenn die Vorhersage das Tageslicht abdeckt', () => {
+    const hours = series(6, 66); // 15. 06:00 bis 17. 23:00
+    const res = rateTrackingWeather(hours, at(6), BERN, TZ)!;
+    expect(res.days.map(d => d.offset)).toEqual([0, 1, 2]);
+    expect(res.days[1].dayStartMs).toBe(at(24));
+    expect(res.days.every(d => d.hours.every(h => h.daylight))).toBe(true);
+    expect(res.days[1].level).toBe('good');
+  });
+
+  it('lässt einen Tag weg, dessen Tageslicht nicht ganz bekannt ist', () => {
+    const hours = series(20, 38); // 15. 20:00 bis 17. 09:00
+    const res = rateTrackingWeather(hours, at(20), BERN, TZ)!;
+    expect(res.days.map(d => d.offset)).toEqual([1]); // heute kein Tageslicht mehr, übermorgen unvollständig
+  });
+
+  it('Tagesstufe = bestes Fenster, mit Grund aus dieser Stunde', () => {
+    // morgen: bis 14 Uhr stürmisch, ab 15 Uhr ruhig
+    const hours = series(6, 66, h => (h >= 15 ? { windSpeed: 3 } : { windSpeed: 35, windGust: 60 }));
+    const tomorrow = rateTrackingWeather(hours, at(6), BERN, TZ)!.days[1];
+    expect(tomorrow.level).toBe('good');
+    expect(tomorrow.bestWindow).toMatchObject({ startMs: at(24 + 15), level: 'good', startsNow: false });
+    expect(tomorrow.reasons.map(r => r.key)).toContain('calm');
+  });
+
+  it('ein ganz schwieriger Tag bleibt schwierig', () => {
+    const hours = series(6, 66, () => ({ temperature: 31 }));
+    const d = rateTrackingWeather(hours, at(6), BERN, TZ)!.days[2];
+    expect(d.level).toBe('hard');
+    expect(d.reasons.map(r => r.key)).toContain('heat');
+  });
+
+  it('Verlauf behält genug Stunden für Vergangenheit und drei Tage', () => {
+    const now = at(12);
+    const fresh = Array.from({ length: 72 }, (_, i) => hour(now + i * HOUR_MS));
+    const prev = Array.from({ length: 12 }, (_, i) => hour(now - (12 - i) * HOUR_MS));
+    expect(mergeHourHistory(prev, fresh, now)).toHaveLength(84);
+  });
+});
