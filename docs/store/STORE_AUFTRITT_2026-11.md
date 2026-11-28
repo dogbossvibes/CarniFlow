@@ -1,4 +1,4 @@
-# ANYVO – Store-Auftritt (Vorschlag, Stand 2026-11-24)
+# ANYVO – Store-Auftritt (Vorschlag, Stand 2026-11-24, Datenschutz-Abschnitt 2026-11-28)
 
 Quelle: Marktanalyse und Roadmap vom 24.11.2026, Quick Win «Store-Auftritt schärfen».
 Kernbotschaft: **alles in einer App** – Fährte, Unterordnung, Schutzdienst, Gesundheit,
@@ -67,10 +67,15 @@ wiederholen) – 87 Zeichen
 > • Fährten mit deinem Trainer teilen und Rückmeldungen erhalten
 > • Gruppentraining: Fährte für eine andere Hundeführerin legen und übergeben
 >
-> DEINE DATEN
-> • Mehrere Hunde in einem Konto
-> • Heimzone: Koordinaten rund um dein Zuhause werden beim Export entfernt
+> DEINE DATEN GEHÖREN DIR
+> • Deine Fährten sind privat. Andere sehen sie nur, wenn du sie teilst, und du kannst jede Freigabe zurücknehmen
+> • Heimzone: Rund um dein Zuhause schneidet ANYVO die Strecke beim Teilen und Exportieren ab
+> • Daten in der EU, keine Werbung, kein Werbe-Tracking
+> • Deine Trainingsdaten gehen an keinen KI-Anbieter
 > • Einträge werden zuerst auf dem Gerät gespeichert und später synchronisiert
+> • Konto und alle Daten jederzeit selbst in der App löschen
+>
+> Mehrere Hunde in einem Konto.
 >
 > ANYVO gibt es kostenlos zum Ausprobieren. Weitere Funktionen gibt es im Abo; Preise und Bedingungen siehst du in der App vor dem Kauf.
 
@@ -146,10 +151,15 @@ Nur Entwurf, vor dem Upload von einer englischsprachigen Person gegenlesen lasse
 > • Share tracks with your trainer and get feedback
 > • Group training: lay a track for another handler and hand it over
 >
-> YOUR DATA
-> • Several dogs in one account
-> • Home zone: coordinates around your home are removed when you export
+> YOUR DATA STAYS YOURS
+> • Your tracks are private. Others only see them if you share them, and you can revoke any share
+> • Home zone: ANYVO cuts the area around your home from shared and exported tracks
+> • Data stored in the EU, no ads, no ad tracking
+> • Your training data is never sent to an AI provider
 > • Entries are saved on the device first and synced later
+> • Delete your account and all data yourself, right in the app
+>
+> Several dogs in one account.
 >
 > Try ANYVO for free. More features are available with a subscription; prices and terms are shown in the app before you buy.
 
@@ -209,6 +219,7 @@ Hinweise für neue Aufnahmen:
 | Gruppentraining, Übergabe | `app/groups/`, `app/groups/handover.tsx` |
 | Heimzone | `app/home-zone.tsx`, `features/home-zone/` |
 | Lokal zuerst, später Sync | `features/sync/`, `OFFLINE_README.md` |
+| Datenschutz-Abschnitt «Deine Daten gehören dir» | siehe `DATENSCHUTZ_KOMMUNIKATION_2026-11.md`, Abschnitt 1 (Stand 2026-11-28) |
 
 Vor dem Upload prüfen: Gilt «kostenlos zum Ausprobieren» so für beide Stores
 (Gratisstufe/Probe)? Text bei Bedarf an die aktuellen Abo-Bedingungen anpassen.
