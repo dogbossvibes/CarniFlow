@@ -11,6 +11,10 @@ export interface FeedItem extends TrainingUnit {
   source: FeedSource;
   /** Nur GPS-Fährten: Länge der gelegten Fährte in Metern (sonst undefined). */
   distance_meters?: number | null;
+  /** Nur GPS-Fährten: Startkoordinate der Fährte, falls gespeichert (nur lesen). */
+  place?: { lat: number; lng: number } | null;
+  /** Nur GPS-Fährten: frei eingegebener Ortsname, falls vorhanden. */
+  location_name?: string | null;
 }
 
 export function sessionToFeedItem(s: TrainingSession): FeedItem {
@@ -94,6 +98,8 @@ export function trackRowToFeedItem(t: any): FeedItem {
     exercises:    [exercise],
     source:       'track',
     distance_meters: t.distance_meters ?? null,
+    place: typeof t.latitude === 'number' && typeof t.longitude === 'number' ? { lat: t.latitude, lng: t.longitude } : null,
+    location_name: typeof t.location_name === 'string' ? t.location_name : null,
   };
 }
 
