@@ -7,7 +7,7 @@ import { LEVEL_RANK, observedGroundFromCondition, type DayOutlook, type HourRati
 import { TRACK_WEATHER_NS, dayKey, levelKey, nowKey, reasonKey } from './i18n';
 import { useTrackWeather } from './useTrackWeather';
 
-// Fährtenwetter — Anzeige. Nur Darstellung; Bewertung in model.ts.
+// Trainings- und Fährtenwetter — Anzeige. Nur Darstellung; Bewertung in model.ts und trainingModel.ts.
 
 const LEVEL_COLOR: Record<TrackWeatherLevel, string> = { good: C.trackPrimary, medium: C.trackWarning, hard: C.trackDanger };
 const LEVEL_DIM: Record<TrackWeatherLevel, string> = {
@@ -31,7 +31,7 @@ function reasonText(t: ReturnType<typeof useWeatherT>, r: Reason): string {
 }
 
 /** «Besser ab …», wenn ein späteres Fenster besser ist als jetzt. */
-export function betterLaterWindow(rating: TrackWeatherRating) {
+export function betterLaterWindow(rating: Pick<TrackWeatherRating, 'bestWindow' | 'level'>) {
   const w = rating.bestWindow;
   if (!w || w.startsNow) return null;
   return LEVEL_RANK[w.level] < LEVEL_RANK[rating.level] ? w : null;
@@ -66,8 +66,11 @@ function HourBar({ hours }: { hours: HourRating[] }) {
   );
 }
 
-/** Variante A: Karte auf dem Startbildschirm. */
-export function TrackWeatherCard({ onOpen, onHide }: { onOpen?: () => void; onHide?: () => void }) {
+/**
+ * Karte auf dem Startbildschirm: oben das Trainingswetter (für jedes Training),
+ * darunter die Fährten-Unterkarte – nur wenn `showTrack` (ein Hund macht Fährte).
+ */
+export function TrackWeatherCard({ onOpen, onHide, showTrack = true }: { onOpen?: () => void; onHide?: () => void; showTrack?: boolean }) {
   const t = useWeatherT();
   const { view, requestPermission } = useTrackWeather();
   if (view.kind === 'off') return null;
@@ -75,8 +78,8 @@ export function TrackWeatherCard({ onOpen, onHide }: { onOpen?: () => void; onHi
   const header = (right?: React.ReactNode) => (
     <View style={s.row}>
       <View style={s.titleRow}>
-        <Ionicons name="leaf-outline" size={16} color={C.trackTextSec} />
-        <Text style={s.title}>{t('title')}</Text>
+        <Ionicons name="partly-sunny-outline" size={16} color={C.trackTextSec} />
+        <Text style={s.title}>{t('trainingTitle')}</Text>
       </View>
       {right}
     </View>
@@ -104,38 +107,82 @@ export function TrackWeatherCard({ onOpen, onHide }: { onOpen?: () => void; onHi
       </View>
     );
   }
-  if (view.kind === 'unavailable' || view.kind === 'stale') {
+  if (view.kind === 'unavailable' || view.kind === 'stale' || !view.training) {
+    const stale = view.kind === 'stale' || view.kind === 'ready';
     return (
       <View style={s.card}>
         {header(<Ionicons name="cloud-offline-outline" size={16} color={C.trackTextMut} />)}
-        <Text style={s.muted}>{view.kind === 'stale' ? t('stale', { time: formatClock(view.fetchedAtMs) }) : t('unavailable')}</Text>
+        <Text style={s.muted}>{stale ? t('stale', { time: formatClock(view.fetchedAtMs) }) : t('unavailable')}</Text>
       </View>
     );
   }
 
-  const { rating } = view;
-  const w = rating.bestWindow;
+  const { rating, training } = view;
+  const temp = training.current.temperature;
+  const later = betterLaterWindow(training);
+  const summary = [
+    temp != null ? `${Math.round(temp)} °C` : null,
+    ...training.reasons.filter(r => !(r.key === 'tMild' && temp != null)).map(r => reasonText(t, r)),
+    later ? t('betterFrom', { from: formatClock(later.startMs) }) : null,
+  ].filter(Boolean).join(' · ');
+  const nextDays = training.days.filter(d => d.offset > 0)
+    .map(d => t('dayShort', { day: t(dayKey(d.offset)), level: t(levelKey(d.level)) })).join(' · ');
   return (
-    <Pressable accessibilityRole="button" onPress={onOpen} disabled={!onOpen} style={s.card}>
-      {header(<LevelPill level={rating.level} />)}
-      {rating.reasons.length > 0 && (
-        <Text style={s.body}>{rating.reasons.map(r => reasonText(t, r)).join(' · ')}</Text>
-      )}
-      <HourBar hours={rating.hours} />
-      <View style={[s.window, { backgroundColor: w ? LEVEL_DIM[w.level] : 'rgba(255,255,255,0.05)' }]}>
-        <Ionicons name="time-outline" size={15} color={w ? LEVEL_COLOR[w.level] : C.trackTextSec} />
-        <Text style={[s.windowTxt, { color: w ? LEVEL_COLOR[w.level] : C.trackTextSec }]}>
-          {w
-            ? `${w.startsNow ? t('windowNow', { to: formatClock(w.endMs) }) : t('window', { from: formatClock(w.startMs), to: formatClock(w.endMs) })} · ${t(levelKey(w.level))}`
-            : t('noWindow')}
-        </Text>
-      </View>
-      <DayList days={rating.days} />
+    <View style={s.card}>
+      {header(<LevelPill level={training.level} />)}
+      {summary.length > 0 && <Text style={s.body}>{summary}</Text>}
+      {nextDays.length > 0 && <Text style={s.muted}>{nextDays}</Text>}
+      {showTrack && <TrackSection rating={rating} onOpen={onOpen} />}
       <View style={s.row}>
         <Text style={s.muted}>{view.fromCache ? t('asOf', { time: formatClock(view.fetchedAtMs) }) : t('hint')}</Text>
         <Text style={s.muted}>{t('source')}</Text>
       </View>
-    </Pressable>
+    </View>
+  );
+}
+
+/** Fährten-Unterkarte: eigene Ampel, bestes Fenster; aufklappbar Stunden und Tage. */
+function TrackSection({ rating, onOpen }: { rating: TrackWeatherRating; onOpen?: () => void }) {
+  const t = useWeatherT();
+  const [open, setOpen] = useState(false);
+  const w = rating.bestWindow;
+  const daysSummary = rating.days.map(d => (d.bestWindow
+    ? t('dayShortWindow', { day: t(dayKey(d.offset)), from: formatClock(d.bestWindow.startMs), to: formatClock(d.bestWindow.endMs) })
+    : t('dayShort', { day: t(dayKey(d.offset)), level: t(levelKey(d.level)) }))).join(' · ');
+  return (
+    <View style={s.sub}>
+      <Pressable accessibilityRole={onOpen ? 'button' : 'text'} onPress={onOpen} disabled={!onOpen} style={s.subHead}>
+        <View style={s.row}>
+          <View style={s.titleRow}>
+            <Ionicons name="leaf-outline" size={15} color={C.trackTextSec} />
+            <Text style={s.subTitle}>{t('trackSection')}</Text>
+          </View>
+          <LevelPill level={rating.level} />
+        </View>
+        {rating.reasons.length > 0 && <Text style={s.body}>{rating.reasons.map(r => reasonText(t, r)).join(' · ')}</Text>}
+        <View style={[s.window, { backgroundColor: w ? LEVEL_DIM[w.level] : 'rgba(255,255,255,0.05)' }]}>
+          <Ionicons name="time-outline" size={15} color={w ? LEVEL_COLOR[w.level] : C.trackTextSec} />
+          <Text style={[s.windowTxt, { color: w ? LEVEL_COLOR[w.level] : C.trackTextSec }]}>
+            {w
+              ? `${w.startsNow ? t('windowNow', { to: formatClock(w.endMs) }) : t('window', { from: formatClock(w.startMs), to: formatClock(w.endMs) })} · ${t(levelKey(w.level))}`
+              : t('noWindow')}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${t('trackMore')}. ${daysSummary}`}
+        onPress={() => setOpen(!open)} style={s.dayRow} hitSlop={4}
+      >
+        <Text style={[s.muted, { flex: 1 }]} numberOfLines={2}>{daysSummary || t('trackMore')}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={C.trackTextSec} />
+      </Pressable>
+      {open && (
+        <View style={{ gap: 8 }}>
+          <HourBar hours={rating.hours} />
+          <DayList days={rating.days} />
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -235,6 +282,9 @@ const s = StyleSheet.create({
   window: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
   windowTxt: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
   day: { borderTopWidth: 1, borderTopColor: C.trackBorder },
+  sub: { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: C.trackBorder, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingTop: 10, gap: 4 },
+  subHead: { gap: 6 },
+  subTitle: { color: C.trackText, fontSize: 14, fontWeight: '700' },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   dayName: { flex: 1, color: C.trackText, fontSize: 14, fontWeight: '600' },
   dayBody: { gap: 4, paddingBottom: 10 },

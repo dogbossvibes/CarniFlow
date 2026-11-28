@@ -110,7 +110,7 @@ describe('deriveTrackWeatherView', () => {
     const cache = { lat: 46.95, lng: 7.44, fetchedAtMs: now, hours: [h(Date.UTC(2026, 3, 15, 8)), h(Date.UTC(2026, 3, 15, 9))] };
     const v = deriveTrackWeatherView({ status: 'ok', cache, fromCache: false }, now, 120);
     expect(v.kind).toBe('ready');
-    if (v.kind === 'ready') expect(v.rating.level).toBe('good');
+    if (v.kind === 'ready') { expect(v.rating.level).toBe('good'); expect(v.training?.level).toBe('good'); }
     const frozen = deriveTrackWeatherView({ status: 'ok', cache, fromCache: false }, now, 120, 'frozen');
     if (frozen.kind === 'ready') expect(frozen.rating.level).toBe('medium');
     expect(frozen.kind).toBe('ready');
