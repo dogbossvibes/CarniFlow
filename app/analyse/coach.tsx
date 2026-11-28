@@ -14,6 +14,7 @@ import { TrainingBalanceCard } from '@/features/ai/components/TrainingBalanceCar
 import { ScoreTrendCard } from '@/features/ai/components/ScoreTrendCard';
 import { EmptyCoachState } from '@/features/ai/components/EmptyCoachState';
 import { CoachWeekSection } from '@/features/ai/components/CoachWeekSection';
+import { CoachAskCard } from '@/features/ai/components/CoachAskCard';
 import type { AiInsight, InsightCta, CoachRecommendation } from '@/features/ai/types/aiCoach';
 
 const SEV_RANK = { critical: 0, warning: 1, info: 2, success: 3 } as const;
@@ -63,6 +64,9 @@ export default function CoachScreen() {
 
         {/* Coach · Wochenvorschlag je Hund (Spec 05) */}
         {isPro ? <View style={{ marginTop: 16 }}><CoachWeekSection /></View> : null}
+
+        {/* Coach · Fragen zur Prüfungsordnung, Antworten mit Fundstelle aus der Wissensbibliothek */}
+        {isPro ? <View style={{ marginTop: 16 }}><CoachAskCard /></View> : null}
 
         {isLoading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />
