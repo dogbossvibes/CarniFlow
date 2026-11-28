@@ -50,3 +50,21 @@ export function pathDistanceM(points: { lat: number; lng: number; breakBefore?: 
   }
   return sum;
 }
+
+// Startzeit einer unterbrochenen Absuche aus VORHANDENEN Daten ableiten, damit die
+// Suchdauer nach einem Neustart weiterläuft statt bei 00:00 zu beginnen.
+// Reihenfolge: Puffer (searchStartedAt) → Registry desselben Laufs → frühester
+// gespeicherter Suchpunkt (untere Schranke, Altformat ohne Startzeit) → jetzt.
+// Nur endliche, positive Zeiten bis `now` gelten; nichts wird verändert.
+export function resolveSearchStartedAt(src: {
+  pendingStartedAt?: number | null;
+  registryStartedAt?: number | null;
+  pointTimesMs?: readonly number[];
+  now: number;
+}): number {
+  const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= src.now;
+  if (ok(src.pendingStartedAt)) return src.pendingStartedAt;
+  if (ok(src.registryStartedAt)) return src.registryStartedAt;
+  const earliest = (src.pointTimesMs ?? []).filter(ok).reduce<number | null>((m, t) => (m == null || t < m ? t : m), null);
+  return earliest ?? src.now;
+}

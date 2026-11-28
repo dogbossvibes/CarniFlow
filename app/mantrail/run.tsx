@@ -111,7 +111,9 @@ export default function MantrailRunScreen() {
     if (!id || !dogId || !s.ready || phase !== 'ready') return;
     hapticSuccess();
     const entry = useActiveFaehrten.getState().get(dogId);
-    const resume = entry?.status === 'searching' && entry.sessionId === id && source && source.searchPoints.length > 0 && entry.searchStartedAt
+    // Laufende Suche desselben Trails fortsetzen — auch ohne gespeicherte Punkte, damit
+    // die Suchdauer nach einem Neustart ab dem gespeicherten Start weiterläuft (nicht 00:00).
+    const resume = entry?.status === 'searching' && entry.sessionId === id && source && entry.searchStartedAt
       ? { points: source.searchPoints, startedAtMs: entry.searchStartedAt } : undefined;
     const startedAt = resume?.startedAtMs ?? clock();
     startedAtRef.current = startedAt;
