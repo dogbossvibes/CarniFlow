@@ -125,6 +125,8 @@ export function buildLocalTrackDetail(
     points: points.map(p => ({
       latitude: p.latitude, longitude: p.longitude, point_type: p.point_type ?? 'lay',
       accuracy: p.accuracy ?? null, timestamp: p.timestamp, ...readContinuityPoint(p.payload_json),
+      // GPS-Höhe nur fürs Höhenprofil der Laufauswertung; wie remote (track_points.altitude).
+      ...(typeof p.altitude === 'number' && Number.isFinite(p.altitude) ? { altitude: p.altitude } : {}),
     })),
     markers: markers.map(m => ({
       id: payload.trackTransferReceipt ? (parseObj(m.payload_json)?.sourceMarkerId ?? m.local_id) : m.local_id, marker_type: m.marker_type, latitude: m.latitude, longitude: m.longitude,

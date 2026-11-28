@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useT } from '@/i18n';
 import { useSearchZoomLevel } from '@/features/tracking/hooks/useSearchZoomLevel';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
+import { OfflineAttribution, OfflineTileLayers, useIsOnline, useOfflineLayerSources } from '@/features/offline-maps/OfflineTileLayer';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleClassify';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
@@ -514,6 +515,10 @@ export function TrackingMap({
     }
   };
 
+  // Offline-Karten: Quellen beim ersten Rendern fixiert (siehe useOfflineLayerSources).
+  const offlineSources = useOfflineLayerSources();
+  const isOnline = useIsOnline(offlineSources.length > 0);
+
   if (!MAPS_AVAILABLE || !RNMaps) {
     return (
       <View style={[s.fallback, style]}>
@@ -567,6 +572,8 @@ export function TrackingMap({
           latitudeDelta: 0.0016, longitudeDelta: 0.0016,
         }}
       >
+        {/* Offline-Karte: immer erstes Kind = unterste Ebene unter allen Linien und Markern. */}
+        <OfflineTileLayers UrlTile={RNMaps.UrlTile} sources={offlineSources} online={isOnline} />
         {/* Referenz-Fährten anderer eigener Hunde: zuerst + zIndex 1 → immer unter
             der aktuellen Lay-Linie (zIndex 2/3). */}
         {distractionDraft && <DistractionLines tracks={[distractionDraft]} Polyline={Polyline} Marker={Marker} />}
@@ -763,6 +770,7 @@ export function TrackingMap({
           </Marker>
         )}
       </MapView>
+      <OfflineAttribution sources={offlineSources} online={isOnline} />
       <MarkerDetailSheet selection={groupSelection} onClose={() => setGroupSelection(null)} />
 
 
