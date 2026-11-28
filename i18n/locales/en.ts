@@ -1039,6 +1039,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "home.widgetQuickActionsDesc": "Your quick actions",
   "home.widgetRecentSessions": "Recent sessions",
   "home.widgetRecentSessionsDesc": "Your most recently logged sessions",
+  "home.widgetBadges": "Badges",
+  "home.widgetBadgesDesc": "Achievements with levels I–III and your next goal",
   "home.widgetDogs": "My dogs",
   "home.widgetDogsDesc": "Overview of your dogs",
   "home.widgetDogBackpack": "Backpack",
